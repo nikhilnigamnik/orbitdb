@@ -1,6 +1,6 @@
 import * as React from 'react'
 import type { RowSelectionState } from '@tanstack/react-table'
-import { IconDownload, IconPlus, IconRefresh, IconTrash, IconX } from '@tabler/icons-react'
+import { IconDownload, IconRefresh, IconTrash, IconX } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
