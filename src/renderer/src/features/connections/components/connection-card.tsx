@@ -1,8 +1,13 @@
 import * as React from 'react'
-import { IconDotsVertical, IconPencil, IconTrash, IconChevronDown } from '@tabler/icons-react'
+import {
+  IconDotsVertical,
+  IconLoader,
+  IconPencil,
+  IconPlugConnected,
+  IconTrash
+} from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Popover } from '@renderer/components/ui/popover'
-import { Spinner } from '@renderer/components/ui/spinner'
 import { ENGINE_LABEL } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import type { SavedConnection } from '@renderer/types'
@@ -81,19 +86,35 @@ export function ConnectionCard({
         type="button"
         onClick={isActive ? onDisconnect : onConnect}
         disabled={isConnecting}
+        aria-label={isActive ? 'Disconnect' : isConnecting ? 'Connecting' : 'Connect'}
         className={cn(
-          'flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
-          isActive
-            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
-            : 'border-border bg-surface-elevated text-text hover:bg-surface-elevated/70'
+          'group/connect flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed',
+          isConnecting
+            ? 'border-border bg-surface-elevated/60 text-text-muted'
+            : isActive
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+              : 'border-border bg-surface-elevated text-text hover:bg-surface-elevated/70'
         )}
       >
         {isConnecting ? (
-          <Spinner size={12} className="text-current" />
+          <>
+            <IconLoader stroke={2} size={12} className="animate-spin" />
+            <span>Connecting…</span>
+          </>
+        ) : isActive ? (
+          <>
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            </span>
+            <span>Connected</span>
+          </>
         ) : (
-          <span className="truncate max-w-40">{connection.database || 'connect'}</span>
+          <>
+            <IconPlugConnected size={12} className="opacity-70" />
+            <span>Connect</span>
+          </>
         )}
-        <IconChevronDown size={12} className="opacity-60" />
       </button>
 
       <div className="shrink-0">
@@ -103,14 +124,14 @@ export function ConnectionCard({
           align="end"
           popoverContentClassName="w-36 overflow-hidden shadow-xl shadow-black/40"
           content={
-            <div className="flex flex-col py-1">
+            <div className="flex flex-col p-1">
               <button
                 type="button"
                 onClick={() => {
                   setMenuOpen(false)
                   onEdit()
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-text hover:bg-surface-elevated"
+                className="flex w-full rounded-md px-1.5 py-1.5 items-center gap-2 text-left text-xs text-text hover:bg-surface-elevated"
               >
                 <IconPencil size={13} />
                 Edit
@@ -121,7 +142,7 @@ export function ConnectionCard({
                   setMenuOpen(false)
                   onDelete()
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-red-400 hover:bg-red-500/10"
+                className="flex w-full rounded-md px-1.5 py-1.5 items-center gap-2 text-left text-xs text-red-400 hover:bg-red-500/10"
               >
                 <IconTrash size={13} />
                 Delete
@@ -132,7 +153,7 @@ export function ConnectionCard({
           <Button
             size="icon-xs"
             variant="ghost"
-            className="text-text-muted hover:bg-surface-elevated hover:text-text"
+            className="cursor-pointer text-text-muted hover:bg-surface-elevated hover:text-text"
             aria-label="More actions"
           >
             <IconDotsVertical size={14} />

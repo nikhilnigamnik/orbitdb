@@ -1,15 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  IconPlus,
-  IconPlug,
-  IconRefresh,
-  IconArrowsSort,
-  IconWorld,
-  IconBrandX,
-  IconBrandGithub,
-  IconBrandDiscord
-} from '@tabler/icons-react'
+import { IconPlus, IconPlug, IconRefresh, IconArrowsSort } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Popover } from '@renderer/components/ui/popover'
 import { EmptyState } from '@renderer/components/common/empty-state'
@@ -22,7 +13,7 @@ import { useConnection } from '../store/connection-store'
 import { ConnectionCard } from './connection-card'
 import { ConnectionFormSheet } from './connection-form-sheet'
 import { ROUTES } from '@renderer/config/routes'
-import { APP_NAME, APP_TAGLINE, APP_VERSION } from '@renderer/config/site'
+import { APP_NAME } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import orbitdbLogo from '@renderer/assets/orbitdb-white.png'
 import type { SavedConnection } from '@renderer/types'
@@ -116,187 +107,141 @@ export function ConnectionsPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center px-6 pt-8 pb-8">
-      <div className="flex w-full max-w-2xl flex-1 flex-col">
-        <h1 className="text-[44px] font-bold leading-none tracking-tight text-text">Dashboard</h1>
-
-        <div className="mt-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-accent/40 to-accent/10">
-              <img src={orbitdbLogo} alt={APP_NAME} className="h-7 w-7" />
-            </div>
-            <div className="min-w-0">
+    <div className="flex min-h-full flex-col items-center p-1 bg-bg">
+      <div className="rounded-lg bg-surface flex-1 flex-col w-full">
+        <div className="mx-auto w-full max-w-2xl flex-col px-6 py-10">
+          <div className="mt-8 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
+                <img src={orbitdbLogo} alt={APP_NAME} className="h-7 w-7" />
                 <span className="truncate text-[18px] font-semibold text-text">{APP_NAME}</span>
-                <span className="rounded-md bg-surface-elevated px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-muted">
-                  Local
-                </span>
               </div>
-              <p className="truncate text-[12px] text-text-subtle">{APP_TAGLINE}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="rounded-md border border-border bg-surface px-3 text-text-muted hover:bg-surface-elevated hover:text-text"
+                onClick={refresh}
+                disabled={isLoading}
+                title="Refresh"
+              >
+                <IconRefresh size={14} className={isLoading ? 'animate-spin' : ''} />
+                Refresh
+              </Button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="mt-12 flex items-center justify-between gap-4">
+            <h2 className="text-2xl font-bold leading-none tracking-tight text-text">
+              Connections
+            </h2>
             <Button
               size="sm"
-              variant="ghost"
-              className="rounded-full border border-border bg-surface px-3 text-text-muted hover:bg-surface-elevated hover:text-text"
-              onClick={refresh}
-              disabled={isLoading}
-              title="Refresh"
+              className="rounded-lg bg-accent px-3.5 text-white hover:bg-accent/90"
+              onClick={openCreate}
             >
-              <IconRefresh size={14} className={isLoading ? 'animate-spin' : ''} />
-              Refresh
+              <IconPlus size={14} />
+              Add new
             </Button>
           </div>
-        </div>
 
-        <div className="mt-12 flex items-center justify-between gap-4">
-          <h2 className="text-[28px] font-bold leading-none tracking-tight text-text">
-            Connections
-          </h2>
-          <Button
-            size="sm"
-            className="rounded-full bg-accent px-3.5 text-white hover:bg-accent/90"
-            onClick={openCreate}
-          >
-            <IconPlus size={14} />
-            Add new
-          </Button>
-        </div>
-
-        <div className="mt-5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-1 rounded-full border border-border bg-surface p-0.5">
-            {TABS.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={cn(
-                  'rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors',
-                  activeTab === tab
-                    ? 'bg-surface-elevated text-text'
-                    : 'text-text-muted hover:text-text'
-                )}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          <Popover
-            openPopover={sortOpen}
-            setOpenPopover={setSortOpen}
-            align="end"
-            popoverContentClassName="w-48 overflow-hidden shadow-xl shadow-black/40"
-            content={
-              <div className="flex flex-col py-1">
-                {(Object.keys(SORT_LABEL) as SortMode[]).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => {
-                      setSort(key)
-                      setSortOpen(false)
-                    }}
-                    className={cn(
-                      'flex w-full items-center px-3 py-2 text-left text-[13px] hover:bg-surface-elevated',
-                      sort === key ? 'text-text' : 'text-text-muted'
-                    )}
-                  >
-                    {SORT_LABEL[key]}
-                  </button>
-                ))}
-              </div>
-            }
-          >
-            <button
-              type="button"
-              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] text-text-muted hover:text-text"
-            >
-              <IconArrowsSort size={13} />
-              {SORT_LABEL[sort]}
-            </button>
-          </Popover>
-        </div>
-
-        <div className="mt-4 flex flex-1 flex-col gap-3">
-          {connectError && <ErrorState title="Failed to connect" message={connectError} />}
-          {error && (
-            <ErrorState title="Failed to load connections" message={error} onRetry={refresh} />
-          )}
-
-          {isLoading ? (
-            <div className="flex flex-1 items-center justify-center py-16">
-              <Spinner size={20} />
-            </div>
-          ) : sorted.length === 0 ? (
-            <EmptyState
-              icon={<IconPlug size={20} />}
-              title="No connections yet"
-              description="Add a Postgres, MySQL, or D1 connection to start exploring."
-              action={
-                <Button
-                  size="sm"
-                  className="rounded-full bg-accent px-3.5 text-white hover:bg-accent/90"
-                  onClick={openCreate}
+          <div className="mt-5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-1 rounded-full border border-border bg-surface p-0.5">
+              {TABS.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={cn(
+                    'rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors',
+                    activeTab === tab
+                      ? 'bg-surface-elevated text-text'
+                      : 'text-text-muted hover:text-text'
+                  )}
                 >
-                  <IconPlus size={14} />
-                  Add new
-                </Button>
-              }
-            />
-          ) : (
-            sorted.map((connection) => (
-              <ConnectionCard
-                key={connection.id}
-                connection={connection}
-                isActive={active?.connectionId === connection.id}
-                isConnecting={isConnecting && pendingConnectId === connection.id}
-                onConnect={() => handleConnect(connection)}
-                onDisconnect={() => void disconnect()}
-                onEdit={() => openEdit(connection)}
-                onDelete={() => confirmDelete(connection)}
-              />
-            ))
-          )}
-        </div>
+                  {tab}
+                </button>
+              ))}
+            </div>
 
-        <div className="mt-12 flex items-center justify-between border-t border-border pt-4 text-text-subtle">
-          <div className="flex items-center gap-3">
-            <a
-              href="https://orbitdb.local"
-              onClick={(e) => e.preventDefault()}
-              className="rounded p-1 hover:text-text"
-              title="Website"
+            <Popover
+              openPopover={sortOpen}
+              setOpenPopover={setSortOpen}
+              align="end"
+              popoverContentClassName="w-48 overflow-hidden shadow-xl shadow-black/40"
+              content={
+                <div className="flex flex-col p-1">
+                  {(Object.keys(SORT_LABEL) as SortMode[]).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        setSort(key)
+                        setSortOpen(false)
+                      }}
+                      className={cn(
+                        'flex w-full cursor-pointer rounded-md items-center px-1.5 py-1.5 text-left text-xs hover:bg-surface-elevated',
+                        sort === key ? 'text-text' : 'text-text-muted'
+                      )}
+                    >
+                      {SORT_LABEL[key]}
+                    </button>
+                  ))}
+                </div>
+              }
             >
-              <IconWorld size={14} />
-            </a>
-            <a
-              href="https://x.com"
-              onClick={(e) => e.preventDefault()}
-              className="rounded p-1 hover:text-text"
-              title="X"
-            >
-              <IconBrandX size={14} />
-            </a>
-            <a
-              href="https://discord.com"
-              onClick={(e) => e.preventDefault()}
-              className="rounded p-1 hover:text-text"
-              title="Discord"
-            >
-              <IconBrandDiscord size={14} />
-            </a>
-            <a
-              href="https://github.com"
-              onClick={(e) => e.preventDefault()}
-              className="rounded p-1 hover:text-text"
-              title="GitHub"
-            >
-              <IconBrandGithub size={14} />
-            </a>
+              <button
+                type="button"
+                className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-[12.5px] text-text-muted hover:text-text"
+              >
+                <IconArrowsSort size={13} />
+                {SORT_LABEL[sort]}
+              </button>
+            </Popover>
           </div>
-          <span className="text-[11.5px]">Current version v{APP_VERSION}</span>
+
+          <div className="mt-4 flex flex-1 flex-col gap-3">
+            {connectError && <ErrorState title="Failed to connect" message={connectError} />}
+            {error && (
+              <ErrorState title="Failed to load connections" message={error} onRetry={refresh} />
+            )}
+
+            {isLoading ? (
+              <div className="flex flex-1 items-center justify-center py-16">
+                <Spinner size={20} />
+              </div>
+            ) : sorted.length === 0 ? (
+              <EmptyState
+                icon={<IconPlug size={20} />}
+                title="No connections yet"
+                description="Add a Postgres, MySQL, or D1 connection to start exploring."
+                action={
+                  <Button
+                    size="sm"
+                    className="rounded-full bg-accent px-3.5 text-white hover:bg-accent/90"
+                    onClick={openCreate}
+                  >
+                    <IconPlus size={14} />
+                    Add new
+                  </Button>
+                }
+              />
+            ) : (
+              sorted.map((connection) => (
+                <ConnectionCard
+                  key={connection.id}
+                  connection={connection}
+                  isActive={active?.connectionId === connection.id}
+                  isConnecting={isConnecting && pendingConnectId === connection.id}
+                  onConnect={() => handleConnect(connection)}
+                  onDisconnect={() => void disconnect()}
+                  onEdit={() => openEdit(connection)}
+                  onDelete={() => confirmDelete(connection)}
+                />
+              ))
+            )}
+          </div>
         </div>
       </div>
 
