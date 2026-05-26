@@ -15,7 +15,7 @@ import { ConnectionFormSheet } from './connection-form-sheet'
 import { ROUTES } from '@renderer/config/routes'
 import { APP_NAME } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
-import orbitdbLogo from '@renderer/assets/orbitdb-white.png'
+import orbitdbLogo from '@renderer/assets/orbitdb-cream.png'
 import type { SavedConnection } from '@renderer/types'
 
 type SortMode = 'name-asc' | 'name-desc' | 'recent'
