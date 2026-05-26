@@ -1,18 +1,25 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  IconChevronDown,
   IconChevronRight,
   IconTable,
   IconEye,
+  IconLoader,
   IconRefresh,
-  IconSearch
+  IconSearch,
+  IconDatabase
 } from '@tabler/icons-react'
-import { Spinner } from '@renderer/components/ui/spinner'
 import { Input } from '@renderer/components/ui/input'
 import { Button } from '@renderer/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from '@renderer/components/ui/collapsible'
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
+import { formatNumber } from '@renderer/lib/format'
 import { tableRoute } from '@renderer/config/routes'
 import type { TableInfo } from '@renderer/types'
 
@@ -101,119 +108,177 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
     return !lowered || value.toLowerCase().includes(lowered)
   }
 
+  const filteredSchemas = schemas.filter((schema) => {
+    if (matchesFilter(schema)) return true
+    const tables = tablesBySchema[schema]?.tables ?? []
+    return tables.some((t) => matchesFilter(t.name))
+  })
+  React.useEffect(() => {
+    if (!lowered) return
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      let changed = false
+      for (const [schema, state] of Object.entries(tablesBySchema)) {
+        if (state.tables?.some((t) => matchesFilter(t.name)) && !next.has(schema)) {
+          next.add(schema)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lowered, tablesBySchema])
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-3 pt-3 pb-2">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
-            Schemas
-          </span>
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            className="text-[var(--color-text-subtle)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text)]"
-            onClick={() => {
-              setTablesBySchema({})
-              onRefresh()
-            }}
-            title="Refresh"
-          >
-            <IconRefresh size={11} className={isLoading ? 'animate-spin' : ''} />
-          </Button>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 px-3 pt-4 pb-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10 text-accent">
+              <IconDatabase size={13} />
+            </div>
+            <div className="flex flex-col leading-tight">
+              <span className="text-[12.5px] font-semibold text-text">Schemas</span>
+            </div>
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                className="text-text-subtle hover:bg-surface-elevated hover:text-text"
+                onClick={() => {
+                  setTablesBySchema({})
+                  onRefresh()
+                }}
+                aria-label="Refresh schemas"
+              >
+                <IconRefresh size={12} className={isLoading ? 'animate-spin' : ''} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Refresh schemas</TooltipContent>
+          </Tooltip>
         </div>
         <div className="relative">
           <IconSearch
-            size={11}
-            className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-subtle)]"
+            size={12}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
           />
           <Input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Search…"
-            className="h-7 border-transparent bg-[var(--color-surface-elevated)] pl-7 text-[12px] focus-visible:border-[var(--color-border-strong)]"
+            placeholder="Search tables…"
+            className="h-8 border-border bg-surface-elevated/50 pl-7 text-[12px] placeholder:text-text-subtle/70 focus-visible:border-accent/40 focus-visible:bg-surface-elevated focus-visible:ring-accent/20"
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-1.5 pb-2">
+      <div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
         {isLoading && schemas.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <Spinner size={14} />
+          <div className="flex items-center justify-center py-10 text-text-subtle">
+            <IconLoader stroke={2} size={18} className="animate-spin" />
           </div>
         ) : schemas.length === 0 ? (
-          <p className="px-3 py-2 text-[11.5px] text-[var(--color-text-subtle)]">No schemas.</p>
+          <div className="flex flex-col items-center justify-center gap-1 py-10 px-4 text-center">
+            <IconDatabase size={20} className="text-text-subtle" />
+            <p className="text-[12px] font-medium text-text">No schemas</p>
+            <p className="text-[10.5px] text-text-subtle">This database has no visible schemas.</p>
+          </div>
+        ) : filteredSchemas.length === 0 ? (
+          <p className="px-3 py-3 text-center text-[11.5px] text-text-subtle">
+            No matches for "{filter}"
+          </p>
         ) : (
-          schemas.filter(matchesFilter).map((schema) => {
+          filteredSchemas.map((schema) => {
             const isOpen = expanded.has(schema)
             const state = tablesBySchema[schema]
-            const filteredTables = state?.tables.filter((t) => matchesFilter(t.name)) ?? []
+            const allTables = state?.tables ?? []
+            const filteredTables = allTables.filter((t) => matchesFilter(t.name))
+            const isSchemaActive = activeSchema === schema
             return (
-              <div key={schema} className="mb-0.5">
-                <button
-                  onClick={() => toggleSchema(schema)}
+              <Collapsible
+                key={schema}
+                open={isOpen}
+                onOpenChange={() => toggleSchema(schema)}
+                className="mb-1"
+              >
+                <CollapsibleTrigger
                   className={cn(
-                    'flex w-full items-center gap-1 rounded-md px-2 py-1 text-left text-[12px] font-medium transition-colors',
-                    activeSchema === schema
-                      ? 'text-[var(--color-text)]'
-                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                    'group flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[12.5px] font-medium transition-colors',
+                    isSchemaActive
+                      ? 'text-text'
+                      : 'text-text-muted hover:bg-surface-elevated/40 hover:text-text'
                   )}
                 >
-                  {isOpen ? (
-                    <IconChevronDown size={11} className="text-[var(--color-text-subtle)]" />
-                  ) : (
-                    <IconChevronRight size={11} className="text-[var(--color-text-subtle)]" />
-                  )}
+                  <IconChevronRight
+                    size={12}
+                    className={cn(
+                      'shrink-0 text-text-subtle transition-transform duration-200',
+                      isOpen && 'rotate-90'
+                    )}
+                  />
                   <span className="truncate">{schema}</span>
-                </button>
+                  {state && !state.isLoading && (
+                    <span className="ml-auto text-[10px] text-text-subtle">
+                      {filter ? filteredTables.length : allTables.length}
+                    </span>
+                  )}
+                </CollapsibleTrigger>
 
-                {isOpen && (
-                  <div className="ml-2 mt-0.5 pl-1">
+                <CollapsibleContent>
+                  <div className="ml-3 mt-0.5 pl-2">
                     {state?.isLoading ? (
-                      <div className="px-3 py-1">
-                        <Spinner size={11} />
+                      <div className="flex items-center justify-center px-3 py-3 text-text-subtle">
+                        <IconLoader stroke={2} size={14} className="animate-spin" />
                       </div>
                     ) : state?.error ? (
-                      <p className="px-3 py-1 text-[11px] text-red-400/80">{state.error}</p>
+                      <p className="px-3 py-1.5 text-[11px] text-red-400/80">{state.error}</p>
                     ) : filteredTables.length === 0 ? (
-                      <p className="px-3 py-1 text-[11px] text-[var(--color-text-subtle)]">
-                        {lowered ? 'No matches' : 'Empty'}
+                      <p className="px-3 py-1.5 text-[11px] text-text-subtle">
+                        {lowered ? 'No matches' : 'Empty schema'}
                       </p>
                     ) : (
                       filteredTables.map((table) => {
-                        const isActive = activeSchema === schema && activeTable === table.name
-                        const Icon =
-                          table.type === 'view' || table.type === 'materialized_view'
-                            ? IconEye
-                            : IconTable
+                        const isActive = isSchemaActive && activeTable === table.name
+                        const isView = table.type === 'view' || table.type === 'materialized_view'
+                        const Icon = isView ? IconEye : IconTable
                         return (
                           <button
                             key={table.name}
                             onClick={() => selectTable(schema, table)}
                             className={cn(
-                              'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[12px] transition-colors',
+                              'group/row flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors',
                               isActive
-                                ? 'bg-[var(--color-surface-elevated)] text-[var(--color-text)]'
-                                : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-elevated)]/50 hover:text-[var(--color-text)]'
+                                ? 'bg-surface-elevated text-text'
+                                : 'text-text-muted hover:bg-surface-elevated/50 hover:text-text'
                             )}
                             title={table.name}
                           >
                             <Icon
-                              size={11}
+                              size={12}
                               className={cn(
                                 'shrink-0',
-                                isActive
-                                  ? 'text-[var(--color-text-muted)]'
-                                  : 'text-[var(--color-text-subtle)]'
+                                isActive ? 'text-text-muted' : 'text-text-subtle'
                               )}
                             />
                             <span className="truncate">{table.name}</span>
+                            {isView && (
+                              <span className="ml-auto rounded bg-surface-elevated px-1 py-0 text-[9px] font-medium uppercase tracking-wide text-text-subtle">
+                                view
+                              </span>
+                            )}
+                            {!isView && table.estimatedRows != null && table.estimatedRows > 0 && (
+                              <span className="ml-auto font-mono text-[10px] text-text-subtle opacity-0 transition-opacity group-hover/row:opacity-100">
+                                {formatNumber(table.estimatedRows)}
+                              </span>
+                            )}
                           </button>
                         )
                       })
                     )}
                   </div>
-                )}
-              </div>
+                </CollapsibleContent>
+              </Collapsible>
             )
           })
         )}

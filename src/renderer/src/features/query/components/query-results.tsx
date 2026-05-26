@@ -1,4 +1,4 @@
-import { Badge } from '@renderer/components/ui/badge'
+import { IconAlertTriangle, IconCheck, IconLoader, IconTable } from '@tabler/icons-react'
 import { formatCellValue, formatNumber } from '@renderer/lib/format'
 import type { QueryResult } from '@renderer/types'
 
@@ -10,27 +10,33 @@ interface QueryResultsProps {
 export function QueryResults({ result, isRunning }: QueryResultsProps) {
   if (isRunning) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-neutral-500">
-        Running…
+      <div className="flex h-full items-center justify-center text-text-subtle">
+        <IconLoader stroke={2} size={20} className="animate-spin" />
       </div>
     )
   }
   if (!result) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-neutral-500">
-        Run a query to see results.
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-text-subtle">
+        <IconTable size={22} className="text-text-subtle/60" />
+        <p className="text-[12px]">Run a query to see results</p>
       </div>
     )
   }
   if (!result.success) {
     return (
-      <div className="p-4">
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="danger">Error</Badge>
-            <span className="text-xs text-neutral-400">{result.durationMs} ms</span>
-          </div>
-          <p className="mt-2 break-all font-mono text-xs text-red-300/80">{result.error}</p>
+      <div className="flex h-full flex-col">
+        <div className="flex shrink-0 items-center gap-3 border-b border-border bg-surface/40 px-4 py-2 text-[11.5px]">
+          <span className="flex items-center gap-1 rounded-md bg-red-500/10 px-1.5 py-0.5 text-[10.5px] font-medium text-red-400">
+            <IconAlertTriangle size={11} />
+            Error
+          </span>
+          <span className="font-mono text-text-subtle">{result.durationMs} ms</span>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          <pre className="whitespace-pre-wrap break-words rounded-md border border-red-500/20 bg-red-500/5 p-3 font-mono text-[12px] text-red-300/90">
+            {result.error}
+          </pre>
         </div>
       </div>
     )
@@ -40,33 +46,41 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-neutral-800 px-3 py-2 text-xs">
-        <Badge variant="success">OK</Badge>
-        {result.command && <span className="font-mono text-neutral-400">{result.command}</span>}
-        {result.rowCount != null && (
-          <span className="text-neutral-400">
-            {formatNumber(result.rowCount)} row{result.rowCount === 1 ? '' : 's'}
+      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-surface/40 px-4 py-2 text-[11.5px]">
+        <span className="flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10.5px] font-medium text-emerald-400">
+          <IconCheck size={11} />
+          OK
+        </span>
+        {result.command && (
+          <span className="rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[10.5px] uppercase tracking-wide text-text-muted">
+            {result.command}
           </span>
         )}
-        <span className="text-neutral-500">{result.durationMs} ms</span>
+        {result.rowCount != null && (
+          <span className="text-text-subtle">
+            <span className="font-mono text-text">{formatNumber(result.rowCount)}</span> row
+            {result.rowCount === 1 ? '' : 's'}
+          </span>
+        )}
+        <span className="ml-auto font-mono text-text-subtle">{result.durationMs} ms</span>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         {fields.length === 0 ? (
-          <div className="p-4 text-sm text-neutral-500">
+          <div className="flex h-full items-center justify-center text-[12px] text-text-subtle">
             Query executed successfully. No rows returned.
           </div>
         ) : (
-          <table className="min-w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-neutral-900/95 backdrop-blur">
+          <table className="min-w-full border-separate border-spacing-0 text-[12.5px]">
+            <thead className="sticky top-0 z-10">
               <tr>
-                <th className="w-10 border-b border-neutral-800 px-2 py-2 text-left text-xs font-medium text-neutral-500">
+                <th className="w-10 border-b border-border bg-surface px-3 py-2 text-left text-[10.5px] font-medium text-text-subtle">
                   #
                 </th>
                 {fields.map((f) => (
                   <th
                     key={f.name}
-                    className="border-b border-neutral-800 px-3 py-2 text-left text-xs font-semibold text-neutral-300"
+                    className="border-b border-border bg-surface px-3 py-2 text-left text-[11.5px] font-medium text-text-muted"
                   >
                     {f.name}
                   </th>
@@ -75,18 +89,20 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
             </thead>
             <tbody>
               {result.rows.map((row, idx) => (
-                <tr key={idx} className="border-b border-neutral-800/60">
-                  <td className="px-2 py-1.5 text-xs text-neutral-600">{idx + 1}</td>
+                <tr key={idx} className="group cursor-default transition-colors hover:bg-surface-elevated/40">
+                  <td className="border-b border-border/60 px-3 py-1.5 text-[10.5px] text-text-subtle">
+                    {idx + 1}
+                  </td>
                   {fields.map((f) => {
                     const value = row[f.name]
                     return (
                       <td
                         key={f.name}
-                        className="max-w-xs truncate px-3 py-1.5 font-mono text-xs text-neutral-200"
+                        className="max-w-xs truncate border-b border-border/60 px-3 py-1.5 font-mono text-[11.5px] text-text"
                         title={formatCellValue(value)}
                       >
                         {value === null ? (
-                          <span className="text-neutral-600 italic">NULL</span>
+                          <span className="italic text-text-subtle">NULL</span>
                         ) : (
                           formatCellValue(value)
                         )}

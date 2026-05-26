@@ -1,7 +1,7 @@
 import * as React from 'react'
-import { IconPlus, IconRefresh } from '@tabler/icons-react'
+import type { RowSelectionState } from '@tanstack/react-table'
+import { IconPlus, IconRefresh, IconTrash, IconX } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
-import { Spinner } from '@renderer/components/ui/spinner'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { unwrap } from '@renderer/lib/ipc'
@@ -17,7 +17,7 @@ import type {
 import { DataGrid } from './data-grid'
 import { FiltersBar } from './filters-bar'
 import { PaginationBar } from './pagination-bar'
-import { RowEditorModal } from './row-editor-modal'
+import { RowEditorSheet } from './row-editor-sheet'
 
 interface TableDataViewProps {
   connectionId: string
@@ -39,10 +39,26 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
   const insertModal = useDisclosure(false)
   const editModal = useDisclosure(false)
   const deleteConfirm = useDisclosure(false)
+  const bulkDeleteConfirm = useDisclosure(false)
   const [editingRow, setEditingRow] = React.useState<Record<string, unknown> | null>(null)
   const [pendingDelete, setPendingDelete] = React.useState<Record<string, unknown> | null>(null)
   const [mutationError, setMutationError] = React.useState<string | null>(null)
   const [isMutating, setIsMutating] = React.useState(false)
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
+
+  const selectedRows = React.useMemo(
+    () =>
+      Object.keys(rowSelection)
+        .filter((key) => rowSelection[key])
+        .map((key) => rows[Number(key)])
+        .filter(Boolean),
+    [rowSelection, rows]
+  )
+  const selectedCount = selectedRows.length
+
+  React.useEffect(() => {
+    setRowSelection({})
+  }, [rows])
 
   const canMutate = details.type === 'table' && details.primaryKey.length > 0
 
@@ -84,10 +100,13 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
   }, [load])
 
   function handleSort(column: string) {
-    if (orderBy === column) {
-      setOrderDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
+    if (orderBy !== column) {
       setOrderBy(column)
+      setOrderDir('asc')
+    } else if (orderDir === 'asc') {
+      setOrderDir('desc')
+    } else {
+      setOrderBy(null)
       setOrderDir('asc')
     }
     setOffset(0)
@@ -148,23 +167,52 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
     }
   }
 
+  async function handleBulkDelete() {
+    if (selectedRows.length === 0) return
+    setIsMutating(true)
+    setMutationError(null)
+    try {
+      await Promise.all(
+        selectedRows.map((row) => {
+          const pk: Record<string, unknown> = {}
+          for (const key of details.primaryKey) pk[key] = row[key]
+          return unwrap(
+            window.api.db.deleteRow({
+              connectionId,
+              schema: details.schema,
+              table: details.name,
+              pk
+            })
+          )
+        })
+      )
+      setRowSelection({})
+      await load()
+      bulkDeleteConfirm.close()
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2">
-        <div className="flex items-center gap-2 text-[12px]">
-          {isLoading ? (
-            <Spinner size={12} />
-          ) : (
-            <span className="text-[var(--color-text-subtle)]">
-              {rows.length} row{rows.length === 1 ? '' : 's'}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-2">
+        <FiltersBar
+          columns={columns}
+          filters={filters}
+          onChange={setFilters}
+          onApply={() => {
+            setOffset(0)
+            void load()
+          }}
+        />
+        <div className="flex items-center gap-1.5">
           <Button
             size="sm"
             variant="ghost"
-            className="text-[var(--color-text-muted)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text)]"
+            className="text-text-muted hover:bg-surface-elevated hover:text-text"
             onClick={load}
             disabled={isLoading}
           >
@@ -178,21 +226,11 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
               onClick={insertModal.open}
             >
               <IconPlus size={12} />
-              Insert
+              Insert row
             </Button>
           )}
         </div>
       </div>
-
-      <FiltersBar
-        columns={columns}
-        filters={filters}
-        onChange={setFilters}
-        onApply={() => {
-          setOffset(0)
-          void load()
-        }}
-      />
 
       {error && (
         <div className="p-3">
@@ -212,22 +250,59 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
         </div>
       )}
 
-      <DataGrid
-        columns={columns}
-        rows={rows}
-        orderBy={orderBy}
-        orderDir={orderDir}
-        onSort={handleSort}
-        onEditRow={(row) => {
-          setEditingRow(row)
-          editModal.open()
-        }}
-        onDeleteRow={(row) => {
-          setPendingDelete(row)
-          deleteConfirm.open()
-        }}
-        canMutate={canMutate}
-      />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <DataGrid
+          columns={columns}
+          rows={rows}
+          orderBy={orderBy}
+          orderDir={orderDir}
+          onSort={handleSort}
+          onEditRow={(row) => {
+            setEditingRow(row)
+            editModal.open()
+          }}
+          onDeleteRow={(row) => {
+            setPendingDelete(row)
+            deleteConfirm.open()
+          }}
+          canMutate={canMutate}
+          rowOffset={offset}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+          isLoading={isLoading}
+        />
+
+        {canMutate && selectedCount > 0 && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center">
+            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-surface px-2 py-1.5 shadow-lg shadow-black/40">
+              <span className="pl-2 text-[12px] text-text">
+                <span className="font-mono text-text">{selectedCount}</span>
+                <span className="text-text-subtle">
+                  {' '}
+                  row{selectedCount === 1 ? '' : 's'} selected
+                </span>
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 gap-1 rounded-full px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+                onClick={() => setRowSelection({})}
+              >
+                <IconX size={12} />
+                Clear
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 gap-1 rounded-full bg-red-500/90 px-2.5 text-white hover:bg-red-500"
+                onClick={bulkDeleteConfirm.open}
+              >
+                <IconTrash size={12} />
+                Delete {selectedCount}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <PaginationBar
         offset={offset}
@@ -241,7 +316,7 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
         }}
       />
 
-      <RowEditorModal
+      <RowEditorSheet
         isOpen={insertModal.isOpen}
         onClose={insertModal.close}
         mode="insert"
@@ -249,7 +324,7 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
         onSubmit={handleInsert}
       />
 
-      <RowEditorModal
+      <RowEditorSheet
         isOpen={editModal.isOpen}
         onClose={editModal.close}
         mode="edit"
@@ -268,6 +343,17 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
         title="Delete row?"
         description={`This will permanently delete the row from ${details.schema}.${details.name}.`}
         confirmLabel={isMutating ? 'Deleting…' : 'Delete row'}
+        variant="danger"
+        isLoading={isMutating}
+      />
+
+      <ConfirmDialog
+        isOpen={bulkDeleteConfirm.isOpen}
+        onClose={bulkDeleteConfirm.close}
+        onConfirm={handleBulkDelete}
+        title={`Delete ${selectedCount} row${selectedCount === 1 ? '' : 's'}?`}
+        description={`This will permanently delete ${selectedCount} row${selectedCount === 1 ? '' : 's'} from ${details.schema}.${details.name}.`}
+        confirmLabel={isMutating ? 'Deleting…' : `Delete ${selectedCount}`}
         variant="danger"
         isLoading={isMutating}
       />

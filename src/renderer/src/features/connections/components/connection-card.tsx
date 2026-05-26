@@ -1,10 +1,12 @@
 import * as React from 'react'
 import { IconDotsVertical, IconPencil, IconTrash, IconChevronDown } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Popover } from '@renderer/components/ui/popover'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { ENGINE_LABEL } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import type { SavedConnection } from '@renderer/types'
+import { ENGINE_ICON } from './engine-icons'
 
 interface ConnectionCardProps {
   connection: SavedConnection
@@ -16,12 +18,11 @@ interface ConnectionCardProps {
   onDelete: () => void
 }
 
-const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; text: string; label: string }> =
-  {
-    postgres: { bg: 'bg-sky-500/15', text: 'text-sky-300', label: 'Pg' },
-    mysql: { bg: 'bg-orange-500/15', text: 'text-orange-300', label: 'My' },
-    d1: { bg: 'bg-amber-500/15', text: 'text-amber-300', label: 'D1' }
-  }
+const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; iconClass: string }> = {
+  postgres: { bg: 'bg-sky-500/10', iconClass: 'text-sky-300' },
+  mysql: { bg: 'bg-orange-500/10', iconClass: 'text-orange-300' },
+  d1: { bg: 'bg-amber-500/10', iconClass: 'text-amber-300' }
+}
 
 function hostLabel(connection: SavedConnection): string {
   if (connection.engine === 'd1') {
@@ -40,17 +41,8 @@ export function ConnectionCard({
   onDelete
 }: ConnectionCardProps) {
   const [menuOpen, setMenuOpen] = React.useState(false)
-  const menuRef = React.useRef<HTMLDivElement | null>(null)
   const engine = ENGINE_STYLES[connection.engine]
-
-  React.useEffect(() => {
-    if (!menuOpen) return
-    const onClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    window.addEventListener('mousedown', onClick)
-    return () => window.removeEventListener('mousedown', onClick)
-  }, [menuOpen])
+  const EngineIcon = ENGINE_ICON[connection.engine]
 
   return (
     <div
@@ -63,13 +55,13 @@ export function ConnectionCard({
     >
       <div
         className={cn(
-          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold',
+          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
           engine.bg,
-          engine.text
+          engine.iconClass
         )}
         aria-hidden
       >
-        {engine.label}
+        <EngineIcon className="h-5 w-5" />
       </div>
 
       <div className="min-w-0 flex-1">
@@ -99,47 +91,53 @@ export function ConnectionCard({
         {isConnecting ? (
           <Spinner size={12} className="text-current" />
         ) : (
-          <span className="truncate max-w-[10rem]">{connection.database || 'connect'}</span>
+          <span className="truncate max-w-40">{connection.database || 'connect'}</span>
         )}
         <IconChevronDown size={12} className="opacity-60" />
       </button>
 
-      <div ref={menuRef} className="relative shrink-0">
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          className="text-text-muted hover:bg-surface-elevated hover:text-text"
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label="More actions"
+      <div className="shrink-0">
+        <Popover
+          openPopover={menuOpen}
+          setOpenPopover={setMenuOpen}
+          align="end"
+          popoverContentClassName="w-36 overflow-hidden shadow-xl shadow-black/40"
+          content={
+            <div className="flex flex-col py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onEdit()
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-text hover:bg-surface-elevated"
+              >
+                <IconPencil size={13} />
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onDelete()
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-red-400 hover:bg-red-500/10"
+              >
+                <IconTrash size={13} />
+                Delete
+              </button>
+            </div>
+          }
         >
-          <IconDotsVertical size={14} />
-        </Button>
-        {menuOpen && (
-          <div className="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-lg border border-border bg-surface shadow-xl shadow-black/40 animate-in fade-in-0 zoom-in-95 duration-150">
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false)
-                onEdit()
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-text hover:bg-surface-elevated"
-            >
-              <IconPencil size={13} />
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false)
-                onDelete()
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-red-400 hover:bg-red-500/10"
-            >
-              <IconTrash size={13} />
-              Delete
-            </button>
-          </div>
-        )}
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            className="text-text-muted hover:bg-surface-elevated hover:text-text"
+            aria-label="More actions"
+          >
+            <IconDotsVertical size={14} />
+          </Button>
+        </Popover>
       </div>
     </div>
   )

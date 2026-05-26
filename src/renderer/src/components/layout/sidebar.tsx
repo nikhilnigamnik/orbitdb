@@ -4,8 +4,7 @@ import { cn } from '@renderer/lib/utils'
 import { APP_NAME } from '@renderer/config/site'
 import { ROUTES } from '@renderer/config/routes'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
-import { shortServerVersion } from '@renderer/lib/format'
-import { ENGINE_LABEL } from '@renderer/config/site'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import orbitdbLogo from '@renderer/assets/orbitdb-white.png'
 
 const NAV_ITEMS = [
@@ -23,12 +22,12 @@ export function Sidebar() {
   const isConnectionsActive = !isBrowserActive && !isQueryActive
 
   return (
-    <aside className="m-2 flex h-[calc(100vh-1rem)] w-56 shrink-0 flex-col rounded-xl border border-border bg-surface shadow-lg shadow-black/20">
-      <div className="flex items-center gap-2 px-5 pt-12 pb-4">
-        <img src={orbitdbLogo} alt={APP_NAME} className="h-10 w-10 shrink-0" />
+    <aside className="m-1 flex h-[calc(100vh-0.5rem)] w-14 shrink-0 flex-col items-center rounded-xl border border-border bg-surface shadow-lg shadow-black/20">
+      <div className="flex items-center justify-center pt-4 pb-4">
+        <img src={orbitdbLogo} alt={APP_NAME} className="h-7 w-7" />
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 px-3">
+      <nav className="flex flex-1 flex-col items-center gap-1">
         {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => {
           const isActive =
             to === ROUTES.connections
@@ -38,59 +37,52 @@ export function Sidebar() {
                 : isQueryActive
           const isDisabled = (to === ROUTES.database || to === ROUTES.query) && !active
           return (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              aria-disabled={isDisabled}
-              onClick={(e) => {
-                if (isDisabled) e.preventDefault()
-              }}
-              className={cn(
-                'group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors',
-                isActive
-                  ? 'bg-[var(--color-surface-elevated)] text-[var(--color-text)]'
-                  : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text)]',
-                isDisabled && 'pointer-events-none opacity-40'
-              )}
-            >
-              <Icon size={14} stroke={1.75} />
-              {label}
-            </NavLink>
+            <Tooltip key={to}>
+              <TooltipTrigger asChild>
+                <NavLink
+                  to={to}
+                  end={end}
+                  aria-label={label}
+                  aria-disabled={isDisabled}
+                  onClick={(e) => {
+                    if (isDisabled) e.preventDefault()
+                  }}
+                  className={cn(
+                    'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+                    isActive
+                      ? 'bg-surface-elevated text-text'
+                      : 'text-text-muted hover:bg-surface-elevated hover:text-text',
+                    isDisabled && 'pointer-events-none opacity-40'
+                  )}
+                >
+                  <Icon size={16} stroke={1.75} />
+                </NavLink>
+              </TooltipTrigger>
+              <TooltipContent side="right">{label}</TooltipContent>
+            </Tooltip>
           )
         })}
       </nav>
 
-      <div className="border-t border-[var(--color-border)] px-4 py-3">
+      <div className="flex items-center justify-center border-t border-border px-2 py-3">
         {active && current ? (
-          <div className="space-y-0.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                <span className="truncate text-[12px] font-medium text-[var(--color-text)]">
-                  {current.name}
-                </span>
-              </div>
-              <span className="shrink-0 rounded border border-[var(--color-border)] px-1 py-0.5 text-[9px] uppercase tracking-wider text-[var(--color-text-subtle)]">
-                {ENGINE_LABEL[current.engine]}
-              </span>
-            </div>
-            <p className="truncate font-mono text-[10.5px] text-[var(--color-text-subtle)]">
-              {current.engine === 'd1'
-                ? `${current.accountId?.slice(0, 8) ?? '—'}/${current.databaseId?.slice(0, 8) ?? '—'}`
-                : `${current.user}@${current.host}:${current.port}`}
-            </p>
-            {active.serverVersion && (
-              <p className="truncate text-[10.5px] text-[var(--color-text-subtle)]">
-                {shortServerVersion(active.serverVersion)}
-              </p>
-            )}
-          </div>
+          <button
+            type="button"
+            className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-surface-elevated"
+            aria-label={`Connected to ${current.name}`}
+          >
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          </button>
         ) : (
-          <div className="flex items-center gap-1.5 text-[12px] text-[var(--color-text-subtle)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-neutral-700" />
-            <span>No connection</span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="h-2 w-2 rounded-full bg-neutral-700"
+                aria-label="No active connection"
+              />
+            </TooltipTrigger>
+            <TooltipContent side="right">No connection</TooltipContent>
+          </Tooltip>
         )}
       </div>
     </aside>

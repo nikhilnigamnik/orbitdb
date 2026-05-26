@@ -23,11 +23,11 @@ export function SqlEditor({ value, onChange, onSubmit, disabled, className }: Sq
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={handleKeyDown}
-      placeholder="-- Write SQL here. Cmd/Ctrl+Enter to run."
+      placeholder="-- Write SQL here. ⌘/Ctrl+Enter to run."
       disabled={disabled}
       spellCheck={false}
       className={cn(
-        'h-full min-h-48 resize-none rounded-none border-0 bg-neutral-950 font-mono text-sm leading-relaxed focus-visible:ring-0',
+        'h-full min-h-0 resize-none rounded-none border-0 bg-surface px-4 py-3 font-mono text-[13px] leading-relaxed text-text placeholder:text-text-subtle/70 focus-visible:ring-0',
         className
       )}
     />

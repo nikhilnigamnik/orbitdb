@@ -1,10 +1,20 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconPlayerPlay, IconPlug, IconTrash, IconHistory } from '@tabler/icons-react'
+import {
+  IconClock,
+  IconGripHorizontal,
+  IconHistory,
+  IconPlayerPlay,
+  IconPlug,
+  IconTrash
+} from '@tabler/icons-react'
+import { formatDistanceToNow } from 'date-fns'
 import { Button } from '@renderer/components/ui/button'
+import { Sheet } from '@renderer/components/ui/sheet'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { unwrap } from '@renderer/lib/ipc'
+import { cn } from '@renderer/lib/utils'
 import { ROUTES } from '@renderer/config/routes'
 import type { QueryResult } from '@renderer/types'
 import { SqlEditor } from './sql-editor'
@@ -18,6 +28,9 @@ interface HistoryEntry {
   success: boolean
 }
 
+const MIN_PANEL_PCT = 15
+const MAX_PANEL_PCT = 85
+
 export function QueryPage() {
   const navigate = useNavigate()
   const { active } = useConnection()
@@ -26,6 +39,29 @@ export function QueryPage() {
   const [isRunning, setIsRunning] = React.useState(false)
   const [history, setHistory] = React.useState<HistoryEntry[]>([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
+  const [editorPct, setEditorPct] = React.useState(50)
+  const [isDragging, setIsDragging] = React.useState(false)
+  const splitRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!isDragging) return
+    function handleMove(e: MouseEvent) {
+      const container = splitRef.current
+      if (!container) return
+      const rect = container.getBoundingClientRect()
+      const pct = ((e.clientY - rect.top) / rect.height) * 100
+      setEditorPct(Math.min(MAX_PANEL_PCT, Math.max(MIN_PANEL_PCT, pct)))
+    }
+    function handleUp() {
+      setIsDragging(false)
+    }
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+    }
+  }, [isDragging])
 
   if (!active) {
     return (
@@ -86,31 +122,109 @@ export function QueryPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2">
-        <div>
-          <h1 className="text-sm font-semibold text-neutral-100">SQL editor</h1>
-          <p className="text-[11px] text-neutral-500">
-            Connected to {active.currentDatabase} as {active.currentUser}
+      <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface/40 px-5 py-2.5">
+        <div className="flex min-w-0 flex-col leading-tight">
+          <h1 className="text-[13px] font-semibold text-text">SQL editor</h1>
+          <p className="truncate text-[10.5px] text-text-subtle">
+            <span className="font-mono text-text-muted">{active.currentDatabase}</span>
+            <span className="text-text-subtle/60"> · </span>
+            <span>{active.currentUser}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700"
-            onClick={() => setHistoryOpen((v) => !v)}
+        <div className="flex items-center gap-1.5">
+          <Sheet
+            openSheet={historyOpen}
+            setOpenSheet={setHistoryOpen}
+            side="right"
+            sheetContentClassName="bg-surface"
+            content={
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2 pr-12">
+                  <div className="flex items-center gap-1.5">
+                    <IconHistory size={12} className="text-text-subtle" />
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                      History
+                    </span>
+                    {history.length > 0 && (
+                      <span className="rounded bg-surface-elevated px-1 py-0 font-mono text-[10px] text-text-subtle">
+                        {history.length}
+                      </span>
+                    )}
+                  </div>
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    className="text-text-subtle hover:bg-surface-elevated hover:text-red-400"
+                    onClick={() => setHistory([])}
+                    disabled={history.length === 0}
+                    aria-label="Clear history"
+                  >
+                    <IconTrash size={12} />
+                  </Button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-auto">
+                  {history.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+                      <IconClock size={18} className="text-text-subtle/60" />
+                      <p className="text-[11.5px] text-text-subtle">No history yet</p>
+                    </div>
+                  ) : (
+                    history.map((entry) => (
+                      <button
+                        key={entry.id}
+                        onClick={() => {
+                          setSql(entry.sql)
+                          setHistoryOpen(false)
+                        }}
+                        className="group/entry block w-full cursor-pointer border-b border-border/60 px-3 py-2 text-left transition-colors hover:bg-surface-elevated/50"
+                      >
+                        <p
+                          className={cn(
+                            'line-clamp-2 font-mono text-[11px] leading-snug',
+                            entry.success ? 'text-text' : 'text-red-300/80'
+                          )}
+                        >
+                          {entry.sql}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2 text-[10px] text-text-subtle">
+                          <span className="font-mono">{entry.durationMs} ms</span>
+                          <span className="text-text-subtle/60">·</span>
+                          <span>
+                            {formatDistanceToNow(new Date(entry.ranAt), { addSuffix: true })}
+                          </span>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            }
           >
-            <IconHistory size={14} />
-            History ({history.length})
-          </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={cn(
+                'text-text-muted hover:bg-surface-elevated hover:text-text',
+                historyOpen && 'bg-surface-elevated text-text'
+              )}
+            >
+              <IconHistory size={12} />
+              History
+              {history.length > 0 && (
+                <span className="ml-0.5 rounded bg-surface px-1 py-0 font-mono text-[10px] text-text-subtle">
+                  {history.length}
+                </span>
+              )}
+            </Button>
+          </Sheet>
           <Button
             size="sm"
-            variant="secondary"
-            className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700"
+            variant="ghost"
+            className="text-text-muted hover:bg-surface-elevated hover:text-text"
             onClick={() => setSql('')}
             disabled={!sql}
           >
-            <IconTrash size={14} />
+            <IconTrash size={12} />
             Clear
           </Button>
           <Button
@@ -119,62 +233,52 @@ export function QueryPage() {
             onClick={runQuery}
             disabled={isRunning || sql.trim() === ''}
           >
-            <IconPlayerPlay size={14} />
+            <IconPlayerPlay size={12} />
             {isRunning ? 'Running…' : 'Run'}
+            <kbd className="ml-1 rounded bg-white/15 px-1 py-0 font-mono text-[10px] text-white/90">
+              ⌘↵
+            </kbd>
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex flex-1 flex-col">
-          <div className="flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div ref={splitRef} className="flex min-w-0 flex-1 flex-col">
+          <div className="min-h-0 overflow-hidden" style={{ height: `${editorPct}%` }}>
             <SqlEditor value={sql} onChange={setSql} onSubmit={runQuery} disabled={isRunning} />
           </div>
-          <div className="h-1/2 flex-1 border-t border-neutral-800">
+
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            aria-valuenow={Math.round(editorPct)}
+            aria-valuemin={MIN_PANEL_PCT}
+            aria-valuemax={MAX_PANEL_PCT}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              setIsDragging(true)
+            }}
+            onDoubleClick={() => setEditorPct(50)}
+            className={cn(
+              'group/handle relative flex h-3 shrink-0 cursor-row-resize items-center justify-center border-y border-border bg-surface transition-colors',
+              isDragging && 'hover:bg-surface-elevated'
+            )}
+          >
+            <IconGripHorizontal
+              stroke={2}
+              size={14}
+              className={cn(
+                'pointer-events-none transition-colors',
+                isDragging ? 'text-text' : 'text-text-subtle group-hover/handle:text-text'
+              )}
+            />
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-hidden">
             <QueryResults result={result} isRunning={isRunning} />
           </div>
         </div>
-        {historyOpen && (
-          <aside className="w-72 shrink-0 border-l border-neutral-800 bg-neutral-950/40">
-            <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-                History
-              </span>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                className="text-neutral-400 hover:bg-neutral-800 hover:text-red-400"
-                onClick={() => setHistory([])}
-                disabled={history.length === 0}
-                title="Clear history"
-              >
-                <IconTrash size={12} />
-              </Button>
-            </div>
-            <div className="max-h-full overflow-auto">
-              {history.length === 0 ? (
-                <p className="px-3 py-3 text-xs text-neutral-500">No history yet.</p>
-              ) : (
-                history.map((entry) => (
-                  <button
-                    key={entry.id}
-                    onClick={() => setSql(entry.sql)}
-                    className="block w-full border-b border-neutral-800/60 px-3 py-2 text-left hover:bg-neutral-900/60"
-                  >
-                    <p
-                      className={`line-clamp-2 font-mono text-[11px] ${
-                        entry.success ? 'text-neutral-200' : 'text-red-300/80'
-                      }`}
-                    >
-                      {entry.sql}
-                    </p>
-                    <p className="mt-1 text-[10px] text-neutral-500">{entry.durationMs} ms</p>
-                  </button>
-                ))
-              )}
-            </div>
-          </aside>
-        )}
+
       </div>
     </div>
   )

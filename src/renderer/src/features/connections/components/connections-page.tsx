@@ -11,6 +11,7 @@ import {
   IconBrandDiscord
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Popover } from '@renderer/components/ui/popover'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
@@ -19,7 +20,7 @@ import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '../store/connection-store'
 import { ConnectionCard } from './connection-card'
-import { ConnectionFormModal } from './connection-form-modal'
+import { ConnectionFormSheet } from './connection-form-sheet'
 import { ROUTES } from '@renderer/config/routes'
 import { APP_NAME, APP_TAGLINE, APP_VERSION } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
@@ -61,16 +62,6 @@ export function ConnectionsPage() {
   const [activeTab, setActiveTab] = React.useState<TabKey>('All')
   const [sort, setSort] = React.useState<SortMode>('name-asc')
   const [sortOpen, setSortOpen] = React.useState(false)
-  const sortRef = React.useRef<HTMLDivElement | null>(null)
-
-  React.useEffect(() => {
-    if (!sortOpen) return
-    const onClick = (e: MouseEvent) => {
-      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false)
-    }
-    window.addEventListener('mousedown', onClick)
-    return () => window.removeEventListener('mousedown', onClick)
-  }, [sortOpen])
 
   const sorted = React.useMemo(() => {
     const list = [...connections]
@@ -125,7 +116,7 @@ export function ConnectionsPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center px-6 pt-16 pb-8">
+    <div className="flex min-h-full flex-col items-center px-6 pt-8 pb-8">
       <div className="flex w-full max-w-2xl flex-1 flex-col">
         <h1 className="text-[44px] font-bold leading-none tracking-tight text-text">Dashboard</h1>
 
@@ -192,17 +183,13 @@ export function ConnectionsPage() {
             ))}
           </div>
 
-          <div ref={sortRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setSortOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] text-text-muted hover:text-text"
-            >
-              <IconArrowsSort size={13} />
-              {SORT_LABEL[sort]}
-            </button>
-            {sortOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-lg border border-border bg-surface shadow-xl shadow-black/40 animate-in fade-in-0 zoom-in-95 duration-150">
+          <Popover
+            openPopover={sortOpen}
+            setOpenPopover={setSortOpen}
+            align="end"
+            popoverContentClassName="w-48 overflow-hidden shadow-xl shadow-black/40"
+            content={
+              <div className="flex flex-col py-1">
                 {(Object.keys(SORT_LABEL) as SortMode[]).map((key) => (
                   <button
                     key={key}
@@ -220,8 +207,16 @@ export function ConnectionsPage() {
                   </button>
                 ))}
               </div>
-            )}
-          </div>
+            }
+          >
+            <button
+              type="button"
+              className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] text-text-muted hover:text-text"
+            >
+              <IconArrowsSort size={13} />
+              {SORT_LABEL[sort]}
+            </button>
+          </Popover>
         </div>
 
         <div className="mt-4 flex flex-1 flex-col gap-3">
@@ -305,7 +300,7 @@ export function ConnectionsPage() {
         </div>
       </div>
 
-      <ConnectionFormModal
+      <ConnectionFormSheet
         isOpen={formModal.isOpen}
         onClose={formModal.close}
         onSaved={() => {

@@ -34,7 +34,7 @@ function Sheet({
 }: SheetProps) {
   return (
     <SheetPrimitive.Root open={openSheet} onOpenChange={setOpenSheet} data-slot="sheet">
-      <SheetPrimitive.Trigger asChild>{children}</SheetPrimitive.Trigger>
+      {children && <SheetPrimitive.Trigger asChild>{children}</SheetPrimitive.Trigger>}
       <SheetContent
         side={side}
         floating={floating}
@@ -62,7 +62,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:duration-150 data-[state=open]:duration-200 fixed inset-0 z-50 backdrop-blur-xl bg-background/50 animate-fade-in',
+        'fixed inset-0 z-50 bg-black/20 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:duration-150 data-[state=open]:duration-200',
         className
       )}
       {...props}
@@ -84,7 +84,7 @@ function SheetContent({
     ? {
         left: 'left-0 top-0 bottom-0 h-[calc(100%-3rem)] w-[88vw] md:w-3/4 data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm',
         right:
-          'right-0 top-0 bottom-0 h-[calc(100%-2rem)] w-[88vw] md:w-3/4 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm'
+          'right-0 top-0 bottom-0 h-[calc(100%-0.5rem)] w-[88vw] md:w-3/4 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm'
       }
     : {
         left: 'inset-y-0 left-0 h-full w-3/4 data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm',
@@ -98,13 +98,13 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          'bg-secondary m-4 border rounded-lg data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-xs transition ease-in-out data-[state=closed]:duration-150 data-[state=open]:duration-200',
+          'fixed z-50 m-1 flex flex-col rounded-lg border border-border bg-surface shadow-2xl shadow-black/40 transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-150 data-[state=open]:duration-200',
           side === 'right' && floatingStyles.right,
           side === 'left' && floatingStyles.left,
           side === 'top' &&
-            'data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 h-auto border-b',
+            'inset-x-0 top-0 h-auto border-b border-border data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
           side === 'bottom' &&
-            'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t',
+            'inset-x-0 bottom-0 h-auto border-t border-border data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
           className
         )}
         {...props}
@@ -114,7 +114,10 @@ function SheetContent({
           <SheetPrimitive.Description>Sheet content</SheetPrimitive.Description>
         </VisuallyHidden.Root>
         {children}
-        <SheetPrimitive.Close className="absolute cursor-pointer bg-background active:bg-primary/5 p-2 top-2 right-2 rounded-full opacity-70 transition-opacity hover:opacity-100">
+        <SheetPrimitive.Close
+          aria-label="Close"
+          className="absolute right-2 top-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border border-border bg-surface-elevated/60 text-text-subtle transition-colors hover:bg-surface-elevated hover:text-text"
+        >
           <IconX className="size-3" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>

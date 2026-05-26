@@ -29,7 +29,7 @@ export function DatabasePage() {
 
   if (!active) {
     return (
-      <div className="flex h-full items-center justify-center p-6">
+      <main className="flex flex-1 items-center justify-center rounded-xl border border-border bg-surface p-6 shadow-lg shadow-black/20">
         <EmptyState
           icon={<IconPlug size={24} />}
           title="No active connection"
@@ -44,16 +44,16 @@ export function DatabasePage() {
             </Button>
           }
         />
-      </div>
+      </main>
     )
   }
 
   return (
-    <div className="flex h-full">
-      <div className="w-56 shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface)]/40 pt-8">
+    <>
+      <aside className="flex h-full w-56 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/20">
         <SchemaTreeContainer connectionId={active.connectionId} />
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col">
+      </aside>
+      <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/20">
         {schema && table ? (
           <TableViewContainer
             key={`${schema}.${table}`}
@@ -70,8 +70,8 @@ export function DatabasePage() {
             description="Pick a table from the sidebar to view its data and structure."
           />
         )}
-      </div>
-    </div>
+      </main>
+    </>
   )
 }
 

@@ -44,7 +44,7 @@ export function Modal({
         <DialogPrimitive.Content
           onOpenAutoFocus={(e) => e.preventDefault()}
           className={cn(
-            'fixed top-2 right-2 bottom-2 z-50 flex flex-col rounded-xl border border-border bg-surface shadow-2xl shadow-black/40',
+            'fixed top-1 right-1 bottom-1 z-50 flex flex-col rounded-xl border border-border bg-surface shadow-2xl shadow-black/40',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right',
             'data-[state=open]:duration-300 data-[state=closed]:duration-200',

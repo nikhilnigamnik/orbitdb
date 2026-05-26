@@ -144,19 +144,17 @@ function normalizeUdtName(declared: string): string {
 
 async function test(input: ConnectionInput): Promise<TestConnectionResult> {
   try {
-    const entry = await callD1<{ version: string }>(input, 'select sqlite_version() as version')
-    const version = entry.results[0]?.version ?? 'SQLite'
-    return { success: true, serverVersion: String(version) }
+    await callD1<{ ok: number }>(input, 'select 1 as ok')
+    return { success: true, serverVersion: 'Cloudflare D1' }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
 
 async function describeActive(saved: SavedConnection): Promise<ActiveMeta> {
-  const entry = await callD1<{ version: string }>(saved, 'select sqlite_version() as version')
-  const version = entry.results[0]?.version ?? ''
+  await callD1<{ ok: number }>(saved, 'select 1 as ok')
   return {
-    serverVersion: `SQLite ${version}`,
+    serverVersion: 'Cloudflare D1',
     currentDatabase: saved.databaseId ?? saved.name,
     currentUser: 'D1'
   }
