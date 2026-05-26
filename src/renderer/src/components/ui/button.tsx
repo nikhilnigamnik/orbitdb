@@ -9,20 +9,20 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'relative isolate overflow-hidden bg-accent text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-z-10 before:h-1/2 before:bg-gradient-to-b before:from-white/22 before:to-transparent [a]:hover:bg-accent/80',
+          'relative isolate overflow-hidden bg-accent text-text before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-z-10 before:h-1/2 before:bg-gradient-to-b before:from-white/22 before:to-transparent [a]:hover:bg-accent/80',
         outline:
-          'border-gray-300 bg-white hover:bg-gray-100 hover:text-gray-900 aria-expanded:bg-gray-100 aria-expanded:text-gray-900',
+          'border-border bg-surface text-text hover:bg-surface-elevated aria-expanded:bg-surface-elevated',
         secondary:
-          'bg-gray-200 text-gray-900 hover:bg-gray-200/80 aria-expanded:bg-gray-200 aria-expanded:text-gray-900',
+          'border border-border bg-surface text-text hover:bg-surface-elevated aria-expanded:bg-surface-elevated',
         ghost:
-          'hover:bg-gray-100 hover:text-gray-900 aria-expanded:bg-gray-100 aria-expanded:text-gray-900',
+          'rounded-md border border-border bg-surface px-3 text-text-muted hover:bg-surface-elevated hover:text-text aria-expanded:bg-surface',
         destructive:
           'bg-red-500/10 text-red-500 hover:bg-red-500/20 focus-visible:border-red-500/40 focus-visible:ring-red-500/20',
         link: 'text-accent underline-offset-4 hover:underline'
       },
       size: {
         default:
-          'h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
+          'h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
         xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: 'h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',

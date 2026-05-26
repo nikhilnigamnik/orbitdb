@@ -146,14 +146,14 @@ export function ConnectionsPage() {
           </div>
 
           <div className="mt-5 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-1 rounded-full border border-border bg-surface p-0.5">
+            <div className="flex items-center gap-1 rounded-md border border-border bg-surface p-0.5">
               {TABS.map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
                   className={cn(
-                    'rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors',
+                    'rounded-sm px-3 py-1 text-[12.5px] font-medium transition-colors',
                     activeTab === tab
                       ? 'bg-surface-elevated text-text'
                       : 'text-text-muted hover:text-text'
@@ -190,13 +190,10 @@ export function ConnectionsPage() {
                 </div>
               }
             >
-              <button
-                type="button"
-                className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-[12.5px] text-text-muted hover:text-text"
-              >
-                <IconArrowsSort size={13} />
+              <Button type="button" variant={'ghost'}>
+                <IconArrowsSort size={10} />
                 {SORT_LABEL[sort]}
-              </button>
+              </Button>
             </Popover>
           </div>
 

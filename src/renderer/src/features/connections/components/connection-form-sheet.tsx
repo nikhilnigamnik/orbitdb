@@ -179,32 +179,51 @@ export function ConnectionFormSheet({
                       key={engine}
                       type="button"
                       onClick={() => changeEngine(engine)}
+                      aria-pressed={isSelected}
                       className={cn(
-                        'group relative flex flex-col items-start gap-2 rounded-xl border bg-surface p-3 text-left transition-all',
+                        'group relative flex cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border bg-surface px-2 py-3 text-center shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] transition-all',
                         isSelected
-                          ? 'border-accent/50 ring-2 ring-accent/30'
-                          : 'border-border hover:border-border-strong hover:bg-surface-elevated/40'
+                          ? 'border-accent/60 bg-accent/4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]'
+                          : 'border-border hover:border-border-strong hover:bg-surface-elevated/50'
                       )}
                     >
                       <div
                         className={cn(
-                          'flex h-9 w-9 items-center justify-center rounded-lg',
+                          'flex h-8 w-8 items-center justify-center rounded-lg ring-1 ring-inset ring-white/5 transition-transform group-hover:scale-105',
                           style.bg,
                           style.iconClass
                         )}
                         aria-hidden
                       >
-                        <Icon className="h-5 w-5" />
+                        <Icon className="h-4 w-4" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-semibold text-text">
-                          {ENGINE_LABEL[engine]}
-                        </p>
-                        <p className="truncate text-[10.5px] text-text-subtle">{style.tagline}</p>
-                      </div>
-                      {isSelected && (
-                        <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent" />
-                      )}
+                      <p
+                        className={cn(
+                          'truncate text-[12px] font-semibold transition-colors',
+                          isSelected ? 'text-text' : 'text-text-muted group-hover:text-text'
+                        )}
+                      >
+                        {ENGINE_LABEL[engine]}
+                      </p>
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'absolute right-1.5 top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-accent text-white transition-all',
+                          isSelected ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
+                        )}
+                      >
+                        <svg
+                          viewBox="0 0 12 12"
+                          className="h-2.5 w-2.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M2.5 6.5L5 9l4.5-5" />
+                        </svg>
+                      </span>
                     </button>
                   )
                 })}
