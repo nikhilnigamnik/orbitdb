@@ -7,6 +7,7 @@ import mysql, {
 import type {
   ColumnInfo,
   ConnectionInput,
+  DistinctValuesOptions,
   ForeignKeyInfo,
   GetRowsOptions,
   IndexInfo,
@@ -23,6 +24,7 @@ import type {
   TestConnectionResult
 } from '../../../shared/types'
 import { getConnection } from '../../store/connections-store'
+import { recordQuery } from '../query-log'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
 const pools = new Map<string, Pool>()
@@ -50,8 +52,54 @@ function getPool(connectionId: string): Pool {
   if (!saved) throw new Error(`Connection ${connectionId} is not saved`)
   if (saved.engine !== 'mysql') throw new Error(`Wrong driver for connection ${connectionId}`)
   const pool = mysql.createPool(toPoolConfig(saved))
+  instrumentMysqlPool(pool, connectionId)
   pools.set(connectionId, pool)
   return pool
+}
+
+function instrumentMysqlPool(pool: Pool, connectionId: string): void {
+  const original = pool.query.bind(pool) as (...args: unknown[]) => Promise<unknown>
+  ;(pool as unknown as { query: unknown }).query = async function patched(
+    ...args: unknown[]
+  ): Promise<unknown> {
+    const sql = typeof args[0] === 'string' ? (args[0] as string) : ''
+    const params = (args[1] as unknown[] | undefined) ?? []
+    const t0 = Date.now()
+    try {
+      const res = (await original(...args)) as unknown
+      let rowCount: number | null = null
+      if (Array.isArray(res) && res[0] && typeof res[0] === 'object') {
+        const head = res[0] as { affectedRows?: number; length?: number }
+        rowCount =
+          typeof head.affectedRows === 'number'
+            ? head.affectedRows
+            : typeof head.length === 'number'
+              ? head.length
+              : null
+      }
+      recordQuery({
+        connectionId,
+        engine: 'mysql',
+        sql,
+        params,
+        durationMs: Date.now() - t0,
+        rowCount,
+        success: true
+      })
+      return res
+    } catch (err) {
+      recordQuery({
+        connectionId,
+        engine: 'mysql',
+        sql,
+        params,
+        durationMs: Date.now() - t0,
+        success: false,
+        error: err instanceof Error ? err.message : String(err)
+      })
+      throw err
+    }
+  }
 }
 
 async function disconnectPool(connectionId: string): Promise<void> {
@@ -74,6 +122,7 @@ async function test(input: ConnectionInput): Promise<TestConnectionResult> {
   let pool: Pool | null = null
   try {
     pool = mysql.createPool({ ...toPoolConfig(input), connectionLimit: 1 })
+    instrumentMysqlPool(pool, '<test>')
     const [rows] = await pool.query<RowDataPacket[]>('select version() as version')
     return { success: true, serverVersion: String(rows[0]?.version ?? '') }
   } catch (err) {
@@ -488,6 +537,20 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   }
 }
 
+async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
+  const pool = getPool(opts.connectionId)
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500)
+  const params: unknown[] = []
+  let where = ''
+  if (opts.search && opts.search.trim()) {
+    params.push(`%${opts.search.trim()}%`)
+    where = `where cast(${quoteIdent(opts.column)} as char) like ?`
+  }
+  const sql = `select distinct ${quoteIdent(opts.column)} as value from ${qualifiedTable(opts.schema, opts.table)} ${where} order by 1 limit ${limit}`
+  const [rows] = await pool.query<RowDataPacket[]>(sql, params)
+  return (rows as Array<{ value: unknown }>).map((r) => r.value)
+}
+
 export const mysqlDriver: DatabaseDriver = {
   test,
   describeActive,
@@ -500,5 +563,6 @@ export const mysqlDriver: DatabaseDriver = {
   insertRow,
   updateRow,
   deleteRow,
-  runQuery
+  runQuery,
+  getColumnDistinct
 }

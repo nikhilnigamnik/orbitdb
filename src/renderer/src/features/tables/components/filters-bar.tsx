@@ -1,20 +1,32 @@
 import * as React from 'react'
-import { IconFilter, IconPlus, IconX } from '@tabler/icons-react'
-import { Button } from '@renderer/components/ui/button'
-import { Input } from '@renderer/components/ui/input'
+import {
+  IconArrowLeft,
+  IconCheck,
+  IconDatabase,
+  IconFilter2,
+  IconLoader,
+  IconPlus,
+  IconSearch,
+  IconX
+} from '@tabler/icons-react'
+import { AnimatedSize } from '@renderer/components/ui/animated-size'
 import { Popover } from '@renderer/components/ui/popover'
-import { Select } from '@renderer/components/ui/select'
+import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
+import { formatCellValue } from '@renderer/lib/format'
 import type { ColumnInfo, RowFilter } from '@renderer/types'
 
 interface FiltersBarProps {
+  connectionId: string
+  schema: string
+  table: string
   columns: ColumnInfo[]
   filters: RowFilter[]
   onChange: (filters: RowFilter[]) => void
   onApply: () => void
 }
 
-const OPERATORS: { value: RowFilter['operator']; label: string }[] = [
+const OPERATORS: { value: RowFilter['operator']; label: string; unary?: boolean }[] = [
   { value: '=', label: '=' },
   { value: '!=', label: '≠' },
   { value: '>', label: '>' },
@@ -23,34 +35,100 @@ const OPERATORS: { value: RowFilter['operator']; label: string }[] = [
   { value: '<=', label: '≤' },
   { value: 'like', label: 'like' },
   { value: 'ilike', label: 'ilike' },
-  { value: 'is null', label: 'is null' },
-  { value: 'is not null', label: 'not null' }
+  { value: 'is null', label: 'is null', unary: true },
+  { value: 'is not null', label: 'not null', unary: true }
 ]
 
-export function FiltersBar({ columns, filters, onChange, onApply }: FiltersBarProps) {
+export function FiltersBar({
+  connectionId,
+  schema,
+  table,
+  columns,
+  filters,
+  onChange,
+  onApply
+}: FiltersBarProps) {
   const [isOpen, setIsOpen] = React.useState(false)
-  const firstColumn = columns[0]?.name ?? ''
+  const [columnSearch, setColumnSearch] = React.useState('')
+  const [editingColumn, setEditingColumn] = React.useState<ColumnInfo | null>(null)
+  const [operator, setOperator] = React.useState<RowFilter['operator']>('=')
+  const [valueSearch, setValueSearch] = React.useState('')
+  const [values, setValues] = React.useState<unknown[]>([])
+  const [valuesLoading, setValuesLoading] = React.useState(false)
+  const [valuesError, setValuesError] = React.useState<string | null>(null)
+
   const hasFilters = filters.length > 0
 
-  const columnOptions = React.useMemo(
-    () => columns.map((col) => ({ value: col.name, label: col.name })),
-    [columns]
-  )
+  const filteredColumns = React.useMemo(() => {
+    const q = columnSearch.trim().toLowerCase()
+    if (!q) return columns
+    return columns.filter((c) => c.name.toLowerCase().includes(q))
+  }, [columns, columnSearch])
 
-  function addFilter() {
-    if (!firstColumn) return
-    onChange([...filters, { column: firstColumn, operator: '=', value: '' }])
-    setIsOpen(true)
+  React.useEffect(() => {
+    if (!editingColumn) return
+    let cancelled = false
+    setValuesLoading(true)
+    setValuesError(null)
+    const timer = window.setTimeout(() => {
+      void unwrap(
+        window.api.db.columnDistinct({
+          connectionId,
+          schema,
+          table,
+          column: editingColumn.name,
+          search: valueSearch.trim() || undefined,
+          limit: 100
+        })
+      )
+        .then((rows) => {
+          if (cancelled) return
+          setValues(rows)
+        })
+        .catch((err) => {
+          if (cancelled) return
+          setValuesError(err instanceof Error ? err.message : String(err))
+          setValues([])
+        })
+        .finally(() => {
+          if (!cancelled) setValuesLoading(false)
+        })
+    }, 180)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [editingColumn, valueSearch, connectionId, schema, table])
+
+  function resetEditor() {
+    setEditingColumn(null)
+    setOperator('=')
+    setValueSearch('')
+    setValues([])
+    setValuesError(null)
   }
 
-  function updateFilter(index: number, patch: Partial<RowFilter>) {
-    const next = filters.slice()
-    next[index] = { ...next[index], ...patch }
-    onChange(next)
+  function openColumn(col: ColumnInfo) {
+    setEditingColumn(col)
+    setOperator('=')
+    setValueSearch('')
+  }
+
+  function commitFilter(rawValue: unknown) {
+    if (!editingColumn) return
+    const opMeta = OPERATORS.find((o) => o.value === operator)
+    const value = opMeta?.unary ? '' : rawValue == null ? '' : String(rawValue)
+    onChange([...filters, { column: editingColumn.name, operator, value }])
+    resetEditor()
+    setColumnSearch('')
+    onApply()
+    setIsOpen(false)
   }
 
   function removeFilter(index: number) {
-    onChange(filters.filter((_, i) => i !== index))
+    const next = filters.filter((_, i) => i !== index)
+    onChange(next)
+    onApply()
   }
 
   function clearAll() {
@@ -58,160 +136,238 @@ export function FiltersBar({ columns, filters, onChange, onApply }: FiltersBarPr
     onApply()
   }
 
-  function handleApply(e?: React.FormEvent) {
-    e?.preventDefault()
-    onApply()
-    setIsOpen(false)
-  }
+  const operatorMeta = OPERATORS.find((o) => o.value === operator)
+  const isUnary = !!operatorMeta?.unary
+  const canCommitFreeText = isUnary || valueSearch.trim().length > 0
 
   return (
-    <div className="flex items-center gap-1.5">
-        <Popover
-          openPopover={isOpen}
-          setOpenPopover={setIsOpen}
-          align="start"
-          side="bottom"
-          sideOffset={6}
-          popoverContentClassName="w-[min(30rem,calc(100vw-2rem))]"
-          content={
-            <form onSubmit={handleApply} className="flex flex-col">
-              <div className="flex items-center justify-between border-b border-border px-3 py-2">
-                <div className="flex items-center gap-1.5">
-                  <IconFilter size={12} className="text-text-subtle" />
-                  <span className="text-[11.5px] font-medium text-text">Filters</span>
-                  {hasFilters && (
-                    <span className="rounded bg-accent/15 px-1 py-0 text-[10px] font-semibold leading-tight text-accent">
-                      {filters.length}
-                    </span>
-                  )}
+    <div className="flex w-full items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {filters.map((f, i) => {
+          const unary = f.operator === 'is null' || f.operator === 'is not null'
+          return (
+            <div
+              key={i}
+              className="inline-flex items-stretch overflow-hidden rounded-md border border-border bg-surface-elevated/60 text-[11.5px] text-text"
+            >
+              <div className="flex items-center gap-1.5 px-2 py-1">
+                <IconDatabase size={11} className="text-text-subtle" />
+                <span>{f.column}</span>
+              </div>
+              <div className="flex items-center border-l border-border px-2 py-1 font-mono text-text-muted">
+                {f.operator}
+              </div>
+              {!unary && (
+                <div className="flex max-w-40 items-center truncate border-l border-border px-2 py-1 font-mono">
+                  {String(f.value ?? '')}
                 </div>
-                {hasFilters && (
-                  <button
-                    type="button"
-                    onClick={clearAll}
-                    className="cursor-pointer rounded px-1.5 py-0.5 text-[10.5px] text-text-subtle transition-colors hover:text-text"
-                  >
-                    Clear all
-                  </button>
-                )}
+              )}
+              <button
+                type="button"
+                onClick={() => removeFilter(i)}
+                aria-label="Remove filter"
+                className="flex cursor-pointer items-center border-l border-border px-2 py-1 text-red-400 transition-colors hover:bg-red-500/10"
+              >
+                <IconX size={11} />
+              </button>
+            </div>
+          )
+        })}
+
+      <Popover
+        openPopover={isOpen}
+        setOpenPopover={(open) => {
+          setIsOpen(open)
+          if (!open) resetEditor()
+        }}
+        align="start"
+        side="bottom"
+        sideOffset={6}
+        popoverContentClassName="w-[min(28rem,calc(100vw-2rem))]"
+        content={
+          <AnimatedSize>{editingColumn ? (
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2 border-b border-border px-2 py-1">
+                <button
+                  type="button"
+                  onClick={resetEditor}
+                  aria-label="Back to columns"
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-text-subtle hover:bg-surface-elevated hover:text-text"
+                >
+                  <IconArrowLeft size={14} />
+                </button>
+                <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <IconDatabase size={12} className="text-text-subtle" />
+                  <span className="truncate text-[13px] font-medium text-text">
+                    {editingColumn.name}
+                  </span>
+                  <span className="font-mono text-[10.5px] text-text-subtle">
+                    {editingColumn.udtName || editingColumn.dataType}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex max-h-[60vh] flex-col gap-1.5 overflow-y-auto px-3 py-2.5">
-                {filters.length === 0 ? (
-                  <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border bg-surface-elevated/20 px-4 py-6 text-center">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-elevated/60 text-text-subtle">
-                      <IconFilter size={13} />
-                    </div>
-                    <p className="text-[11.5px] text-text-muted">No filters yet</p>
-                    <p className="text-[10.5px] text-text-subtle">
-                      Add a condition to narrow down rows.
+              <div className="flex flex-wrap gap-1 border-b border-border px-2 py-2">
+                {OPERATORS.map((op) => (
+                  <button
+                    key={op.value}
+                    type="button"
+                    onClick={() => setOperator(op.value)}
+                    className={cn(
+                      'cursor-pointer rounded-md border px-2 py-0.5 font-mono text-[11.5px]',
+                      op.value === operator
+                        ? 'border-border-strong bg-surface-elevated text-text'
+                        : 'border-border bg-surface-elevated/30 text-text-muted hover:bg-surface-elevated hover:text-text'
+                    )}
+                  >
+                    {op.label}
+                  </button>
+                ))}
+              </div>
+
+              {!isUnary && (
+                <div className="border-b border-border px-2 py-1.5">
+                  <div className="relative">
+                    <IconSearch
+                      size={14}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
+                    />
+                    <input
+                      autoFocus
+                      value={valueSearch}
+                      onChange={(e) => setValueSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && canCommitFreeText) {
+                          e.preventDefault()
+                          commitFilter(valueSearch)
+                        }
+                      }}
+                      placeholder="Type a value or pick below…"
+                      className="w-full rounded-md bg-transparent pl-8 pr-2 text-[13px] text-text outline-none placeholder:text-text-subtle"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="max-h-72 overflow-y-auto p-1">
+                {isUnary ? (
+                  <button
+                    type="button"
+                    onClick={() => commitFilter('')}
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md px-2 py-2 text-[12.5px] font-medium text-text transition-colors hover:bg-surface-elevated"
+                  >
+                    <IconCheck size={13} />
+                    Apply &ldquo;{operatorMeta?.label}&rdquo;
+                  </button>
+                ) : valuesLoading ? (
+                  <div className="flex items-center justify-center py-6 text-text-subtle">
+                    <IconLoader stroke={2} size={16} className="animate-spin" />
+                  </div>
+                ) : valuesError ? (
+                  <p className="px-2 py-3 text-center text-[11.5px] text-red-300/80">
+                    {valuesError}
+                  </p>
+                ) : values.length === 0 ? (
+                  <div className="px-2 py-3 text-center">
+                    <p className="text-[11.5px] text-text-subtle">
+                      {valueSearch ? 'No matches' : 'No values'}
                     </p>
+                    {valueSearch && (
+                      <button
+                        type="button"
+                        onClick={() => commitFilter(valueSearch)}
+                        className="mt-1.5 cursor-pointer rounded-md border border-border bg-surface-elevated/60 px-2 py-1 text-[11.5px] text-text hover:bg-surface-elevated"
+                      >
+                        Use &ldquo;{valueSearch}&rdquo;
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  filters.map((filter, index) => {
-                    const isUnary =
-                      filter.operator === 'is null' || filter.operator === 'is not null'
+                  values.map((value, i) => {
+                    const display = value === null ? 'NULL' : formatCellValue(value)
                     return (
-                      <div
-                        key={index}
-                        className="group/filter flex items-center gap-1 rounded-md border border-border bg-surface-elevated/30 p-1 transition-colors hover:border-border-strong"
+                      <button
+                        key={`${display}-${i}`}
+                        type="button"
+                        onClick={() => commitFilter(value)}
+                        className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-elevated"
                       >
-                        <Select
-                          value={filter.column}
-                          onChange={(value) => updateFilter(index, { column: value })}
-                          options={columnOptions}
-                          size="sm"
-                          className="min-w-[7rem] flex-1 border-transparent bg-transparent hover:bg-surface-elevated/60"
-                          ariaLabel="Filter column"
-                        />
-                        <Select<RowFilter['operator']>
-                          value={filter.operator}
-                          onChange={(value) => updateFilter(index, { operator: value })}
-                          options={OPERATORS}
-                          size="sm"
-                          className="min-w-[3.5rem] border-transparent bg-transparent font-mono hover:bg-surface-elevated/60"
-                          contentClassName="min-w-[8rem]"
-                          ariaLabel="Filter operator"
-                        />
-                        {isUnary ? (
-                          <div className="flex-1" />
-                        ) : (
-                          <Input
-                            value={filter.value ?? ''}
-                            onChange={(e) => updateFilter(index, { value: e.target.value })}
-                            placeholder="value"
-                            className="h-7 flex-1 border-transparent bg-transparent text-[11.5px] hover:bg-surface-elevated/60 focus-visible:border-accent/40 focus-visible:bg-surface-elevated"
-                          />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => removeFilter(index)}
-                          aria-label="Remove filter"
+                        <span
                           className={cn(
-                            'flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded transition-colors',
-                            'text-text-subtle opacity-0 group-hover/filter:opacity-100',
-                            'hover:bg-red-500/10 hover:text-red-400'
+                            'flex-1 truncate font-mono text-[12.5px]',
+                            value === null ? 'italic text-text-subtle' : 'text-text'
                           )}
                         >
-                          <IconX size={12} />
-                        </button>
-                      </div>
+                          {display}
+                        </span>
+                      </button>
                     )
                   })
                 )}
-
-                <button
-                  type="button"
-                  onClick={addFilter}
-                  className="flex w-fit cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
-                >
-                  <IconPlus size={12} />
-                  Add filter
-                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              <div className="border-b border-border px-2 py-1">
+                <div className="relative">
+                  <IconSearch
+                    size={12}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
+                  />
+                  <input
+                    autoFocus
+                    value={columnSearch}
+                    onChange={(e) => setColumnSearch(e.target.value)}
+                    placeholder="Select column to filter…"
+                    className="h-8 w-full rounded-md bg-transparent pl-8 pr-2 text-[13px] text-text outline-none placeholder:text-text-subtle"
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-1.5 border-t border-border bg-surface-elevated/20 px-3 py-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="text-text-muted hover:bg-surface-elevated hover:text-text"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" className="bg-accent text-white hover:bg-accent/90">
-                  Apply
-                </Button>
+              <div className="max-h-80 overflow-y-auto p-1">
+                {filteredColumns.length === 0 ? (
+                  <p className="px-2 py-3 text-center text-[11.5px] text-text-subtle">
+                    No columns match &ldquo;{columnSearch}&rdquo;
+                  </p>
+                ) : (
+                  filteredColumns.map((col) => (
+                    <button
+                      key={col.name}
+                      type="button"
+                      onClick={() => openColumn(col)}
+                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-elevated"
+                    >
+                      <IconDatabase size={14} className="shrink-0 text-text-subtle" />
+                      <span className="flex-1 truncate text-[13px] text-text">{col.name}</span>
+                      <span className="font-mono text-[11px] text-text-subtle">
+                        {col.udtName || col.dataType}
+                      </span>
+                    </button>
+                  ))
+                )}
               </div>
-            </form>
-          }
+            </div>
+          )}</AnimatedSize>
+        }
+      >
+        <button
+          type="button"
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border bg-surface-elevated/40 text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
+          aria-label={hasFilters ? 'Add filter' : 'Open filters'}
         >
-          <button
-            type="button"
-            className={cn(
-              'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12px] font-medium transition-colors',
-              hasFilters || isOpen
-                ? 'border-accent/40 bg-accent/10 text-accent'
-                : 'border-border bg-surface-elevated/40 text-text-muted hover:bg-surface-elevated hover:text-text'
-            )}
-          >
-            <IconFilter size={12} />
-            Filters
-            {hasFilters && (
-              <span className="rounded bg-accent/20 px-1 py-0 text-[10px] font-semibold leading-tight">
-                {filters.length}
-              </span>
-            )}
-          </button>
-        </Popover>
+          {hasFilters ? <IconPlus stroke={2} size={14} /> : <IconFilter2 stroke={2} size={14} />}
+        </button>
+      </Popover>
+      </div>
+
       {hasFilters && (
         <button
           type="button"
           onClick={clearAll}
-          className="cursor-pointer rounded-md px-2 py-1 text-[11.5px] text-text-subtle transition-colors hover:text-text"
+          className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-[11.5px] text-red-400 transition-colors hover:bg-red-500/15"
         >
-          Clear all
+          <IconFilter2 size={12} />
+          Clear
         </button>
       )}
     </div>

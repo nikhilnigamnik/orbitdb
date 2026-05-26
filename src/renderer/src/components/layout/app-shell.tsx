@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : (
         <>
           <Sidebar />
-          <main className="my-1 mr-1 flex-1 overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/20">
+          <main className="my-1 mr-1 flex-1 overflow-hidden rounded-xl bg-surface shadow-lg shadow-black/20">
             {children}
           </main>
         </>

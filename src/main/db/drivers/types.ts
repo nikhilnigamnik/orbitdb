@@ -1,5 +1,6 @@
 import type {
   ConnectionInput,
+  DistinctValuesOptions,
   GetRowsOptions,
   QueryResult,
   RowDelete,
@@ -36,4 +37,5 @@ export interface DatabaseDriver {
   deleteRow(opts: RowDelete): Promise<{ deleted: number }>
 
   runQuery(opts: RunQueryOptions): Promise<QueryResult>
+  getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]>
 }

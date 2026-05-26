@@ -24,6 +24,10 @@
 }
 
 @layer base {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+
   html,
   body {
     @apply bg-[var(--color-bg)] text-[var(--color-text)] font-sans antialiased;

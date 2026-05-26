@@ -131,7 +131,7 @@ export function ConnectionCard({
                   setMenuOpen(false)
                   onEdit()
                 }}
-                className="flex w-full rounded-md px-1.5 py-1.5 items-center gap-2 text-left text-xs text-text hover:bg-surface-elevated"
+                className="flex w-full cursor-pointer rounded-md px-1.5 py-1.5 items-center gap-2 text-left text-xs text-text hover:bg-surface-elevated"
               >
                 <IconPencil size={13} />
                 Edit
@@ -142,7 +142,7 @@ export function ConnectionCard({
                   setMenuOpen(false)
                   onDelete()
                 }}
-                className="flex w-full rounded-md px-1.5 py-1.5 items-center gap-2 text-left text-xs text-red-400 hover:bg-red-500/10"
+                className="flex w-full cursor-pointer rounded-md px-1.5 py-1.5 items-center gap-2 text-left text-xs text-rose-500 hover:bg-rose-500/10"
               >
                 <IconTrash size={13} />
                 Delete

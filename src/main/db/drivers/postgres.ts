@@ -1,7 +1,9 @@
 import { Pool, type PoolConfig } from 'pg'
+import { recordQuery } from '../query-log'
 import type {
   ColumnInfo,
   ConnectionInput,
+  DistinctValuesOptions,
   ForeignKeyInfo,
   GetRowsOptions,
   IndexInfo,
@@ -46,8 +48,48 @@ function getPool(connectionId: string): Pool {
   pool.on('error', (err) => {
     console.error(`[pg pool ${connectionId}] error`, err)
   })
+  instrumentPgPool(pool, connectionId)
   pools.set(connectionId, pool)
   return pool
+}
+
+function instrumentPgPool(pool: Pool, connectionId: string): void {
+  const original = pool.query.bind(pool) as (...args: unknown[]) => Promise<unknown>
+  ;(pool as unknown as { query: unknown }).query = async function patched(
+    ...args: unknown[]
+  ): Promise<unknown> {
+    const first = args[0] as string | { text?: string; values?: unknown[] }
+    const sql = typeof first === 'string' ? first : (first?.text ?? '')
+    const params =
+      typeof first === 'string'
+        ? ((args[1] as unknown[] | undefined) ?? [])
+        : ((first?.values as unknown[] | undefined) ?? [])
+    const t0 = Date.now()
+    try {
+      const res = (await original(...args)) as { rowCount?: number | null }
+      recordQuery({
+        connectionId,
+        engine: 'postgres',
+        sql,
+        params,
+        durationMs: Date.now() - t0,
+        rowCount: res?.rowCount ?? null,
+        success: true
+      })
+      return res
+    } catch (err) {
+      recordQuery({
+        connectionId,
+        engine: 'postgres',
+        sql,
+        params,
+        durationMs: Date.now() - t0,
+        success: false,
+        error: err instanceof Error ? err.message : String(err)
+      })
+      throw err
+    }
+  }
 }
 
 async function disconnectPool(connectionId: string): Promise<void> {
@@ -68,6 +110,7 @@ async function disconnectAll(): Promise<void> {
 
 async function test(input: ConnectionInput): Promise<TestConnectionResult> {
   const pool = new Pool({ ...toPoolConfig(input), max: 1 })
+  instrumentPgPool(pool, '<test>')
   try {
     const res = await pool.query<{ version: string }>('select version() as version')
     return { success: true, serverVersion: res.rows[0]?.version }
@@ -461,6 +504,21 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   }
 }
 
+async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
+  const pool = getPool(opts.connectionId)
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500)
+  const params: unknown[] = []
+  let where = ''
+  if (opts.search && opts.search.trim()) {
+    params.push(`%${opts.search.trim()}%`)
+    where = `where ${quoteIdent(opts.column)}::text ilike $${params.length}`
+  }
+  params.push(limit)
+  const sql = `select distinct ${quoteIdent(opts.column)} as value from ${qualifiedTable(opts.schema, opts.table)} ${where} order by 1 nulls last limit $${params.length}`
+  const res = await pool.query<{ value: unknown }>(sql, params)
+  return res.rows.map((r) => r.value)
+}
+
 export const postgresDriver: DatabaseDriver = {
   test,
   describeActive,
@@ -473,5 +531,6 @@ export const postgresDriver: DatabaseDriver = {
   insertRow,
   updateRow,
   deleteRow,
-  runQuery
+  runQuery,
+  getColumnDistinct
 }

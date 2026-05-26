@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import type {
   ConnectionInput,
+  DistinctValuesOptions,
   GetRowsOptions,
   RowDelete,
   RowMutation,
@@ -18,6 +19,7 @@ import {
   describeActive,
   deleteRow,
   disconnectPool,
+  getColumnDistinct,
   getRows,
   insertRow,
   listSchemas,
@@ -27,6 +29,7 @@ import {
   testConnection,
   updateRow
 } from '../db/manager'
+import { clearQueryLogs, listQueryLogs } from '../db/query-log'
 
 function wrap<TArgs extends unknown[], TResult>(
   handler: (...args: TArgs) => Promise<TResult> | TResult
@@ -118,5 +121,21 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'db:query-run',
     wrap(async (opts: RunQueryOptions) => runQuery(opts))
+  )
+
+  ipcMain.handle(
+    'db:column-distinct',
+    wrap(async (opts: DistinctValuesOptions) => getColumnDistinct(opts))
+  )
+
+  ipcMain.handle(
+    'db:logs-list',
+    wrap(async () => listQueryLogs())
+  )
+  ipcMain.handle(
+    'db:logs-clear',
+    wrap(async () => {
+      clearQueryLogs()
+    })
   )
 }

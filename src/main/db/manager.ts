@@ -1,6 +1,7 @@
 import type {
   ConnectionInput,
   DatabaseEngine,
+  DistinctValuesOptions,
   GetRowsOptions,
   QueryResult,
   RowDelete,
@@ -88,4 +89,8 @@ export function deleteRow(opts: RowDelete): Promise<{ deleted: number }> {
 
 export function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   return driverForConnection(opts.connectionId).runQuery(opts)
+}
+
+export function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
+  return driverForConnection(opts.connectionId).getColumnDistinct(opts)
 }

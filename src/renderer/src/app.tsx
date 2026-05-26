@@ -4,6 +4,7 @@ import { ConnectionProvider } from '@renderer/features/connections/store/connect
 import { ConnectionsPage } from '@renderer/features/connections/components/connections-page'
 import { DatabasePage } from '@renderer/features/database/components/database-page'
 import { QueryPage } from '@renderer/features/query/components/query-page'
+import { LogsPage } from '@renderer/features/logs/components/logs-page'
 import { ROUTES } from '@renderer/config/routes'
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
           <Route path={ROUTES.database} element={<DatabasePage />} />
           <Route path={ROUTES.table} element={<DatabasePage />} />
           <Route path={ROUTES.query} element={<QueryPage />} />
+          <Route path={ROUTES.logs} element={<LogsPage />} />
           <Route path="*" element={<Navigate to={ROUTES.connections} replace />} />
         </Routes>
       </AppShell>

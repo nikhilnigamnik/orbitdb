@@ -127,6 +127,15 @@ export interface RunQueryOptions {
   params?: unknown[]
 }
 
+export interface DistinctValuesOptions {
+  connectionId: string
+  schema: string
+  table: string
+  column: string
+  limit?: number
+  search?: string
+}
+
 export interface QueryResult {
   success: boolean
   error?: string
@@ -148,4 +157,17 @@ export interface ActiveConnectionMeta {
   serverVersion: string
   currentDatabase: string
   currentUser: string
+}
+
+export interface QueryLogEntry {
+  id: string
+  connectionId: string
+  engine: DatabaseEngine
+  sql: string
+  params: unknown[]
+  durationMs: number
+  rowCount: number | null
+  success: boolean
+  error?: string
+  ranAt: string
 }

@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { IconDatabase, IconPlug, IconTerminal2 } from '@tabler/icons-react'
+import { IconDatabase, IconListDetails, IconPlug, IconTerminal2 } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
 import { APP_NAME } from '@renderer/config/site'
 import { ROUTES } from '@renderer/config/routes'
@@ -10,7 +10,8 @@ import orbitdbLogo from '@renderer/assets/orbitdb-white.png'
 const NAV_ITEMS = [
   { to: ROUTES.connections, label: 'Connections', icon: IconPlug, end: true },
   { to: ROUTES.database, label: 'Browser', icon: IconDatabase, end: false },
-  { to: ROUTES.query, label: 'Query', icon: IconTerminal2, end: false }
+  { to: ROUTES.query, label: 'Query', icon: IconTerminal2, end: false },
+  { to: ROUTES.logs, label: 'Query log', icon: IconListDetails, end: false }
 ]
 
 export function Sidebar() {
@@ -19,10 +20,11 @@ export function Sidebar() {
 
   const isBrowserActive = pathname.startsWith(ROUTES.database)
   const isQueryActive = pathname.startsWith(ROUTES.query)
-  const isConnectionsActive = !isBrowserActive && !isQueryActive
+  const isLogsActive = pathname.startsWith(ROUTES.logs)
+  const isConnectionsActive = !isBrowserActive && !isQueryActive && !isLogsActive
 
   return (
-    <aside className="m-1 flex h-[calc(100vh-0.5rem)] w-14 shrink-0 flex-col items-center rounded-xl border border-border bg-surface shadow-lg shadow-black/20">
+    <aside className="m-1 flex h-[calc(100vh-0.5rem)] w-14 shrink-0 flex-col items-center rounded-xl bg-surface shadow-lg shadow-black/20">
       <div className="flex items-center justify-center pt-4 pb-4">
         <img src={orbitdbLogo} alt={APP_NAME} className="h-7 w-7" />
       </div>
@@ -34,7 +36,9 @@ export function Sidebar() {
               ? isConnectionsActive
               : to === ROUTES.database
                 ? isBrowserActive
-                : isQueryActive
+                : to === ROUTES.query
+                  ? isQueryActive
+                  : isLogsActive
           const isDisabled = (to === ROUTES.database || to === ROUTES.query) && !active
           return (
             <Tooltip key={to}>

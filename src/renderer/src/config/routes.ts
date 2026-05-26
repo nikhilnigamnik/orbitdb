@@ -2,7 +2,8 @@ export const ROUTES = {
   connections: '/',
   database: '/database',
   table: '/database/table',
-  query: '/query'
+  query: '/query',
+  logs: '/logs'
 } as const
 
 export function tableRoute(schema: string, name: string): string {

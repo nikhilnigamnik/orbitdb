@@ -3,8 +3,10 @@ import { electronAPI } from '@electron-toolkit/preload'
 import type {
   ActiveConnectionMeta,
   ConnectionInput,
+  DistinctValuesOptions,
   GetRowsOptions,
   OperationResult,
+  QueryLogEntry,
   QueryResult,
   RowDelete,
   RowMutation,
@@ -44,7 +46,11 @@ const api = {
     insertRow: (opts: RowMutation) => invoke<Record<string, unknown>>('db:row-insert', opts),
     updateRow: (opts: RowUpdate) => invoke<Record<string, unknown>>('db:row-update', opts),
     deleteRow: (opts: RowDelete) => invoke<{ deleted: number }>('db:row-delete', opts),
-    runQuery: (opts: RunQueryOptions) => invoke<QueryResult>('db:query-run', opts)
+    runQuery: (opts: RunQueryOptions) => invoke<QueryResult>('db:query-run', opts),
+    columnDistinct: (opts: DistinctValuesOptions) =>
+      invoke<unknown[]>('db:column-distinct', opts),
+    listLogs: () => invoke<QueryLogEntry[]>('db:logs-list'),
+    clearLogs: () => invoke<void>('db:logs-clear')
   }
 }
 

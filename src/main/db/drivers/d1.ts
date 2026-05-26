@@ -1,6 +1,7 @@
 import type {
   ColumnInfo,
   ConnectionInput,
+  DistinctValuesOptions,
   ForeignKeyInfo,
   GetRowsOptions,
   IndexInfo,
@@ -17,6 +18,7 @@ import type {
   TestConnectionResult
 } from '../../../shared/types'
 import { getConnection } from '../../store/connections-store'
+import { recordQuery } from '../query-log'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
 const CF_API = 'https://api.cloudflare.com/client/v4'
@@ -61,6 +63,39 @@ async function callD1<TRow = Record<string, unknown>>(
   input: ConnectionInput,
   sql: string,
   params: unknown[] = []
+): Promise<D1QueryResultEntry<TRow>> {
+  const connectionId = 'id' in input ? (input as SavedConnection).id : '<test>'
+  const t0 = Date.now()
+  try {
+    const entry = await callD1Raw<TRow>(input, sql, params)
+    recordQuery({
+      connectionId,
+      engine: 'd1',
+      sql,
+      params,
+      durationMs: Date.now() - t0,
+      rowCount: entry.results?.length ?? null,
+      success: true
+    })
+    return entry
+  } catch (err) {
+    recordQuery({
+      connectionId,
+      engine: 'd1',
+      sql,
+      params,
+      durationMs: Date.now() - t0,
+      success: false,
+      error: err instanceof Error ? err.message : String(err)
+    })
+    throw err
+  }
+}
+
+async function callD1Raw<TRow = Record<string, unknown>>(
+  input: ConnectionInput,
+  sql: string,
+  params: unknown[]
 ): Promise<D1QueryResultEntry<TRow>> {
   const { accountId, databaseId, apiToken } = requireD1Credentials(input)
   const url = `${CF_API}/accounts/${accountId}/d1/database/${databaseId}/query`
@@ -516,6 +551,20 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
 // quoteLiteral is reserved for future use (e.g., DDL helpers that can't bind).
 void quoteLiteral
 
+async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
+  const saved = loadSaved(opts.connectionId)
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500)
+  const params: unknown[] = []
+  let where = ''
+  if (opts.search && opts.search.trim()) {
+    params.push(`%${opts.search.trim()}%`)
+    where = `where cast(${quoteIdent(opts.column)} as text) like ?`
+  }
+  const sql = `select distinct ${quoteIdent(opts.column)} as value from ${quoteIdent(opts.table)} ${where} order by 1 limit ${limit}`
+  const entry = await callD1<{ value: unknown }>(saved, sql, params)
+  return entry.results.map((r) => r.value)
+}
+
 export const d1Driver: DatabaseDriver = {
   test,
   describeActive,
@@ -528,5 +577,6 @@ export const d1Driver: DatabaseDriver = {
   insertRow,
   updateRow,
   deleteRow,
-  runQuery
+  runQuery,
+  getColumnDistinct
 }

@@ -207,12 +207,14 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-2">
         <FiltersBar
+          connectionId={connectionId}
+          schema={details.schema}
+          table={details.name}
           columns={columns}
           filters={filters}
           onChange={setFilters}
           onApply={() => {
             setOffset(0)
-            void load()
           }}
         />
         <div className="flex items-center gap-1.5">

@@ -247,7 +247,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                             key={table.name}
                             onClick={() => selectTable(schema, table)}
                             className={cn(
-                              'group/row flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors',
+                              'group/row flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px]',
                               isActive
                                 ? 'bg-surface-elevated text-text'
                                 : 'text-text-muted hover:bg-surface-elevated/50 hover:text-text'
