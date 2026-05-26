@@ -8,7 +8,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-accent text-white [a]:hover:bg-accent/80',
+        default:
+          'relative isolate overflow-hidden bg-accent text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-z-10 before:h-1/2 before:bg-gradient-to-b before:from-white/22 before:to-transparent [a]:hover:bg-accent/80',
         outline:
           'border-gray-300 bg-white hover:bg-gray-100 hover:text-gray-900 aria-expanded:bg-gray-100 aria-expanded:text-gray-900',
         secondary:

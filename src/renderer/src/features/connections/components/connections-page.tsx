@@ -141,7 +141,6 @@ export function ConnectionsPage() {
               className="rounded-lg bg-accent px-3.5 text-white hover:bg-accent/90"
               onClick={openCreate}
             >
-              <IconPlus size={14} />
               Add new
             </Button>
           </div>

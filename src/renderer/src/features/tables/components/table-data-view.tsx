@@ -249,7 +249,6 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
               className="bg-accent text-white hover:bg-accent/90"
               onClick={insertModal.open}
             >
-              <IconPlus size={12} />
               Insert row
             </Button>
           )}
