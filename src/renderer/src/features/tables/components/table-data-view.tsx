@@ -174,7 +174,7 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
           {canMutate && (
             <Button
               size="sm"
-              className="bg-[var(--color-text)] text-[var(--color-bg)] hover:bg-[var(--color-text)]/90"
+              className="bg-accent text-white hover:bg-accent/90"
               onClick={insertModal.open}
             >
               <IconPlus size={12} />

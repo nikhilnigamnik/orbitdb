@@ -1,4 +1,6 @@
 import * as React from 'react'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden'
 import { IconX } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
 
@@ -13,10 +15,10 @@ interface ModalProps {
 }
 
 const SIZE_CLASSES: Record<NonNullable<ModalProps['size']>, string> = {
-  sm: 'max-w-md',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
-  xl: 'max-w-4xl'
+  sm: 'w-[90vw] sm:max-w-md',
+  md: 'w-[90vw] sm:max-w-lg',
+  lg: 'w-[90vw] sm:max-w-2xl',
+  xl: 'w-[92vw] sm:max-w-4xl'
 }
 
 export function Modal({
@@ -28,51 +30,61 @@ export function Modal({
   footer,
   size = 'md'
 }: ModalProps) {
-  React.useEffect(() => {
-    if (!isOpen) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose])
-
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className={cn(
-          'relative w-full rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl',
-          SIZE_CLASSES[size]
-        )}
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-neutral-800 px-5 py-4">
-          <div>
-            <h2 className="text-base font-semibold text-neutral-100">{title}</h2>
-            {description && <p className="mt-1 text-xs text-neutral-500">{description}</p>}
+    <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay
+          className={cn(
+            'fixed inset-0 z-50 bg-black/50 backdrop-blur-sm',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
+            'data-[state=open]:duration-200 data-[state=closed]:duration-150'
+          )}
+        />
+        <DialogPrimitive.Content
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          className={cn(
+            'fixed top-2 right-2 bottom-2 z-50 flex flex-col rounded-xl border border-border bg-surface shadow-2xl shadow-black/40',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right',
+            'data-[state=open]:duration-300 data-[state=closed]:duration-200',
+            'ease-out',
+            SIZE_CLASSES[size]
+          )}
+        >
+          <VisuallyHidden.Root>
+            <DialogPrimitive.Title>
+              {typeof title === 'string' ? title : 'Dialog'}
+            </DialogPrimitive.Title>
+            {description && (
+              <DialogPrimitive.Description>
+                {typeof description === 'string' ? description : ''}
+              </DialogPrimitive.Description>
+            )}
+          </VisuallyHidden.Root>
+
+          <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+            <div>
+              <h2 className="text-base font-semibold text-text">{title}</h2>
+              {description && <p className="mt-1 text-xs text-text-subtle">{description}</p>}
+            </div>
+            <DialogPrimitive.Close
+              className="rounded-md p-1 text-text-subtle transition-colors hover:bg-surface-elevated hover:text-text"
+              aria-label="Close"
+            >
+              <IconX size={16} />
+            </DialogPrimitive.Close>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
-          >
-            <IconX size={16} />
-          </button>
-        </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && (
-          <div className="flex items-center justify-end gap-2 border-t border-neutral-800 px-5 py-3">
-            {footer}
-          </div>
-        )}
-      </div>
-    </div>
+
+          <div className="flex-1 overflow-auto px-5 py-4">{children}</div>
+
+          {footer && (
+            <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
+              {footer}
+            </div>
+          )}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }

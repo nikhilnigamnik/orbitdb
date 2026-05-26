@@ -158,7 +158,7 @@ export function RowEditorModal({
           </Button>
           <SubmitButton
             size="sm"
-            className="bg-blue-600 text-white hover:bg-blue-600/90"
+            className="bg-accent text-white hover:bg-accent/90"
             onClick={handleSubmit}
             isSubmitting={isSubmitting}
             loadingText={mode === 'insert' ? 'Inserting…' : 'Updating…'}

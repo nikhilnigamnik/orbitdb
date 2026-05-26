@@ -37,7 +37,7 @@ export function QueryPage() {
           action={
             <Button
               size="sm"
-              className="bg-blue-600 text-white hover:bg-blue-600/90"
+              className="bg-accent text-white hover:bg-accent/90"
               onClick={() => navigate(ROUTES.connections)}
             >
               Go to connections
@@ -115,7 +115,7 @@ export function QueryPage() {
           </Button>
           <Button
             size="sm"
-            className="bg-blue-600 text-white hover:bg-blue-600/90"
+            className="bg-accent text-white hover:bg-accent/90"
             onClick={runQuery}
             disabled={isRunning || sql.trim() === ''}
           >

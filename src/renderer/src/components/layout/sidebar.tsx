@@ -6,6 +6,7 @@ import { ROUTES } from '@renderer/config/routes'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { shortServerVersion } from '@renderer/lib/format'
 import { ENGINE_LABEL } from '@renderer/config/site'
+import orbitdbLogo from '@renderer/assets/orbitdb-white.png'
 
 const NAV_ITEMS = [
   { to: ROUTES.connections, label: 'Connections', icon: IconPlug, end: true },
@@ -22,11 +23,9 @@ export function Sidebar() {
   const isConnectionsActive = !isBrowserActive && !isQueryActive
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
+    <aside className="m-2 flex h-[calc(100vh-1rem)] w-56 shrink-0 flex-col rounded-xl border border-border bg-surface shadow-lg shadow-black/20">
       <div className="flex items-center gap-2 px-5 pt-12 pb-4">
-        <span className="text-[13px] font-semibold tracking-tight text-[var(--color-text)]">
-          {APP_NAME}
-        </span>
+        <img src={orbitdbLogo} alt={APP_NAME} className="h-10 w-10 shrink-0" />
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 px-3">

@@ -20,7 +20,15 @@ nsis:
   createDesktopShortcut: always
 mac:
   entitlementsInherit: build/entitlements.mac.plist
+  identity: null
   notarize: false
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:

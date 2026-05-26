@@ -37,7 +37,7 @@ export function DatabasePage() {
           action={
             <Button
               size="sm"
-              className="bg-[var(--color-text)] text-[var(--color-bg)] hover:bg-[var(--color-text)]/90"
+              className="bg-accent text-white hover:bg-accent/90"
               onClick={() => navigate(ROUTES.connections)}
             >
               Go to connections

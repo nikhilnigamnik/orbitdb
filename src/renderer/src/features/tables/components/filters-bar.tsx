@@ -160,7 +160,7 @@ export function FiltersBar({ columns, filters, onChange, onApply }: FiltersBarPr
               Add filter
             </Button>
             <div className="flex-1" />
-            <Button type="submit" size="sm" className="bg-blue-600 text-white hover:bg-blue-600/90">
+            <Button type="submit" size="sm" className="bg-accent text-white hover:bg-accent/90">
               Apply
             </Button>
           </div>
