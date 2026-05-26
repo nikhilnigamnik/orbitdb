@@ -1,5 +1,13 @@
-import { IconAlertTriangle, IconCheck, IconLoader, IconTable } from '@tabler/icons-react'
+import {
+  IconAlertTriangle,
+  IconCheck,
+  IconDownload,
+  IconLoader,
+  IconTable
+} from '@tabler/icons-react'
+import { Button } from '@renderer/components/ui/button'
 import { formatCellValue, formatNumber } from '@renderer/lib/format'
+import { buildExportFilename, downloadJson } from '@renderer/lib/export'
 import type { QueryResult } from '@renderer/types'
 
 interface QueryResultsProps {
@@ -43,6 +51,13 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
   }
 
   const fields = result.fields
+  const rowsForExport = result.rows
+  const canExport = rowsForExport.length > 0
+
+  function handleExport() {
+    if (!canExport) return
+    downloadJson(buildExportFilename(['query-result'], 'json'), rowsForExport)
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -63,6 +78,17 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
           </span>
         )}
         <span className="ml-auto font-mono text-text-subtle">{result.durationMs} ms</span>
+        {canExport && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="-my-1 h-6 px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+            onClick={handleExport}
+          >
+            <IconDownload size={11} />
+            Export
+          </Button>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">

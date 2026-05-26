@@ -1,10 +1,11 @@
 import * as React from 'react'
 import type { RowSelectionState } from '@tanstack/react-table'
-import { IconPlus, IconRefresh, IconTrash, IconX } from '@tabler/icons-react'
+import { IconDownload, IconPlus, IconRefresh, IconTrash, IconX } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { unwrap } from '@renderer/lib/ipc'
+import { buildExportFilename, downloadJson } from '@renderer/lib/export'
 import { DEFAULT_PAGE_SIZE } from '@renderer/config/site'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import type {
@@ -167,6 +168,12 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
     }
   }
 
+  function handleExport() {
+    const data = selectedRows.length > 0 ? selectedRows : rows
+    if (data.length === 0) return
+    downloadJson(buildExportFilename([details.schema, details.name], 'json'), data)
+  }
+
   async function handleBulkDelete() {
     if (selectedRows.length === 0) return
     setIsMutating(true)
@@ -209,6 +216,21 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
           }}
         />
         <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-text-muted hover:bg-surface-elevated hover:text-text"
+            onClick={handleExport}
+            disabled={rows.length === 0}
+          >
+            <IconDownload size={12} />
+            Export
+            {selectedCount > 0 && (
+              <span className="ml-0.5 rounded bg-surface px-1 py-0 font-mono text-[10px] text-text-subtle">
+                {selectedCount}
+              </span>
+            )}
+          </Button>
           <Button
             size="sm"
             variant="ghost"

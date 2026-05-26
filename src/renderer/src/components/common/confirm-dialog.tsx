@@ -1,5 +1,7 @@
-import { Modal } from '@renderer/components/ui/modal'
+import { IconAlertTriangle } from '@tabler/icons-react'
+import { Sheet } from '@renderer/components/ui/sheet'
 import { Button } from '@renderer/components/ui/button'
+import { cn } from '@renderer/lib/utils'
 
 interface ConfirmDialogProps {
   isOpen: boolean
@@ -24,40 +26,59 @@ export function ConfirmDialog({
   variant = 'default',
   isLoading
 }: ConfirmDialogProps) {
+  const isDanger = variant === 'danger'
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={title}
-      description={description}
-      size="sm"
-      footer={
-        <>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700"
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            {cancelLabel}
-          </Button>
-          <Button
-            size="sm"
-            className={
-              variant === 'danger'
-                ? 'bg-red-500 text-white hover:bg-red-500/90'
-                : 'bg-accent text-white hover:bg-accent/90'
-            }
-            onClick={onConfirm}
-            disabled={isLoading}
-          >
-            {confirmLabel}
-          </Button>
-        </>
+    <Sheet
+      openSheet={isOpen}
+      setOpenSheet={(open) => {
+        if (!open && !isLoading) onClose()
+      }}
+      side="right"
+      sheetContentClassName="sm:max-w-sm"
+      content={
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="flex flex-1 flex-col items-start gap-3 px-5 py-5 pr-12">
+            <div
+              className={cn(
+                'flex h-9 w-9 items-center justify-center rounded-full',
+                isDanger ? 'bg-red-500/10 text-red-400' : 'bg-accent/10 text-accent'
+              )}
+            >
+              <IconAlertTriangle size={18} stroke={2} />
+            </div>
+            <h2 className="text-[14px] font-semibold text-text">{title}</h2>
+            {description && (
+              <p className="text-[12px] leading-relaxed text-text-muted">{description}</p>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface-elevated/20 px-4 py-3">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="text-text-muted hover:bg-surface-elevated hover:text-text"
+              onClick={onClose}
+              disabled={isLoading}
+            >
+              {cancelLabel}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className={
+                isDanger
+                  ? 'bg-red-500 text-white hover:bg-red-500/90'
+                  : 'bg-accent text-white hover:bg-accent/90'
+              }
+              onClick={onConfirm}
+              disabled={isLoading}
+            >
+              {confirmLabel}
+            </Button>
+          </div>
+        </div>
       }
-    >
-      <div className="text-sm text-neutral-300" />
-    </Modal>
+    />
   )
 }
