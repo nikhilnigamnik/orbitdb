@@ -15,7 +15,8 @@ import {
   IconLoader,
   IconPencil,
   IconTrash,
-  IconKey
+  IconKey,
+  IconArrowUpRight
 } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
 import { formatCellValue } from '@renderer/lib/format'
@@ -24,6 +25,12 @@ import { Checkbox } from '@renderer/components/ui/checkbox'
 import type { ColumnInfo, SortDirection } from '@renderer/types'
 
 type Row = Record<string, unknown>
+
+interface ForeignKeyTarget {
+  schema: string
+  table: string
+  column: string
+}
 
 interface DataGridProps {
   columns: ColumnInfo[]
@@ -38,6 +45,8 @@ interface DataGridProps {
   rowSelection?: RowSelectionState
   onRowSelectionChange?: (selection: RowSelectionState) => void
   isLoading?: boolean
+  fkColumns?: Map<string, ForeignKeyTarget>
+  onOpenForeignKey?: (column: string, value: unknown) => void
 }
 
 const SELECT_COLUMN_ID = '__select__'
@@ -56,7 +65,9 @@ export function DataGrid({
   rowOffset = 0,
   rowSelection: controlledRowSelection,
   onRowSelectionChange,
-  isLoading = false
+  isLoading = false,
+  fkColumns,
+  onOpenForeignKey
 }: DataGridProps) {
   const [internalRowSelection, setInternalRowSelection] = React.useState<RowSelectionState>({})
   const isControlled = controlledRowSelection !== undefined
@@ -191,6 +202,26 @@ export function DataGrid({
           if (value === null) {
             return <span className="italic text-text-subtle">NULL</span>
           }
+          const fkTarget = fkColumns?.get(col.name)
+          if (fkTarget && onOpenForeignKey) {
+            return (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenForeignKey(col.name, value)
+                }}
+                className="group/fk inline-flex max-w-full cursor-pointer items-center gap-1 truncate rounded text-accent transition-colors hover:text-accent/80 hover:underline"
+                title={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
+              >
+                <span className="truncate">{display}</span>
+                <IconArrowUpRight
+                  size={10}
+                  className="shrink-0 opacity-0 transition-opacity group-hover/fk:opacity-100"
+                />
+              </button>
+            )
+          }
           return <span className="text-text">{display}</span>
         },
         meta: { dataType: col.dataType }
@@ -235,7 +266,18 @@ export function DataGrid({
       )
     }
     return cols
-  }, [columns, canMutate, orderBy, orderDir, onSort, onEditRow, onDeleteRow, rowOffset])
+  }, [
+    columns,
+    canMutate,
+    orderBy,
+    orderDir,
+    onSort,
+    onEditRow,
+    onDeleteRow,
+    rowOffset,
+    fkColumns,
+    onOpenForeignKey
+  ])
 
   const table = useReactTable<Row>({
     data: rows,

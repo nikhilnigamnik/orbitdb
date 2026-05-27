@@ -10,3 +10,15 @@ export const ROUTES = {
 export function tableRoute(schema: string, name: string): string {
   return `${ROUTES.table}?schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(name)}`
 }
+
+export function tableRouteWithFk(
+  schema: string,
+  name: string,
+  fkColumn: string,
+  fkValue: string
+): string {
+  return (
+    tableRoute(schema, name) +
+    `&fkColumn=${encodeURIComponent(fkColumn)}&fkValue=${encodeURIComponent(fkValue)}`
+  )
+}

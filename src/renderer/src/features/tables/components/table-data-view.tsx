@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { RowSelectionState } from '@tanstack/react-table'
 import { IconDownload, IconRefresh, IconTrash, IconX } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
@@ -7,6 +8,7 @@ import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { unwrap } from '@renderer/lib/ipc'
 import { buildExportFilename, downloadJson } from '@renderer/lib/export'
 import { DEFAULT_PAGE_SIZE } from '@renderer/config/site'
+import { tableRouteWithFk } from '@renderer/config/routes'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import type {
   ColumnInfo,
@@ -26,6 +28,11 @@ interface TableDataViewProps {
 }
 
 export function TableDataView({ connectionId, details }: TableDataViewProps) {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const fkColumn = searchParams.get('fkColumn')
+  const fkValue = searchParams.get('fkValue')
+
   const [rows, setRows] = React.useState<Record<string, unknown>[]>([])
   const [columns, setColumns] = React.useState<ColumnInfo[]>(details.columns)
   const [totalEstimate, setTotalEstimate] = React.useState<number | null>(details.estimatedRows)
@@ -35,7 +42,34 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
   const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE)
   const [orderBy, setOrderBy] = React.useState<string | null>(null)
   const [orderDir, setOrderDir] = React.useState<SortDirection>('asc')
-  const [filters, setFilters] = React.useState<RowFilter[]>([])
+  const [filters, setFilters] = React.useState<RowFilter[]>(() => {
+    if (fkColumn && fkValue != null) {
+      return [{ column: fkColumn, operator: '=', value: fkValue }]
+    }
+    return []
+  })
+
+  const fkByColumn = React.useMemo(() => {
+    const map = new Map<string, { schema: string; table: string; column: string }>()
+    for (const fk of details.foreignKeys) {
+      if (fk.columns.length !== 1 || fk.referencedColumns.length !== 1) continue
+      map.set(fk.columns[0], {
+        schema: fk.referencedSchema,
+        table: fk.referencedTable,
+        column: fk.referencedColumns[0]
+      })
+    }
+    return map
+  }, [details.foreignKeys])
+
+  const openForeignKey = React.useCallback(
+    (column: string, value: unknown) => {
+      const target = fkByColumn.get(column)
+      if (!target || value == null) return
+      navigate(tableRouteWithFk(target.schema, target.table, target.column, String(value)))
+    },
+    [fkByColumn, navigate]
+  )
 
   const insertModal = useDisclosure(false)
   const editModal = useDisclosure(false)
@@ -293,6 +327,8 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
           rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}
           isLoading={isLoading}
+          fkColumns={fkByColumn}
+          onOpenForeignKey={openForeignKey}
         />
 
         {canMutate && selectedCount > 0 && (
