@@ -3,8 +3,10 @@ import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { randomUUID } from 'crypto'
 import type { ConnectionInput, SavedConnection } from '../../shared/types'
+import { decryptString, encryptString, isEncrypted, isEncryptionAvailable } from './crypto'
 
 const FILE_NAME = 'connections.json'
+const SENSITIVE_FIELDS = ['password', 'apiToken'] as const
 
 interface StoreShape {
   version: 1
@@ -17,29 +19,74 @@ function storePath(): string {
   return join(dir, FILE_NAME)
 }
 
+function encryptForDisk(conn: SavedConnection): SavedConnection {
+  const out: SavedConnection = { ...conn }
+  for (const field of SENSITIVE_FIELDS) {
+    const value = out[field]
+    if (typeof value === 'string' && value.length > 0) {
+      out[field] = encryptString(value)
+    }
+  }
+  return out
+}
+
+function decryptFromDisk(conn: SavedConnection): SavedConnection {
+  const out: SavedConnection = { ...conn }
+  for (const field of SENSITIVE_FIELDS) {
+    const value = out[field]
+    if (typeof value === 'string' && value.length > 0) {
+      out[field] = decryptString(value)
+    }
+  }
+  return out
+}
+
+function hasPlaintextSecrets(conn: SavedConnection): boolean {
+  return SENSITIVE_FIELDS.some((field) => {
+    const value = conn[field]
+    return typeof value === 'string' && value.length > 0 && !isEncrypted(value)
+  })
+}
+
 function read(): StoreShape {
   const path = storePath()
   if (!existsSync(path)) {
     return { version: 1, connections: [] }
   }
+  let parsed: StoreShape
   try {
     const raw = readFileSync(path, 'utf8')
-    const parsed = JSON.parse(raw) as StoreShape
+    parsed = JSON.parse(raw) as StoreShape
     if (!parsed || !Array.isArray(parsed.connections)) {
       return { version: 1, connections: [] }
     }
-    parsed.connections = parsed.connections.map((c) => ({
-      ...c,
-      engine: c.engine ?? 'postgres'
-    }))
-    return parsed
   } catch {
     return { version: 1, connections: [] }
   }
+
+  parsed.connections = parsed.connections.map((c) => ({
+    ...c,
+    engine: c.engine ?? 'postgres'
+  }))
+
+  const needsMigration =
+    isEncryptionAvailable() && parsed.connections.some(hasPlaintextSecrets)
+  if (needsMigration) {
+    console.info(
+      '[connections-store] migrating plaintext credentials to encrypted-at-rest'
+    )
+    writeRaw({ ...parsed, connections: parsed.connections.map(encryptForDisk) })
+  }
+
+  return { ...parsed, connections: parsed.connections.map(decryptFromDisk) }
+}
+
+function writeRaw(state: StoreShape): void {
+  writeFileSync(storePath(), JSON.stringify(state, null, 2), 'utf8')
 }
 
 function write(state: StoreShape): void {
-  writeFileSync(storePath(), JSON.stringify(state, null, 2), 'utf8')
+  writeRaw({ ...state, connections: state.connections.map(encryptForDisk) })
 }
 
 export function listConnections(): SavedConnection[] {
