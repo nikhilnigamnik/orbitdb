@@ -4,6 +4,7 @@ import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { Switch } from '@renderer/components/ui/switch'
+import { Select } from '@renderer/components/ui/select'
 import { FormField } from '@renderer/components/forms/form-field'
 import { SubmitButton } from '@renderer/components/forms/submit-button'
 import { Badge } from '@renderer/components/ui/badge'
@@ -185,19 +186,18 @@ export function RowEditorSheet({
                           className="font-mono text-xs"
                         />
                       ) : isBoolType(col.udtName) ? (
-                        <select
-                          id={`row-${col.name}`}
+                        <Select
                           value={field.raw}
-                          onChange={(e) =>
-                            update(col.name, { raw: e.target.value, isNull: false })
-                          }
+                          onChange={(value) => update(col.name, { raw: value, isNull: false })}
+                          options={[
+                            { value: 'true', label: 'true' },
+                            { value: 'false', label: 'false' }
+                          ]}
+                          placeholder="—"
                           disabled={field.isNull}
-                          className="h-9 w-full rounded-lg border border-border bg-transparent px-2.5 text-sm text-text outline-none focus-visible:border-accent/40"
-                        >
-                          <option value="">—</option>
-                          <option value="true">true</option>
-                          <option value="false">false</option>
-                        </select>
+                          ariaLabel={col.name}
+                          className="h-9 w-full"
+                        />
                       ) : (
                         <Input
                           id={`row-${col.name}`}
