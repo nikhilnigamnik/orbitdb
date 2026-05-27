@@ -17,7 +17,8 @@ import type {
   SchemaInfo,
   TableDetails,
   TableInfo,
-  TestConnectionResult
+  TestConnectionResult,
+  UpdateCheckResult
 } from '../shared/types'
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<OperationResult<T>> {
@@ -51,6 +52,11 @@ const api = {
       invoke<unknown[]>('db:column-distinct', opts),
     listLogs: () => invoke<QueryLogEntry[]>('db:logs-list'),
     clearLogs: () => invoke<void>('db:logs-clear')
+  },
+  app: {
+    getVersion: () => invoke<string>('app:get-version'),
+    checkUpdate: () => invoke<UpdateCheckResult>('app:check-update'),
+    openExternal: (url: string) => invoke<void>('app:open-external', url)
   }
 }
 

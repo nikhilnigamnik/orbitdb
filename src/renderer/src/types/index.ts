@@ -21,5 +21,6 @@ export type {
   SortDirection,
   TableDetails,
   TableInfo,
-  TestConnectionResult
+  TestConnectionResult,
+  UpdateCheckResult
 } from '../../../shared/types'

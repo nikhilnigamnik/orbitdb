@@ -1,9 +1,16 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { IconDatabase, IconListDetails, IconPlug, IconTerminal2 } from '@tabler/icons-react'
+import {
+  IconDatabase,
+  IconListDetails,
+  IconPlug,
+  IconTerminal2,
+  IconSettings
+} from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
 import { APP_NAME } from '@renderer/config/site'
 import { ROUTES } from '@renderer/config/routes'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
+import { useUpdateCheck } from '@renderer/features/settings/store'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import orbitdbLogo from '@renderer/assets/orbitdb-brand.png'
 
@@ -17,11 +24,15 @@ const NAV_ITEMS = [
 export function Sidebar() {
   const { pathname } = useLocation()
   const { active, current } = useConnection()
+  const { result } = useUpdateCheck()
+  const hasUpdate = !!result?.hasUpdate
 
   const isBrowserActive = pathname.startsWith(ROUTES.database)
   const isQueryActive = pathname.startsWith(ROUTES.query)
   const isLogsActive = pathname.startsWith(ROUTES.logs)
-  const isConnectionsActive = !isBrowserActive && !isQueryActive && !isLogsActive
+  const isSettingsActive = pathname.startsWith(ROUTES.settings)
+  const isConnectionsActive =
+    !isBrowserActive && !isQueryActive && !isLogsActive && !isSettingsActive
 
   return (
     <aside className="m-1 flex h-[calc(100vh-0.5rem)] w-14 shrink-0 flex-col items-center rounded-xl bg-surface shadow-lg shadow-black/20">
@@ -68,22 +79,54 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="flex items-center justify-center border-t border-border px-2 py-3">
+      <div className="flex flex-col items-center gap-1.5 border-t border-border px-2 py-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <NavLink
+              to={ROUTES.settings}
+              aria-label="Settings"
+              className={cn(
+                'relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+                isSettingsActive
+                  ? 'bg-surface-elevated text-text'
+                  : 'text-text-muted hover:bg-surface-elevated hover:text-text'
+              )}
+            >
+              <IconSettings size={16} stroke={1.75} />
+              {hasUpdate && (
+                <span
+                  className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-2 ring-surface"
+                  aria-hidden
+                />
+              )}
+            </NavLink>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {hasUpdate ? 'Settings — update available' : 'Settings'}
+          </TooltipContent>
+        </Tooltip>
+
         {active && current ? (
-          <button
-            type="button"
-            className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-surface-elevated"
-            aria-label={`Connected to ${current.name}`}
-          >
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="flex h-7 w-7 items-center justify-center rounded-md"
+                aria-label={`Connected to ${current.name}`}
+              >
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="right">Connected to {current.name}</TooltipContent>
+          </Tooltip>
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
               <span
-                className="h-2 w-2 rounded-full bg-neutral-700"
+                className="flex h-7 w-7 items-center justify-center rounded-md"
                 aria-label="No active connection"
-              />
+              >
+                <span className="h-2 w-2 rounded-full bg-neutral-700" />
+              </span>
             </TooltipTrigger>
             <TooltipContent side="right">No connection</TooltipContent>
           </Tooltip>

@@ -152,6 +152,14 @@ export interface OperationResult<T = void> {
   data?: T
 }
 
+export interface UpdateCheckResult {
+  currentVersion: string
+  latestVersion: string | null
+  hasUpdate: boolean
+  releaseUrl: string | null
+  publishedAt: string | null
+}
+
 export interface ActiveConnectionMeta {
   connectionId: string
   serverVersion: string

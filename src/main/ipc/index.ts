@@ -1,4 +1,5 @@
-import { ipcMain } from 'electron'
+import { ipcMain, app, shell } from 'electron'
+import { checkForUpdate } from '../app/update-check'
 import type {
   ConnectionInput,
   DistinctValuesOptions,
@@ -136,6 +137,21 @@ export function registerIpcHandlers(): void {
     'db:logs-clear',
     wrap(async () => {
       clearQueryLogs()
+    })
+  )
+
+  ipcMain.handle(
+    'app:get-version',
+    wrap(() => app.getVersion())
+  )
+  ipcMain.handle(
+    'app:check-update',
+    wrap(async () => checkForUpdate())
+  )
+  ipcMain.handle(
+    'app:open-external',
+    wrap(async (url: string) => {
+      await shell.openExternal(url)
     })
   )
 }
