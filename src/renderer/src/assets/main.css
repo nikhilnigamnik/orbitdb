@@ -30,7 +30,7 @@
 
   html,
   body {
-    @apply bg-[var(--color-bg)] text-[var(--color-text)] font-sans antialiased;
+    @apply bg-bg text-text font-sans antialiased selection:bg-accent selection:text-text;
     letter-spacing: -0.005em;
   }
 
