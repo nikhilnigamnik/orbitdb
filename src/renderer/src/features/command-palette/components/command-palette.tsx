@@ -9,11 +9,13 @@ import {
   IconPlug,
   IconPlugOff,
   IconSearch,
-  IconCornerDownLeft
+  IconCornerDownLeft,
+  IconClock
 } from '@tabler/icons-react'
 import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { ROUTES, tableRoute } from '@renderer/config/routes'
+import { loadRecent, type TableRef } from '@renderer/features/database/lib/table-prefs'
 import type { ActiveConnectionMeta, TableInfo } from '@renderer/types'
 
 interface PaletteTable {
@@ -27,7 +29,7 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void
 }
 
-const OVERLAY_CLASSES = 'fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-fade-in'
+const OVERLAY_CLASSES = 'fixed inset-0 z-40 bg-black/20 backdrop-blur-sm animate-fade-in'
 
 const CONTENT_CLASSES = [
   'fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(600px,calc(100vw-2rem))]',
@@ -57,6 +59,12 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [tables, setTables] = React.useState<PaletteTable[]>([])
   const [tablesError, setTablesError] = React.useState<string | null>(null)
   const fetchedFor = React.useRef<string | null>(null)
+  const [recents, setRecents] = React.useState<TableRef[]>([])
+
+  React.useEffect(() => {
+    if (!open || !active) return
+    setRecents(loadRecent(active.connectionId))
+  }, [open, active])
 
   const close = React.useCallback(() => onOpenChange(false), [onOpenChange])
 
@@ -155,6 +163,21 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             />
           )}
         </Command.Group>
+
+        {active && recents.length > 0 && (
+          <Command.Group heading="Recent">
+            {recents.map((r) => (
+              <PaletteItem
+                key={`${r.schema}.${r.table}`}
+                icon={<IconClock size={14} />}
+                label={r.table}
+                secondary={r.schema}
+                onSelect={() => runNavigate(tableRoute(r.schema, r.table))}
+                keywords={[r.schema, r.table]}
+              />
+            ))}
+          </Command.Group>
+        )}
 
         {connections.length > 0 && (
           <Command.Group heading="Connections">

@@ -10,6 +10,7 @@ import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { TableDataView } from '@renderer/features/tables/components/table-data-view'
 import { ROUTES, tableRoute } from '@renderer/config/routes'
+import { pushRecent } from '@renderer/features/database/lib/table-prefs'
 import type { TableDetails } from '@renderer/types'
 import { SchemaTree } from './schema-tree'
 import { TableHeader } from './table-header'
@@ -60,6 +61,7 @@ export function DatabasePage() {
     } catch {
       // ignore quota/private-mode errors
     }
+    pushRecent(active.connectionId, { schema, table })
   }, [active, schema, table])
 
   if (!active) {
