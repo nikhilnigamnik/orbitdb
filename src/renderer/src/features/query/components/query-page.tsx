@@ -6,9 +6,11 @@ import {
   IconHistory,
   IconPlayerPlay,
   IconPlug,
-  IconTrash
+  IconTrash,
+  IconSparkles
 } from '@tabler/icons-react'
 import { formatDistanceToNow } from 'date-fns'
+import { format as formatSql } from 'sql-formatter'
 import { Button } from '@renderer/components/ui/button'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { EmptyState } from '@renderer/components/common/empty-state'
@@ -33,7 +35,7 @@ const MAX_PANEL_PCT = 85
 
 export function QueryPage() {
   const navigate = useNavigate()
-  const { active } = useConnection()
+  const { active, current } = useConnection()
   const [sql, setSql] = React.useState('select now();')
   const [result, setResult] = React.useState<QueryResult | null>(null)
   const [isRunning, setIsRunning] = React.useState(false)
@@ -82,6 +84,18 @@ export function QueryPage() {
         />
       </div>
     )
+  }
+
+  function handleFormat() {
+    const trimmed = sql.trim()
+    if (!trimmed) return
+    const language =
+      current?.engine === 'mysql' ? 'mysql' : current?.engine === 'd1' ? 'sqlite' : 'postgresql'
+    try {
+      setSql(formatSql(trimmed, { language, keywordCase: 'lower' }))
+    } catch {
+      // sql-formatter throws on syntax it can't parse; leave the SQL alone
+    }
   }
 
   async function runQuery() {
@@ -217,6 +231,17 @@ export function QueryPage() {
               )}
             </Button>
           </Sheet>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-text-muted hover:bg-surface-elevated hover:text-text"
+            onClick={handleFormat}
+            disabled={!sql.trim()}
+            title="Format SQL"
+          >
+            <IconSparkles size={12} />
+            Format
+          </Button>
           <Button
             size="sm"
             variant="ghost"
