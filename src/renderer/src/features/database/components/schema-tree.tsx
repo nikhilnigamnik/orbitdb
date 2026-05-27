@@ -168,7 +168,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Search tables…"
-            className="h-8 border-border bg-surface-elevated/50 pl-7 text-[12px] placeholder:text-text-subtle/70 focus-visible:border-accent/40 focus-visible:bg-surface-elevated focus-visible:ring-accent/20"
+            className="h-8 pl-7"
           />
         </div>
       </div>
