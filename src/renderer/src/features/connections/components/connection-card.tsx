@@ -8,19 +8,38 @@ import {
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Popover } from '@renderer/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { ENGINE_LABEL } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import type { SavedConnection } from '@renderer/types'
+import type { ConnectionHealth } from '../lib/use-connection-health'
 import { ENGINE_ICON } from './engine-icons'
 
 interface ConnectionCardProps {
   connection: SavedConnection
   isActive: boolean
   isConnecting: boolean
+  health?: ConnectionHealth
+  healthError?: string
   onConnect: () => void
   onDisconnect: () => void
   onEdit: () => void
   onDelete: () => void
+  onRefreshHealth?: () => void
+}
+
+const HEALTH_DOT_CLASSES: Record<ConnectionHealth, string> = {
+  unknown: 'bg-text-subtle/60',
+  checking: 'bg-amber-400 animate-pulse',
+  ok: 'bg-emerald-400',
+  fail: 'bg-red-500'
+}
+
+const HEALTH_LABEL: Record<ConnectionHealth, string> = {
+  unknown: 'Status unknown — click to check',
+  checking: 'Checking…',
+  ok: 'Reachable',
+  fail: 'Unreachable'
 }
 
 const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; iconClass: string }> = {
@@ -40,10 +59,13 @@ export function ConnectionCard({
   connection,
   isActive,
   isConnecting,
+  health = 'unknown',
+  healthError,
   onConnect,
   onDisconnect,
   onEdit,
-  onDelete
+  onDelete,
+  onRefreshHealth
 }: ConnectionCardProps) {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const engine = ENGINE_STYLES[connection.engine]
@@ -58,15 +80,41 @@ export function ConnectionCard({
           : 'border-border hover:border-border-strong'
       )}
     >
-      <div
-        className={cn(
-          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-          engine.bg,
-          engine.iconClass
-        )}
-        aria-hidden
-      >
-        <EngineIcon className="h-5 w-5" />
+      <div className="relative shrink-0">
+        <div
+          className={cn(
+            'flex h-10 w-10 items-center justify-center rounded-lg',
+            engine.bg,
+            engine.iconClass
+          )}
+          aria-hidden
+        >
+          <EngineIcon className="h-5 w-5" />
+        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onRefreshHealth?.()
+              }}
+              aria-label={HEALTH_LABEL[health]}
+              className={cn(
+                'absolute -bottom-0.5 -right-0.5 flex h-3 w-3 cursor-pointer items-center justify-center rounded-full ring-2 ring-surface transition-transform hover:scale-110',
+                HEALTH_DOT_CLASSES[health]
+              )}
+            />
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {HEALTH_LABEL[health]}
+            {health === 'fail' && healthError && (
+              <div className="mt-1 max-w-[20rem] font-mono text-[10px] text-text-subtle">
+                {healthError}
+              </div>
+            )}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       <div className="min-w-0 flex-1">

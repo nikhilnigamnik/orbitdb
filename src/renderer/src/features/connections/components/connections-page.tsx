@@ -10,6 +10,7 @@ import { Spinner } from '@renderer/components/ui/spinner'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '../store/connection-store'
+import { useConnectionHealth } from '../lib/use-connection-health'
 import { ConnectionCard } from './connection-card'
 import { ConnectionFormSheet } from './connection-form-sheet'
 import { ROUTES } from '@renderer/config/routes'
@@ -42,6 +43,8 @@ export function ConnectionsPage() {
     isConnecting,
     connectError
   } = useConnection()
+
+  const { health, errors: healthErrors, refresh: refreshHealth } = useConnectionHealth(connections)
 
   const formModal = useDisclosure(false)
   const confirmModal = useDisclosure(false)
@@ -190,7 +193,7 @@ export function ConnectionsPage() {
                 </div>
               }
             >
-              <Button type="button" variant={'ghost'}>
+              <Button type="button" variant={'ghost'} className="text-xs">
                 <IconArrowsSort size={10} />
                 {SORT_LABEL[sort]}
               </Button>
@@ -230,10 +233,13 @@ export function ConnectionsPage() {
                   connection={connection}
                   isActive={active?.connectionId === connection.id}
                   isConnecting={isConnecting && pendingConnectId === connection.id}
+                  health={health[connection.id] ?? 'unknown'}
+                  healthError={healthErrors[connection.id]}
                   onConnect={() => handleConnect(connection)}
                   onDisconnect={() => void disconnect()}
                   onEdit={() => openEdit(connection)}
                   onDelete={() => confirmDelete(connection)}
+                  onRefreshHealth={() => void refreshHealth(connection)}
                 />
               ))
             )}
