@@ -496,44 +496,73 @@ function detectCommand(sql: string): string | null {
   return trimmed ? trimmed.toUpperCase() : null
 }
 
+interface MysqlInflight {
+  threadId: number
+  connectionId: string
+}
+const mysqlInflight = new Map<string, MysqlInflight>()
+
 async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   const pool = getPool(opts.connectionId)
   const started = Date.now()
+  const conn = await pool.getConnection()
   try {
-    const [result, fields] = await pool.query(opts.sql, opts.params)
-    const command = detectCommand(opts.sql)
-    if (Array.isArray(result)) {
+    if (opts.queryId) {
+      const threadId = conn.threadId
+      if (typeof threadId === 'number') {
+        mysqlInflight.set(opts.queryId, { threadId, connectionId: opts.connectionId })
+      }
+    }
+    try {
+      const [result, fields] = await conn.query(opts.sql, opts.params)
+      const command = detectCommand(opts.sql)
+      if (Array.isArray(result)) {
+        return {
+          success: true,
+          rows: result as unknown as Record<string, unknown>[],
+          fields: (fields ?? []).map((f) => ({
+            name: String(f.name),
+            dataTypeID: typeof f.columnType === 'number' ? f.columnType : 0
+          })),
+          rowCount: result.length,
+          command,
+          durationMs: Date.now() - started
+        }
+      }
+      const header = result as ResultSetHeader
       return {
         success: true,
-        rows: result as unknown as Record<string, unknown>[],
-        fields: (fields ?? []).map((f) => ({
-          name: String(f.name),
-          dataTypeID: typeof f.columnType === 'number' ? f.columnType : 0
-        })),
-        rowCount: result.length,
+        rows: [],
+        fields: [],
+        rowCount: header.affectedRows ?? null,
         command,
         durationMs: Date.now() - started
       }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+        rows: [],
+        fields: [],
+        rowCount: null,
+        command: null,
+        durationMs: Date.now() - started
+      }
     }
-    const header = result as ResultSetHeader
-    return {
-      success: true,
-      rows: [],
-      fields: [],
-      rowCount: header.affectedRows ?? null,
-      command,
-      durationMs: Date.now() - started
-    }
+  } finally {
+    if (opts.queryId) mysqlInflight.delete(opts.queryId)
+    conn.release()
+  }
+}
+
+async function cancelQuery(connectionId: string, queryId: string): Promise<void> {
+  const entry = mysqlInflight.get(queryId)
+  if (!entry || entry.connectionId !== connectionId) return
+  const pool = getPool(connectionId)
+  try {
+    await pool.query(`KILL QUERY ${entry.threadId}`)
   } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : String(err),
-      rows: [],
-      fields: [],
-      rowCount: null,
-      command: null,
-      durationMs: Date.now() - started
-    }
+    console.error('[mysql] cancel failed:', err)
   }
 }
 
@@ -564,5 +593,6 @@ export const mysqlDriver: DatabaseDriver = {
   updateRow,
   deleteRow,
   runQuery,
+  cancelQuery,
   getColumnDistinct
 }

@@ -5,6 +5,7 @@ import {
   IconGripHorizontal,
   IconHistory,
   IconPlayerPlay,
+  IconPlayerStop,
   IconPlug,
   IconTrash,
   IconSparkles
@@ -40,6 +41,7 @@ export function QueryPage() {
   const [sql, setSql] = React.useState('select now();')
   const [result, setResult] = React.useState<QueryResult | null>(null)
   const [isRunning, setIsRunning] = React.useState(false)
+  const runningQueryIdRef = React.useRef<string | null>(null)
   const [history, setHistory] = React.useState<HistoryEntry[]>([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [editorPct, setEditorPct] = React.useState(50)
@@ -102,10 +104,12 @@ export function QueryPage() {
   async function runQuery() {
     const trimmed = sql.trim()
     if (!trimmed) return
+    const queryId = crypto.randomUUID()
+    runningQueryIdRef.current = queryId
     setIsRunning(true)
     try {
       const queryResult = await unwrap(
-        window.api.db.runQuery({ connectionId: active!.connectionId, sql: trimmed })
+        window.api.db.runQuery({ connectionId: active!.connectionId, sql: trimmed, queryId })
       )
       setResult(queryResult)
       setHistory((prev) =>
@@ -132,6 +136,17 @@ export function QueryPage() {
       })
     } finally {
       setIsRunning(false)
+      runningQueryIdRef.current = null
+    }
+  }
+
+  async function cancelRunningQuery() {
+    const queryId = runningQueryIdRef.current
+    if (!queryId || !active) return
+    try {
+      await unwrap(window.api.db.cancelQuery(active.connectionId, queryId))
+    } catch {
+      // best effort; the run() promise will surface the cancellation error
     }
   }
 
@@ -254,18 +269,29 @@ export function QueryPage() {
             <IconTrash size={12} />
             Clear
           </Button>
-          <Button
-            size="sm"
-            className="bg-accent text-white hover:bg-accent/90"
-            onClick={runQuery}
-            disabled={isRunning || sql.trim() === ''}
-          >
-            <IconPlayerPlay size={12} />
-            {isRunning ? 'Running…' : 'Run'}
-            <kbd className="ml-1 rounded bg-white/15 px-1 py-0 font-mono text-[10px] text-white/90">
-              ⌘↵
-            </kbd>
-          </Button>
+          {isRunning ? (
+            <Button
+              size="sm"
+              className="bg-red-500/80 text-white hover:bg-red-500"
+              onClick={cancelRunningQuery}
+            >
+              <IconPlayerStop size={12} />
+              Cancel
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="bg-accent text-white hover:bg-accent/90"
+              onClick={runQuery}
+              disabled={sql.trim() === ''}
+            >
+              <IconPlayerPlay size={12} />
+              Run
+              <kbd className="ml-1 rounded bg-white/15 px-1 py-0 font-mono text-[10px] text-white/90">
+                ⌘↵
+              </kbd>
+            </Button>
+          )}
         </div>
       </div>
 

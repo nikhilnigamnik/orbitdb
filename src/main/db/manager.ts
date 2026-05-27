@@ -91,6 +91,10 @@ export function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   return driverForConnection(opts.connectionId).runQuery(opts)
 }
 
+export function cancelQuery(connectionId: string, queryId: string): Promise<void> {
+  return driverForConnection(connectionId).cancelQuery(connectionId, queryId)
+}
+
 export function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
   return driverForConnection(opts.connectionId).getColumnDistinct(opts)
 }

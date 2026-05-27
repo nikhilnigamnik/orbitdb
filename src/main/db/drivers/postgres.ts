@@ -478,29 +478,60 @@ async function deleteRow(opts: RowDelete): Promise<{ deleted: number }> {
   return { deleted: res.rowCount ?? 0 }
 }
 
+interface PgInflightQuery {
+  pid: number
+  connectionId: string
+}
+const pgInflight = new Map<string, PgInflightQuery>()
+
 async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   const pool = getPool(opts.connectionId)
   const started = Date.now()
+  const client = await pool.connect()
   try {
-    const res = await pool.query<Record<string, unknown>>(opts.sql, opts.params)
-    return {
-      success: true,
-      rows: res.rows,
-      fields: res.fields.map((f) => ({ name: f.name, dataTypeID: f.dataTypeID })),
-      rowCount: res.rowCount,
-      command: res.command ?? null,
-      durationMs: Date.now() - started
+    let pid: number | null = null
+    if (opts.queryId) {
+      const pidRes = await client.query<{ pid: number }>('select pg_backend_pid() as pid')
+      pid = pidRes.rows[0]?.pid ?? null
+      if (pid != null) {
+        pgInflight.set(opts.queryId, { pid, connectionId: opts.connectionId })
+      }
     }
+    try {
+      const res = await client.query<Record<string, unknown>>(opts.sql, opts.params)
+      return {
+        success: true,
+        rows: res.rows,
+        fields: res.fields.map((f) => ({ name: f.name, dataTypeID: f.dataTypeID })),
+        rowCount: res.rowCount,
+        command: res.command ?? null,
+        durationMs: Date.now() - started
+      }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+        rows: [],
+        fields: [],
+        rowCount: null,
+        command: null,
+        durationMs: Date.now() - started
+      }
+    }
+  } finally {
+    if (opts.queryId) pgInflight.delete(opts.queryId)
+    client.release()
+  }
+}
+
+async function cancelQuery(connectionId: string, queryId: string): Promise<void> {
+  const entry = pgInflight.get(queryId)
+  if (!entry || entry.connectionId !== connectionId) return
+  const pool = getPool(connectionId)
+  try {
+    await pool.query('select pg_cancel_backend($1)', [entry.pid])
   } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : String(err),
-      rows: [],
-      fields: [],
-      rowCount: null,
-      command: null,
-      durationMs: Date.now() - started
-    }
+    console.error('[postgres] cancel failed:', err)
   }
 }
 
@@ -532,5 +563,6 @@ export const postgresDriver: DatabaseDriver = {
   updateRow,
   deleteRow,
   runQuery,
+  cancelQuery,
   getColumnDistinct
 }

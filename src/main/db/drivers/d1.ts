@@ -62,12 +62,13 @@ function requireD1Credentials(input: ConnectionInput): {
 async function callD1<TRow = Record<string, unknown>>(
   input: ConnectionInput,
   sql: string,
-  params: unknown[] = []
+  params: unknown[] = [],
+  signal?: AbortSignal
 ): Promise<D1QueryResultEntry<TRow>> {
   const connectionId = 'id' in input ? (input as SavedConnection).id : '<test>'
   const t0 = Date.now()
   try {
-    const entry = await callD1Raw<TRow>(input, sql, params)
+    const entry = await callD1Raw<TRow>(input, sql, params, signal)
     recordQuery({
       connectionId,
       engine: 'd1',
@@ -95,7 +96,8 @@ async function callD1<TRow = Record<string, unknown>>(
 async function callD1Raw<TRow = Record<string, unknown>>(
   input: ConnectionInput,
   sql: string,
-  params: unknown[]
+  params: unknown[],
+  signal?: AbortSignal
 ): Promise<D1QueryResultEntry<TRow>> {
   const { accountId, databaseId, apiToken } = requireD1Credentials(input)
   const url = `${CF_API}/accounts/${accountId}/d1/database/${databaseId}/query`
@@ -108,7 +110,8 @@ async function callD1Raw<TRow = Record<string, unknown>>(
         Authorization: `Bearer ${apiToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ sql, params })
+      body: JSON.stringify({ sql, params }),
+      signal
     })
   } catch (err) {
     throw new Error(
@@ -521,11 +524,17 @@ function detectCommand(sql: string): string | null {
   return trimmed ? trimmed.toUpperCase() : null
 }
 
+const d1Inflight = new Map<string, { controller: AbortController; connectionId: string }>()
+
 async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   const saved = loadSaved(opts.connectionId)
   const started = Date.now()
+  const controller = new AbortController()
+  if (opts.queryId) {
+    d1Inflight.set(opts.queryId, { controller, connectionId: opts.connectionId })
+  }
   try {
-    const entry = await callD1(saved, opts.sql, opts.params ?? [])
+    const entry = await callD1(saved, opts.sql, opts.params ?? [], controller.signal)
     const fieldNames = entry.results[0] ? Object.keys(entry.results[0]) : []
     return {
       success: true,
@@ -545,7 +554,15 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
       command: null,
       durationMs: Date.now() - started
     }
+  } finally {
+    if (opts.queryId) d1Inflight.delete(opts.queryId)
   }
+}
+
+async function cancelQuery(connectionId: string, queryId: string): Promise<void> {
+  const entry = d1Inflight.get(queryId)
+  if (!entry || entry.connectionId !== connectionId) return
+  entry.controller.abort()
 }
 
 // quoteLiteral is reserved for future use (e.g., DDL helpers that can't bind).
@@ -578,5 +595,6 @@ export const d1Driver: DatabaseDriver = {
   updateRow,
   deleteRow,
   runQuery,
+  cancelQuery,
   getColumnDistinct
 }

@@ -37,5 +37,6 @@ export interface DatabaseDriver {
   deleteRow(opts: RowDelete): Promise<{ deleted: number }>
 
   runQuery(opts: RunQueryOptions): Promise<QueryResult>
+  cancelQuery(connectionId: string, queryId: string): Promise<void>
   getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]>
 }

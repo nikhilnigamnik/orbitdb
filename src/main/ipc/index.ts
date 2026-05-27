@@ -17,6 +17,7 @@ import {
   updateConnection
 } from '../store/connections-store'
 import {
+  cancelQuery,
   describeActive,
   deleteRow,
   disconnectPool,
@@ -122,6 +123,12 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'db:query-run',
     wrap(async (opts: RunQueryOptions) => runQuery(opts))
+  )
+  ipcMain.handle(
+    'db:query-cancel',
+    wrap(async (connectionId: string, queryId: string) =>
+      cancelQuery(connectionId, queryId)
+    )
   )
 
   ipcMain.handle(

@@ -48,6 +48,8 @@ const api = {
     updateRow: (opts: RowUpdate) => invoke<Record<string, unknown>>('db:row-update', opts),
     deleteRow: (opts: RowDelete) => invoke<{ deleted: number }>('db:row-delete', opts),
     runQuery: (opts: RunQueryOptions) => invoke<QueryResult>('db:query-run', opts),
+    cancelQuery: (connectionId: string, queryId: string) =>
+      invoke<void>('db:query-cancel', connectionId, queryId),
     columnDistinct: (opts: DistinctValuesOptions) =>
       invoke<unknown[]>('db:column-distinct', opts),
     listLogs: () => invoke<QueryLogEntry[]>('db:logs-list'),

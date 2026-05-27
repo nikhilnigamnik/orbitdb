@@ -125,6 +125,12 @@ export interface RunQueryOptions {
   connectionId: string
   sql: string
   params?: unknown[]
+  queryId?: string
+}
+
+export interface CancelQueryOptions {
+  connectionId: string
+  queryId: string
 }
 
 export interface DistinctValuesOptions {
