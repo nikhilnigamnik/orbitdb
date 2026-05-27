@@ -9,7 +9,7 @@ import { useAsync } from '@renderer/hooks/use-async'
 import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { TableDataView } from '@renderer/features/tables/components/table-data-view'
-import { ROUTES } from '@renderer/config/routes'
+import { ROUTES, tableRoute } from '@renderer/config/routes'
 import type { TableDetails } from '@renderer/types'
 import { SchemaTree } from './schema-tree'
 import { TableHeader } from './table-header'
@@ -26,6 +26,41 @@ export function DatabasePage() {
   React.useEffect(() => {
     setActiveTab('data')
   }, [schema, table])
+
+  const lastConnectionId = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (!active) {
+      lastConnectionId.current = null
+      return
+    }
+    if (lastConnectionId.current === active.connectionId) return
+    lastConnectionId.current = active.connectionId
+    if (schema && table) return
+    try {
+      const raw = localStorage.getItem(`orbitdb:last-table:${active.connectionId}`)
+      if (!raw) return
+      const saved = JSON.parse(raw) as { schema?: string; table?: string }
+      if (saved.schema && saved.table) {
+        navigate(tableRoute(saved.schema, saved.table), { replace: true })
+      }
+    } catch {
+      // ignore unreadable/quota-exceeded localStorage
+    }
+    // schema/table intentionally not in deps — only restore on connection change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, navigate])
+
+  React.useEffect(() => {
+    if (!active || !schema || !table) return
+    try {
+      localStorage.setItem(
+        `orbitdb:last-table:${active.connectionId}`,
+        JSON.stringify({ schema, table })
+      )
+    } catch {
+      // ignore quota/private-mode errors
+    }
+  }, [active, schema, table])
 
   if (!active) {
     return (
