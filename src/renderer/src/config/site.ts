@@ -1,4 +1,4 @@
-import type { DatabaseEngine } from '@renderer/types'
+import type { ConnectionEnvironment, DatabaseEngine } from '@renderer/types'
 
 export const APP_NAME = 'OrbitDB'
 export const APP_TAGLINE = 'Postgres + MySQL, made friendly'
@@ -32,9 +32,20 @@ export const DEFAULT_DATABASES: Record<DatabaseEngine, string> = {
   d1: ''
 }
 
+export const ENVIRONMENTS: ConnectionEnvironment[] = ['dev', 'stage', 'prod']
+
+export const ENVIRONMENT_LABEL: Record<ConnectionEnvironment, string> = {
+  dev: 'Dev',
+  stage: 'Stage',
+  prod: 'Prod'
+}
+
+export const DEFAULT_ENVIRONMENT: ConnectionEnvironment = 'dev'
+
 export const DEFAULT_CONNECTION_VALUES = {
   name: '',
   engine: 'postgres' as DatabaseEngine,
+  environment: DEFAULT_ENVIRONMENT,
   host: 'localhost',
   port: DEFAULT_PORTS.postgres,
   database: DEFAULT_DATABASES.postgres,

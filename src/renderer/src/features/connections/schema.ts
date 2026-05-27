@@ -4,6 +4,7 @@ export const connectionSchema = z
   .object({
     name: z.string().min(1, 'Name is required').max(80, 'Name is too long'),
     engine: z.enum(['postgres', 'mysql', 'd1']),
+    environment: z.enum(['dev', 'stage', 'prod']),
     host: z.string(),
     port: z
       .number({ invalid_type_error: 'Port must be a number' })

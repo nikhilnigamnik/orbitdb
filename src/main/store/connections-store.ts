@@ -66,7 +66,8 @@ function read(): StoreShape {
 
   parsed.connections = parsed.connections.map((c) => ({
     ...c,
-    engine: c.engine ?? 'postgres'
+    engine: c.engine ?? 'postgres',
+    environment: c.environment ?? 'dev'
   }))
 
   const needsMigration =

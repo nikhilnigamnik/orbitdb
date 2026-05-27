@@ -1,8 +1,9 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconPlus, IconPlug, IconRefresh, IconArrowsSort } from '@tabler/icons-react'
+import { IconPlug, IconRefresh, IconArrowsSort } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Popover } from '@renderer/components/ui/popover'
+import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
@@ -14,10 +15,10 @@ import { useConnectionHealth } from '../lib/use-connection-health'
 import { ConnectionCard } from './connection-card'
 import { ConnectionFormSheet } from './connection-form-sheet'
 import { ROUTES } from '@renderer/config/routes'
-import { APP_NAME } from '@renderer/config/site'
+import { APP_NAME, DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import orbitdbLogo from '@renderer/assets/orbitdb-cream.png'
-import type { SavedConnection } from '@renderer/types'
+import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 
 type SortMode = 'name-asc' | 'name-desc' | 'recent'
 
@@ -27,8 +28,14 @@ const SORT_LABEL: Record<SortMode, string> = {
   recent: 'Recently added'
 }
 
-const TABS = ['All'] as const
-type TabKey = (typeof TABS)[number]
+type TabKey = 'all' | ConnectionEnvironment
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'dev', label: ENVIRONMENT_LABEL.dev },
+  { key: 'stage', label: ENVIRONMENT_LABEL.stage },
+  { key: 'prod', label: ENVIRONMENT_LABEL.prod }
+]
 
 export function ConnectionsPage() {
   const navigate = useNavigate()
@@ -53,17 +60,27 @@ export function ConnectionsPage() {
   const [pendingDelete, setPendingDelete] = React.useState<SavedConnection | null>(null)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
-  const [activeTab, setActiveTab] = React.useState<TabKey>('All')
+  const [activeTab, setActiveTab] = React.useState<TabKey>('all')
   const [sort, setSort] = React.useState<SortMode>('name-asc')
   const [sortOpen, setSortOpen] = React.useState(false)
 
+  const counts = React.useMemo(() => {
+    const acc: Record<TabKey, number> = { all: connections.length, dev: 0, stage: 0, prod: 0 }
+    for (const c of connections) acc[c.environment ?? DEFAULT_ENVIRONMENT] += 1
+    return acc
+  }, [connections])
+
   const sorted = React.useMemo(() => {
-    const list = [...connections]
+    const filtered =
+      activeTab === 'all'
+        ? connections
+        : connections.filter((c) => (c.environment ?? DEFAULT_ENVIRONMENT) === activeTab)
+    const list = [...filtered]
     if (sort === 'name-asc') list.sort((a, b) => a.name.localeCompare(b.name))
     else if (sort === 'name-desc') list.sort((a, b) => b.name.localeCompare(a.name))
     else list.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     return list
-  }, [connections, sort])
+  }, [connections, sort, activeTab])
 
   function openCreate() {
     setEditing(null)
@@ -149,23 +166,15 @@ export function ConnectionsPage() {
           </div>
 
           <div className="mt-5 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-1 rounded-md border border-border bg-surface p-0.5">
-              {TABS.map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={cn(
-                    'rounded-sm px-3 py-1 text-[12.5px] font-medium transition-colors',
-                    activeTab === tab
-                      ? 'bg-surface-elevated text-text'
-                      : 'text-text-muted hover:text-text'
-                  )}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+            <SlidingTabs
+              tabs={TABS.map((tab) => ({
+                id: tab.key,
+                label: tab.label,
+                count: counts[tab.key]
+              }))}
+              value={activeTab}
+              onChange={setActiveTab}
+            />
 
             <Popover
               openPopover={sortOpen}
@@ -213,15 +222,22 @@ export function ConnectionsPage() {
             ) : sorted.length === 0 ? (
               <EmptyState
                 icon={<IconPlug size={20} />}
-                title="No connections yet"
-                description="Add a Postgres, MySQL, or D1 connection to start exploring."
+                title={
+                  activeTab === 'all'
+                    ? 'No connections yet'
+                    : `No ${ENVIRONMENT_LABEL[activeTab]} connections`
+                }
+                description={
+                  activeTab === 'all'
+                    ? 'Add a Postgres, MySQL, or D1 connection to start exploring.'
+                    : `Tag a connection as ${ENVIRONMENT_LABEL[activeTab]} to see it here.`
+                }
                 action={
                   <Button
                     size="sm"
-                    className="rounded-full bg-accent px-3.5 text-white hover:bg-accent/90"
+                    className="rounded-lg bg-accent px-3.5 text-white hover:bg-accent/90"
                     onClick={openCreate}
                   >
-                    <IconPlus size={14} />
                     Add new
                   </Button>
                 }

@@ -5,6 +5,7 @@ import { Sheet } from '@renderer/components/ui/sheet'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Switch } from '@renderer/components/ui/switch'
+import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { FormField } from '@renderer/components/forms/form-field'
 import { SubmitButton } from '@renderer/components/forms/submit-button'
 import { Badge } from '@renderer/components/ui/badge'
@@ -13,14 +14,22 @@ import { parseConnectionUrl } from '../lib/parse-connection-url'
 import {
   DEFAULT_CONNECTION_VALUES,
   DEFAULT_DATABASES,
+  DEFAULT_ENVIRONMENT,
   DEFAULT_PORTS,
   DEFAULT_USERS,
-  ENGINE_LABEL
+  ENGINE_LABEL,
+  ENVIRONMENTS,
+  ENVIRONMENT_LABEL
 } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import { connectionSchema, type ConnectionFormValues } from '../schema'
 import { ENGINE_ICON } from './engine-icons'
-import type { DatabaseEngine, SavedConnection, TestConnectionResult } from '@renderer/types'
+import type {
+  ConnectionEnvironment,
+  DatabaseEngine,
+  SavedConnection,
+  TestConnectionResult
+} from '@renderer/types'
 import { shortServerVersion } from '@renderer/lib/format'
 
 interface ConnectionFormSheetProps {
@@ -38,11 +47,19 @@ const ENGINE_STYLES: Record<DatabaseEngine, { bg: string; iconClass: string; tag
   d1: { bg: 'bg-amber-500/10', iconClass: 'text-amber-300', tagline: 'Cloudflare SQLite' }
 }
 
+const ENVIRONMENT_ACTIVE: Record<ConnectionEnvironment, { bg: string; text: string; dot: string }> =
+  {
+    dev: { bg: 'bg-emerald-500/10', text: 'text-emerald-300', dot: 'bg-emerald-400' },
+    stage: { bg: 'bg-amber-500/10', text: 'text-amber-300', dot: 'bg-amber-400' },
+    prod: { bg: 'bg-rose-500/10', text: 'text-rose-300', dot: 'bg-rose-400' }
+  }
+
 function toFormValues(initial?: SavedConnection | null): ConnectionFormValues {
   if (!initial) return { ...DEFAULT_CONNECTION_VALUES }
   return {
     name: initial.name,
     engine: initial.engine,
+    environment: initial.environment ?? DEFAULT_ENVIRONMENT,
     host: initial.host,
     port: initial.port,
     database: initial.database,
@@ -297,6 +314,31 @@ export function ConnectionFormSheet({
                 onChange={(e) => update('name', e.target.value)}
                 placeholder={`My local ${ENGINE_LABEL[values.engine]}`}
                 autoFocus
+              />
+            </FormField>
+
+            <FormField label="Environment" error={errors.environment}>
+              <SlidingTabs
+                tabs={ENVIRONMENTS.map((env) => {
+                  const active = ENVIRONMENT_ACTIVE[env]
+                  return {
+                    id: env,
+                    label: ENVIRONMENT_LABEL[env],
+                    leading: (isActive) => (
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'h-1.5 w-1.5 rounded-full',
+                          isActive ? active.dot : 'bg-text-subtle/60'
+                        )}
+                      />
+                    ),
+                    activeClassName: active.text,
+                    indicatorClassName: active.bg
+                  }
+                })}
+                value={values.environment}
+                onChange={(env) => update('environment', env)}
               />
             </FormField>
 

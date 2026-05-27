@@ -10,8 +10,9 @@ import {
 import { Button } from '@renderer/components/ui/button'
 import { Popover } from '@renderer/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
+import { DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
-import type { SavedConnection } from '@renderer/types'
+import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 import type { ConnectionHealth } from '../lib/use-connection-health'
 import { ENGINE_ICON } from './engine-icons'
 
@@ -29,10 +30,11 @@ interface ConnectionCardProps {
 }
 
 const HEALTH_DOT_CLASSES: Record<ConnectionHealth, string> = {
-  unknown: 'bg-text-subtle/60',
-  checking: 'bg-amber-400 animate-pulse',
-  ok: 'bg-emerald-400',
-  fail: 'bg-red-500'
+  unknown: 'bg-linear-to-b from-neutral-400/70 to-neutral-600/70',
+  checking:
+    'bg-linear-to-b from-amber-300 to-amber-500 shadow-[0_0_4px_0_rgba(251,191,36,0.45)] animate-pulse',
+  ok: 'bg-linear-to-b from-emerald-300 to-emerald-500 shadow-[0_0_4px_0_rgba(52,211,153,0.4)]',
+  fail: 'bg-linear-to-b from-rose-300 to-rose-500 shadow-[0_0_4px_0_rgba(244,63,94,0.45)]'
 }
 
 const HEALTH_LABEL: Record<ConnectionHealth, string> = {
@@ -43,9 +45,16 @@ const HEALTH_LABEL: Record<ConnectionHealth, string> = {
 }
 
 const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; iconClass: string }> = {
-  postgres: { bg: 'bg-sky-500/10', iconClass: 'text-sky-300' },
-  mysql: { bg: 'bg-orange-500/10', iconClass: 'text-orange-300' },
-  d1: { bg: 'bg-amber-500/10', iconClass: 'text-amber-300' }
+  postgres: { bg: 'bg-sky-500/8', iconClass: 'text-sky-300/80' },
+  mysql: { bg: 'bg-orange-500/8', iconClass: 'text-orange-300/80' },
+  d1: { bg: 'bg-amber-500/8', iconClass: 'text-amber-300/80' }
+}
+
+const ENVIRONMENT_CHIP: Record<ConnectionEnvironment, string> = {
+  dev: 'bg-linear-to-b from-emerald-500/20 to-emerald-500/5 text-emerald-200 ring-emerald-500/25 shadow-[inset_0_1px_0_rgba(110,231,183,0.35)]',
+  stage:
+    'bg-linear-to-b from-amber-500/20 to-amber-500/5 text-amber-200 ring-amber-500/25 shadow-[inset_0_1px_0_rgba(252,211,77,0.35)]',
+  prod: 'bg-linear-to-b from-rose-500/20 to-rose-500/5 text-rose-200 ring-rose-500/25 shadow-[inset_0_1px_0_rgba(253,164,175,0.35)]'
 }
 
 function metaParts(connection: SavedConnection): string[] {
@@ -79,26 +88,27 @@ export function ConnectionCard({
   const EngineIcon = ENGINE_ICON[connection.engine]
 
   const parts = metaParts(connection)
+  const environment = connection.environment ?? DEFAULT_ENVIRONMENT
 
   return (
     <div
       className={cn(
-        'group relative flex items-center gap-3.5 rounded-2xl border bg-surface px-4 py-3 transition-all',
+        'group flex items-center gap-3 rounded-lg border bg-surface px-3.5 py-3 transition-colors',
         isActive
-          ? 'border-accent/40 shadow-[inset_0_0_0_1px_rgba(72,120,234,0.15)]'
-          : 'border-border hover:border-border-strong hover:bg-surface/80'
+          ? 'border-border-strong'
+          : 'border-border hover:border-border-strong hover:bg-surface-elevated/30'
       )}
     >
       <div className="relative shrink-0">
         <div
           className={cn(
-            'flex h-11 w-11 items-center justify-center rounded-xl ring-1 ring-inset ring-white/5',
+            'flex h-9 w-9 items-center justify-center rounded-md ring-1 ring-inset ring-white/5',
             engine.bg,
             engine.iconClass
           )}
           aria-hidden
         >
-          <EngineIcon className="h-[18px] w-[18px]" />
+          <EngineIcon className="h-4 w-4" />
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -110,7 +120,7 @@ export function ConnectionCard({
               }}
               aria-label={HEALTH_LABEL[health]}
               className={cn(
-                'absolute -bottom-0.5 -right-0.5 flex h-3 w-3 cursor-pointer items-center justify-center rounded-full ring-2 ring-surface transition-transform hover:scale-110',
+                'absolute -bottom-0.5 -right-0.5 h-2 w-2 cursor-pointer rounded-full ring-2 ring-surface transition-transform hover:scale-125',
                 HEALTH_DOT_CLASSES[health]
               )}
             />
@@ -128,13 +138,21 @@ export function ConnectionCard({
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-[14.5px] font-semibold leading-tight text-text">
+          <span className="truncate text-[13.5px] font-medium leading-tight text-text">
             {connection.name}
+          </span>
+          <span
+            className={cn(
+              'shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] ring-1 ring-inset',
+              ENVIRONMENT_CHIP[environment]
+            )}
+          >
+            {ENVIRONMENT_LABEL[environment]}
           </span>
           {connection.ssl && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="flex shrink-0 items-center text-text-subtle">
+                <span className="flex shrink-0 items-center text-text-subtle/70">
                   <IconLock size={11} />
                 </span>
               </TooltipTrigger>
@@ -142,16 +160,11 @@ export function ConnectionCard({
             </Tooltip>
           )}
         </div>
-        <div className="mt-1 flex min-w-0 items-center gap-1.5 font-mono text-[11px] text-text-subtle">
+        <div className="mt-1 truncate font-mono text-[11px] leading-tight text-text-subtle">
           {parts.length === 0 ? (
             <span className="italic">no host configured</span>
           ) : (
-            parts.map((part, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <span className="text-text-subtle/40">·</span>}
-                <span className="truncate">{part}</span>
-              </React.Fragment>
-            ))
+            parts.join('  ·  ')
           )}
         </div>
       </div>
@@ -162,12 +175,12 @@ export function ConnectionCard({
         disabled={isConnecting}
         aria-label={isActive ? 'Disconnect' : isConnecting ? 'Connecting' : 'Connect'}
         className={cn(
-          'flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed',
+          'flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11.5px] font-medium transition-colors disabled:cursor-not-allowed',
           isConnecting
-            ? 'border-border bg-surface-elevated/60 text-text-muted'
+            ? 'border-border text-text-muted'
             : isActive
-              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
-              : 'border-border bg-surface-elevated text-text hover:border-accent/50 hover:bg-accent/10 hover:text-text'
+              ? 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/5'
+              : 'border-border text-text-muted hover:border-border-strong hover:text-text'
         )}
       >
         {isConnecting ? (
@@ -177,15 +190,12 @@ export function ConnectionCard({
           </>
         ) : isActive ? (
           <>
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-            </span>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
             <span>Connected</span>
           </>
         ) : (
           <>
-            <IconPlugConnected size={12} className="opacity-70" />
+            <IconPlugConnected size={12} className="opacity-60" />
             <span>Connect</span>
           </>
         )}
@@ -227,10 +237,7 @@ export function ConnectionCard({
           <Button
             size="icon-xs"
             variant="ghost"
-            className={cn(
-              'cursor-pointer text-text-muted transition-opacity hover:bg-surface-elevated hover:text-text',
-              !menuOpen && 'opacity-0 group-hover:opacity-100'
-            )}
+            className="cursor-pointer text-text-muted hover:bg-surface-elevated hover:text-text"
             aria-label="More actions"
           >
             <IconDotsVertical size={14} />

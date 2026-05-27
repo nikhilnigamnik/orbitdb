@@ -1,8 +1,11 @@
 export type DatabaseEngine = 'postgres' | 'mysql' | 'd1'
 
+export type ConnectionEnvironment = 'dev' | 'stage' | 'prod'
+
 export interface ConnectionInput {
   name: string
   engine: DatabaseEngine
+  environment: ConnectionEnvironment
   host: string
   port: number
   database: string

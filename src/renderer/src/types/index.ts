@@ -1,6 +1,7 @@
 export type {
   ActiveConnectionMeta,
   ColumnInfo,
+  ConnectionEnvironment,
   ConnectionInput,
   DatabaseEngine,
   DistinctValuesOptions,
