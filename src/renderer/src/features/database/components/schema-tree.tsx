@@ -9,8 +9,8 @@ import {
   IconSearch,
   IconDatabase
 } from '@tabler/icons-react'
-import { Input } from '@renderer/components/ui/input'
 import { Button } from '@renderer/components/ui/button'
+import { useCommandPalette } from '@renderer/features/command-palette/store'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import {
   Collapsible,
@@ -44,7 +44,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
 
   const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set(['public']))
   const [tablesBySchema, setTablesBySchema] = React.useState<Record<string, TablesState>>({})
-  const [filter, setFilter] = React.useState('')
+  const { open: openPalette } = useCommandPalette()
 
   const fetchTables = React.useCallback(
     async (schema: string) => {
@@ -103,31 +103,8 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
     navigate(tableRoute(schema, table.name))
   }
 
-  const lowered = filter.trim().toLowerCase()
-  function matchesFilter(value: string) {
-    return !lowered || value.toLowerCase().includes(lowered)
-  }
-
-  const filteredSchemas = schemas.filter((schema) => {
-    if (matchesFilter(schema)) return true
-    const tables = tablesBySchema[schema]?.tables ?? []
-    return tables.some((t) => matchesFilter(t.name))
-  })
-  React.useEffect(() => {
-    if (!lowered) return
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      let changed = false
-      for (const [schema, state] of Object.entries(tablesBySchema)) {
-        if (state.tables?.some((t) => matchesFilter(t.name)) && !next.has(schema)) {
-          next.add(schema)
-          changed = true
-        }
-      }
-      return changed ? next : prev
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lowered, tablesBySchema])
+  const isMac =
+    typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -159,18 +136,23 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
             <TooltipContent side="bottom">Refresh schemas</TooltipContent>
           </Tooltip>
         </div>
-        <div className="relative">
-          <IconSearch
-            size={12}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
-          />
-          <Input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Search tables…"
-            className="h-8 pl-7"
-          />
-        </div>
+        <button
+          type="button"
+          onClick={openPalette}
+          aria-label="Open command palette"
+          className="group flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left text-[12px] text-text-subtle transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-muted"
+        >
+          <IconSearch size={12} className="shrink-0" />
+          <span className="flex-1 truncate">Search tables…</span>
+          <span className="flex shrink-0 items-center gap-0.5">
+            <kbd className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-border bg-surface px-1 font-mono text-[10px] leading-none text-text-subtle">
+              {isMac ? '⌘' : 'Ctrl'}
+            </kbd>
+            <kbd className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-border bg-surface px-1 font-mono text-[10px] leading-none text-text-subtle">
+              K
+            </kbd>
+          </span>
+        </button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
@@ -184,16 +166,11 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
             <p className="text-[12px] font-medium text-text">No schemas</p>
             <p className="text-[10.5px] text-text-subtle">This database has no visible schemas.</p>
           </div>
-        ) : filteredSchemas.length === 0 ? (
-          <p className="px-3 py-3 text-center text-[11.5px] text-text-subtle">
-            No matches for "{filter}"
-          </p>
         ) : (
-          filteredSchemas.map((schema) => {
+          schemas.map((schema) => {
             const isOpen = expanded.has(schema)
             const state = tablesBySchema[schema]
             const allTables = state?.tables ?? []
-            const filteredTables = allTables.filter((t) => matchesFilter(t.name))
             const isSchemaActive = activeSchema === schema
             return (
               <Collapsible
@@ -220,7 +197,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                   <span className="truncate">{schema}</span>
                   {state && !state.isLoading && (
                     <span className="ml-auto text-[10px] text-text-subtle">
-                      {filter ? filteredTables.length : allTables.length}
+                      {allTables.length}
                     </span>
                   )}
                 </CollapsibleTrigger>
@@ -233,12 +210,10 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                       </div>
                     ) : state?.error ? (
                       <p className="px-3 py-1.5 text-[11px] text-red-400/80">{state.error}</p>
-                    ) : filteredTables.length === 0 ? (
-                      <p className="px-3 py-1.5 text-[11px] text-text-subtle">
-                        {lowered ? 'No matches' : 'Empty schema'}
-                      </p>
+                    ) : allTables.length === 0 ? (
+                      <p className="px-3 py-1.5 text-[11px] text-text-subtle">Empty schema</p>
                     ) : (
-                      filteredTables.map((table) => {
+                      allTables.map((table) => {
                         const isActive = isSchemaActive && activeTable === table.name
                         const isView = table.type === 'view' || table.type === 'materialized_view'
                         const Icon = isView ? IconEye : IconTable
