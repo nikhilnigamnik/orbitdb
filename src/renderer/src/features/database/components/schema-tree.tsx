@@ -7,10 +7,13 @@ import {
   IconLoader,
   IconRefresh,
   IconSearch,
-  IconDatabase
+  IconDatabase,
+  IconPin,
+  IconPinFilled
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { useCommandPalette } from '@renderer/features/command-palette/store'
+import { loadPinned, togglePinned, type TableRef } from '@renderer/features/database/lib/table-prefs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import {
   Collapsible,
@@ -44,7 +47,21 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
 
   const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set(['public']))
   const [tablesBySchema, setTablesBySchema] = React.useState<Record<string, TablesState>>({})
+  const [pinned, setPinned] = React.useState<TableRef[]>(() => loadPinned(connectionId))
   const { open: openPalette } = useCommandPalette()
+
+  React.useEffect(() => {
+    setPinned(loadPinned(connectionId))
+  }, [connectionId])
+
+  function handleTogglePin(ref: TableRef) {
+    setPinned(togglePinned(connectionId, ref))
+  }
+
+  const pinnedSet = React.useMemo(
+    () => new Set(pinned.map((p) => `${p.schema}.${p.table}`)),
+    [pinned]
+  )
 
   const fetchTables = React.useCallback(
     async (schema: string) => {
@@ -156,6 +173,59 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
+        {pinned.length > 0 && (
+          <div className="mb-2 border-b border-border/60 pb-2">
+            <div className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-text-subtle">
+              Pinned
+            </div>
+            {pinned.map((pin) => {
+              const isActive = activeSchema === pin.schema && activeTable === pin.table
+              return (
+                <div
+                  key={`${pin.schema}.${pin.table}`}
+                  className={cn(
+                    'group/row flex w-full items-center gap-1 rounded-md',
+                    isActive
+                      ? 'bg-surface-elevated text-text'
+                      : 'text-text-muted hover:bg-surface-elevated/50 hover:text-text'
+                  )}
+                >
+                  <button
+                    onClick={() =>
+                      navigate(tableRoute(pin.schema, pin.table))
+                    }
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px]"
+                    title={`${pin.schema}.${pin.table}`}
+                  >
+                    <IconTable
+                      size={12}
+                      className={cn(
+                        'shrink-0',
+                        isActive ? 'text-text-muted' : 'text-text-subtle'
+                      )}
+                    />
+                    <span className="truncate">{pin.table}</span>
+                    <span className="ml-auto truncate font-mono text-[9.5px] text-text-subtle">
+                      {pin.schema}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleTogglePin(pin)
+                    }}
+                    className="mr-1 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-amber-300/80 transition-colors hover:bg-surface hover:text-text"
+                    aria-label="Unpin table"
+                    title="Unpin table"
+                  >
+                    <IconPinFilled size={11} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
         {isLoading && schemas.length === 0 ? (
           <div className="flex items-center justify-center py-10 text-text-subtle">
             <IconLoader stroke={2} size={18} className="animate-spin" />
@@ -217,37 +287,66 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                         const isActive = isSchemaActive && activeTable === table.name
                         const isView = table.type === 'view' || table.type === 'materialized_view'
                         const Icon = isView ? IconEye : IconTable
+                        const tableIsPinned = pinnedSet.has(`${schema}.${table.name}`)
                         return (
-                          <button
+                          <div
                             key={table.name}
-                            onClick={() => selectTable(schema, table)}
                             className={cn(
-                              'group/row flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px]',
+                              'group/row flex w-full items-center gap-1 rounded-md',
                               isActive
                                 ? 'bg-surface-elevated text-text'
                                 : 'text-text-muted hover:bg-surface-elevated/50 hover:text-text'
                             )}
-                            title={table.name}
                           >
-                            <Icon
-                              size={12}
-                              className={cn(
-                                'shrink-0',
-                                isActive ? 'text-text-muted' : 'text-text-subtle'
+                            <button
+                              onClick={() => selectTable(schema, table)}
+                              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px]"
+                              title={table.name}
+                            >
+                              <Icon
+                                size={12}
+                                className={cn(
+                                  'shrink-0',
+                                  isActive ? 'text-text-muted' : 'text-text-subtle'
+                                )}
+                              />
+                              <span className="truncate">{table.name}</span>
+                              {isView && (
+                                <span className="ml-auto rounded bg-surface-elevated px-1 py-0 text-[9px] font-medium uppercase tracking-wide text-text-subtle">
+                                  view
+                                </span>
                               )}
-                            />
-                            <span className="truncate">{table.name}</span>
-                            {isView && (
-                              <span className="ml-auto rounded bg-surface-elevated px-1 py-0 text-[9px] font-medium uppercase tracking-wide text-text-subtle">
-                                view
-                              </span>
-                            )}
-                            {!isView && table.estimatedRows != null && table.estimatedRows > 0 && (
-                              <span className="ml-auto font-mono text-[10px] text-text-subtle opacity-0 transition-opacity group-hover/row:opacity-100">
-                                {formatNumber(table.estimatedRows)}
-                              </span>
-                            )}
-                          </button>
+                              {!isView &&
+                                !tableIsPinned &&
+                                table.estimatedRows != null &&
+                                table.estimatedRows > 0 && (
+                                  <span className="ml-auto font-mono text-[10px] text-text-subtle opacity-0 transition-opacity group-hover/row:opacity-100">
+                                    {formatNumber(table.estimatedRows)}
+                                  </span>
+                                )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleTogglePin({ schema, table: table.name })
+                              }}
+                              className={cn(
+                                'mr-1 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-text-subtle transition-opacity hover:bg-surface hover:text-text',
+                                tableIsPinned
+                                  ? 'opacity-100 text-amber-300/80'
+                                  : 'opacity-0 group-hover/row:opacity-100'
+                              )}
+                              aria-label={tableIsPinned ? 'Unpin table' : 'Pin table'}
+                              title={tableIsPinned ? 'Unpin table' : 'Pin table'}
+                            >
+                              {tableIsPinned ? (
+                                <IconPinFilled size={11} />
+                              ) : (
+                                <IconPin size={11} />
+                              )}
+                            </button>
+                          </div>
                         )
                       })
                     )}
