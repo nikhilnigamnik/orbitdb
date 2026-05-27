@@ -18,6 +18,7 @@ import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { unwrap } from '@renderer/lib/ipc'
 import { buildExportFilename, downloadJson } from '@renderer/lib/export'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
+import { CmdKHint } from '@renderer/features/command-palette/components/cmdk-hint'
 import { cn } from '@renderer/lib/utils'
 import { formatNumber } from '@renderer/lib/format'
 import type { QueryLogEntry } from '@renderer/types'
@@ -114,6 +115,7 @@ export function LogsPage() {
           </p>
         </div>
         <div className="flex items-center gap-1.5">
+          <CmdKHint label="Search tables, connections, actions" />
           <Button
             size="sm"
             variant="ghost"

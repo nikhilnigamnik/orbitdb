@@ -18,6 +18,7 @@ import { useConnection } from '@renderer/features/connections/store/connection-s
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { ROUTES } from '@renderer/config/routes'
+import { CmdKHint } from '@renderer/features/command-palette/components/cmdk-hint'
 import type { QueryResult } from '@renderer/types'
 import { SqlEditor } from './sql-editor'
 import { QueryResults } from './query-results'
@@ -146,6 +147,7 @@ export function QueryPage() {
           </p>
         </div>
         <div className="flex items-center gap-1.5">
+          <CmdKHint label="Search tables, connections, actions" />
           <Sheet
             openSheet={historyOpen}
             setOpenSheet={setHistoryOpen}
