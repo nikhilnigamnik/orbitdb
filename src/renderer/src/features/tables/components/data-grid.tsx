@@ -224,7 +224,7 @@ export function DataGrid({
             )
           }
           return (
-            <CellPreview value={value} display={display}>
+            <CellPreview value={value} display={display} columnName={col.name}>
               <span className="text-text">{display}</span>
             </CellPreview>
           )

@@ -6,7 +6,37 @@ import { formatDistanceToNow } from 'date-fns'
 interface CellPreviewProps {
   value: unknown
   display: string
+  columnName?: string
   children: React.ReactNode
+}
+
+const DATE_COLUMN_NAMES = new Set([
+  'date',
+  'datetime',
+  'timestamp',
+  'created',
+  'updated',
+  'deleted',
+  'expires',
+  'expired',
+  'published',
+  'scheduled',
+  'createdat',
+  'updatedat',
+  'deletedat',
+  'expiresat',
+  'publishedat',
+  'scheduledat',
+  'lastseen',
+  'lastlogin',
+  'lastloggedin'
+])
+
+function looksLikeDateColumn(name: string | undefined): boolean {
+  if (!name) return false
+  if (/_(at|date|time|timestamp)$/i.test(name)) return true
+  if (/(At|Date|Time|Timestamp)$/.test(name)) return true
+  return DATE_COLUMN_NAMES.has(name.toLowerCase())
 }
 
 function useClipboardCopy(): {
@@ -39,21 +69,64 @@ function useClipboardCopy(): {
 const SHORT_THRESHOLD = 50
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/
 
-function parseAsDate(value: unknown): Date | null {
+// Roughly year-2001 → year-2096 in milliseconds. Tight enough that random
+// integer IDs typically fall outside this window.
+const EPOCH_MS_MIN = 1e12
+const EPOCH_MS_MAX = 4e12
+// Same range expressed in seconds. Used only when the column name hints at
+// a timestamp, since 1e9-4e9 IDs are common.
+const EPOCH_S_MIN = 1e9
+const EPOCH_S_MAX = 4e9
+
+function epochMsToDate(n: number): Date | null {
+  if (!Number.isFinite(n)) return null
+  if (n < EPOCH_MS_MIN || n >= EPOCH_MS_MAX) return null
+  const d = new Date(n)
+  return Number.isFinite(d.getTime()) ? d : null
+}
+
+function epochSecondsToDate(n: number): Date | null {
+  if (!Number.isFinite(n)) return null
+  if (n < EPOCH_S_MIN || n >= EPOCH_S_MAX) return null
+  const d = new Date(n * 1000)
+  return Number.isFinite(d.getTime()) ? d : null
+}
+
+function numericToDate(n: number, columnHint: boolean): Date | null {
+  return epochMsToDate(n) ?? (columnHint ? epochSecondsToDate(n) : null)
+}
+
+function parseAsDate(value: unknown, columnName?: string): Date | null {
   if (value instanceof Date) {
     return Number.isFinite(value.getTime()) ? value : null
   }
+  const columnHint = looksLikeDateColumn(columnName)
+  if (typeof value === 'number') {
+    return numericToDate(value, columnHint)
+  }
+  if (typeof value === 'bigint') {
+    return numericToDate(Number(value), columnHint)
+  }
   if (typeof value === 'string') {
-    if (!ISO_DATE_PATTERN.test(value.trim())) return null
-    const d = new Date(value)
+    const trimmed = value.trim()
+    if (/^-?\d{13}$/.test(trimmed)) {
+      const fromMs = epochMsToDate(Number(trimmed))
+      if (fromMs) return fromMs
+    }
+    if (columnHint && /^-?\d{10}$/.test(trimmed)) {
+      const fromSec = epochSecondsToDate(Number(trimmed))
+      if (fromSec) return fromSec
+    }
+    if (!ISO_DATE_PATTERN.test(trimmed)) return null
+    const d = new Date(trimmed)
     return Number.isFinite(d.getTime()) ? d : null
   }
   return null
 }
 
-function isPreviewWorthy(value: unknown, display: string): boolean {
+function isPreviewWorthy(value: unknown, display: string, columnName?: string): boolean {
   if (value === null || value === undefined) return false
-  if (parseAsDate(value)) return true
+  if (parseAsDate(value, columnName)) return true
   if (typeof value === 'object') return true
   if (display.length > SHORT_THRESHOLD) return true
   if (display.includes('\n')) return true
@@ -85,12 +158,12 @@ function prettyValue(value: unknown, display: string): string {
   return display
 }
 
-export function CellPreview({ value, display, children }: CellPreviewProps) {
-  if (!isPreviewWorthy(value, display)) {
+export function CellPreview({ value, display, columnName, children }: CellPreviewProps) {
+  if (!isPreviewWorthy(value, display, columnName)) {
     return <>{children}</>
   }
 
-  const dateValue = parseAsDate(value)
+  const dateValue = parseAsDate(value, columnName)
 
   return (
     <HoverCardPrimitive.Root openDelay={300} closeDelay={80}>
