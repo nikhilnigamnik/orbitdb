@@ -306,7 +306,7 @@ export function DataGrid({
                   key={row.id}
                   className={cn(
                     'group cursor-default transition-colors',
-                    isSelected ? 'bg-accent/10' : 'hover:bg-surface-elevated/40'
+                    isSelected ? 'bg-surface-elevated/70' : 'hover:bg-surface-elevated/40'
                   )}
                 >
                   {row.getVisibleCells().map((cell) => {
