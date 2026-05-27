@@ -27,23 +27,13 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void
 }
 
-const OVERLAY_CLASSES = [
-  'fixed inset-0 z-40 bg-black/60 backdrop-blur-sm',
-  'data-[state=open]:animate-in data-[state=closed]:animate-out',
-  'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
-  'data-[state=open]:duration-200 data-[state=closed]:duration-150'
-].join(' ')
+const OVERLAY_CLASSES = 'fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-fade-in'
 
 const CONTENT_CLASSES = [
   'fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(600px,calc(100vw-2rem))]',
   'overflow-hidden rounded-2xl border border-border bg-surface',
   'shadow-2xl shadow-black/60',
-  'data-[state=open]:animate-in data-[state=closed]:animate-out',
-  'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
-  'data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95',
-  'data-[state=open]:slide-in-from-top-4 data-[state=closed]:slide-out-to-top-4',
-  'data-[state=open]:duration-200 data-[state=closed]:duration-150',
-  'ease-out'
+  'animate-scale-in'
 ].join(' ')
 
 const COMMAND_CLASSES = [
