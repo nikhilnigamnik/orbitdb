@@ -2,11 +2,24 @@ import * as React from 'react'
 import { useLocation } from 'react-router-dom'
 import { Sidebar } from './sidebar'
 import { ROUTES } from '@renderer/config/routes'
+import { CommandPalette } from '@renderer/features/command-palette/components/command-palette'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
   const isHome = pathname === ROUTES.connections
   const isSplit = pathname.startsWith(ROUTES.database)
+  const [paletteOpen, setPaletteOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const isModK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
+      if (!isModK) return
+      e.preventDefault()
+      setPaletteOpen((prev) => !prev)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   return (
     <div className="relative flex h-screen bg-bg">
@@ -25,6 +38,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </main>
         </>
       )}
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   )
 }
