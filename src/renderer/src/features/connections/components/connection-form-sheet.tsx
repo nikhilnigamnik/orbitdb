@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { z } from 'zod'
+import { IconLink } from '@tabler/icons-react'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
@@ -8,6 +9,7 @@ import { FormField } from '@renderer/components/forms/form-field'
 import { SubmitButton } from '@renderer/components/forms/submit-button'
 import { Badge } from '@renderer/components/ui/badge'
 import { unwrap } from '@renderer/lib/ipc'
+import { parseConnectionUrl } from '../lib/parse-connection-url'
 import {
   DEFAULT_CONNECTION_VALUES,
   DEFAULT_DATABASES,
@@ -67,6 +69,30 @@ export function ConnectionFormSheet({
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [isTesting, setIsTesting] = React.useState(false)
   const [testResult, setTestResult] = React.useState<TestConnectionResult | null>(null)
+  const [urlInput, setUrlInput] = React.useState('')
+
+  const urlIsInvalid =
+    urlInput.trim().length > 0 && parseConnectionUrl(urlInput) === null
+
+  function applyConnectionUrl(input: string) {
+    const trimmed = input.trim()
+    if (!trimmed) return
+    const parsed = parseConnectionUrl(trimmed)
+    if (!parsed) return
+    setValues((prev) => ({
+      ...prev,
+      engine: parsed.engine,
+      host: parsed.host,
+      port: parsed.port,
+      database: parsed.database || prev.database,
+      user: parsed.user || prev.user,
+      password: parsed.password || prev.password,
+      ssl: parsed.ssl
+    }))
+    setErrors({})
+    setUrlInput('')
+    setTestResult(null)
+  }
 
   React.useEffect(() => {
     if (isOpen) {
@@ -168,6 +194,40 @@ export function ConnectionFormSheet({
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-4">
+            <FormField
+              label="Connection URL"
+              htmlFor="conn-url"
+              hint="Paste a postgres:// or mysql:// URL to autofill the fields below."
+              error={urlIsInvalid ? 'Not a valid postgres:// or mysql:// URL' : undefined}
+            >
+              <div className="relative">
+                <IconLink
+                  size={13}
+                  className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
+                />
+                <Input
+                  id="conn-url"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onPaste={(e) => {
+                    const text = e.clipboardData.getData('text')
+                    if (text && parseConnectionUrl(text)) {
+                      e.preventDefault()
+                      applyConnectionUrl(text)
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      applyConnectionUrl(urlInput)
+                    }
+                  }}
+                  placeholder="postgres://user:password@host:5432/db"
+                  className="pl-8 font-mono"
+                />
+              </div>
+            </FormField>
+
             <FormField label="Engine">
               <div className="grid grid-cols-3 gap-2">
                 {ENGINES.map((engine) => {
