@@ -22,6 +22,7 @@ import { cn } from '@renderer/lib/utils'
 import { formatCellValue } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
+import { CellPreview } from './cell-preview'
 import type { ColumnInfo, SortDirection } from '@renderer/types'
 
 type Row = Record<string, unknown>
@@ -222,7 +223,11 @@ export function DataGrid({
               </button>
             )
           }
-          return <span className="text-text">{display}</span>
+          return (
+            <CellPreview value={value} display={display}>
+              <span className="text-text">{display}</span>
+            </CellPreview>
+          )
         },
         meta: { dataType: col.dataType }
       })
