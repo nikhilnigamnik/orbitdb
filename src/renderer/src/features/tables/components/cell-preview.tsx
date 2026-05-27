@@ -176,7 +176,7 @@ export function CellPreview({ value, display, columnName, children }: CellPrevie
           align="start"
           sideOffset={6}
           collisionPadding={12}
-          className="animate-fade-in z-50 max-h-[60vh] min-w-[16rem] max-w-[36rem] overflow-auto rounded-lg border border-border bg-surface p-2 shadow-2xl shadow-black/50"
+          className="animate-fade-in z-50 max-h-[60vh] max-w-xl overflow-auto rounded-lg border border-border bg-surface p-2 shadow-2xl shadow-black/50"
         >
           {dateValue ? (
             <DatePreviewBody date={dateValue} />
@@ -292,26 +292,28 @@ function CopyableRow({
 
 function TextPreviewBody({ text }: { text: string }) {
   const { copied, copy } = useClipboardCopy()
+  const isCopied = copied === 'text'
+
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => void copy('text', text)}
-        title="Click to copy"
-        className="absolute right-1 top-1 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded text-text-subtle opacity-0 transition-opacity hover:bg-surface-elevated hover:text-text [&:hover]:opacity-100 group-hover:opacity-100"
-      >
-        {copied === 'text' ? (
-          <IconCheck size={11} className="text-emerald-400" />
-        ) : (
-          <IconCopy size={11} />
-        )}
-      </button>
-      <pre
-        onClick={() => void copy('text', text)}
-        className="cursor-pointer whitespace-pre-wrap break-words rounded font-mono text-[11px] leading-snug text-text-muted transition-colors hover:bg-surface-elevated/40"
-      >
+    <button
+      type="button"
+      onClick={() => void copy('text', text)}
+      title="Click to copy"
+      className="group/copy flex w-full cursor-pointer items-start gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-surface-elevated"
+    >
+      <pre className="min-w-0 flex-1 whitespace-pre-wrap wrap-anywhere font-mono text-[11px] leading-snug text-text-muted">
         {text}
       </pre>
-    </div>
+      <span className="mt-0.5 shrink-0">
+        {isCopied ? (
+          <IconCheck size={11} className="text-emerald-400" />
+        ) : (
+          <IconCopy
+            size={11}
+            className="text-text-subtle opacity-0 transition-opacity group-hover/copy:opacity-100"
+          />
+        )}
+      </span>
+    </button>
   )
 }
