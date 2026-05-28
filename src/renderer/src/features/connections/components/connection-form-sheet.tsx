@@ -8,7 +8,7 @@ import { Switch } from '@renderer/components/ui/switch'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { FormField } from '@renderer/components/forms/form-field'
 import { SubmitButton } from '@renderer/components/forms/submit-button'
-import { Badge } from '@renderer/components/ui/badge'
+import { Chip } from '@renderer/components/ui/chip'
 import { unwrap } from '@renderer/lib/ipc'
 import { parseConnectionUrl } from '../lib/parse-connection-url'
 import {
@@ -470,24 +470,34 @@ export function ConnectionFormSheet({
 
             {testResult && (
               <div
-                className={
+                className={cn(
+                  'rounded-md border px-2.5 py-2',
                   testResult.success
-                    ? 'rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2.5'
-                    : 'rounded-md border border-red-500/20 bg-red-500/5 p-2.5'
-                }
+                    ? 'border-emerald-500/20 bg-emerald-500/4'
+                    : 'border-rose-500/20 bg-rose-500/4'
+                )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <Badge variant={testResult.success ? 'success' : 'danger'}>
+                  <Chip tone={testResult.success ? 'emerald' : 'rose'}>
+                    <span
+                      aria-hidden
+                      className={cn(
+                        'h-1.5 w-1.5 rounded-full',
+                        testResult.success
+                          ? 'bg-emerald-300 shadow-[0_0_4px_0_rgba(110,231,183,0.6)]'
+                          : 'bg-rose-300 shadow-[0_0_4px_0_rgba(253,164,175,0.6)]'
+                      )}
+                    />
                     {testResult.success ? 'Connected' : 'Failed'}
-                  </Badge>
+                  </Chip>
                   {testResult.serverVersion && (
-                    <span className="text-[11px] text-text-muted">
+                    <span className="truncate rounded-sm bg-surface-elevated/60 px-1.5 py-0.5 font-mono text-[10.5px] text-text-muted ring-1 ring-inset ring-white/5">
                       {shortServerVersion(testResult.serverVersion)}
                     </span>
                   )}
                 </div>
                 {!testResult.success && testResult.error && (
-                  <p className="mt-2 break-all font-mono text-[11px] text-red-300/80">
+                  <p className="mt-2 break-all font-mono text-[11px] text-rose-300/80">
                     {testResult.error}
                   </p>
                 )}
