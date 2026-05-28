@@ -1,4 +1,5 @@
 import { IconTable, IconEye } from '@tabler/icons-react'
+import { Chip } from '@renderer/components/ui/chip'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { cn } from '@renderer/lib/utils'
 import type { TableDetails } from '@renderer/types'
@@ -24,8 +25,10 @@ export function TableHeader({ details, activeTab, onChangeTab }: TableHeaderProp
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <div
             className={cn(
-              'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
-              isView ? 'bg-amber-500/10 text-amber-300' : 'bg-accent/10 text-accent'
+              'flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-linear-to-b ring-1 ring-inset',
+              isView
+                ? 'from-amber-500/20 to-amber-500/5 text-amber-200 ring-amber-500/25 shadow-[inset_0_1px_0_rgba(252,211,77,0.35)]'
+                : 'from-sky-500/20 to-sky-500/5 text-sky-200 ring-sky-500/25 shadow-[inset_0_1px_0_rgba(125,211,252,0.35)]'
             )}
           >
             <Icon size={14} />
@@ -33,9 +36,7 @@ export function TableHeader({ details, activeTab, onChangeTab }: TableHeaderProp
           <h2 className="truncate text-[18px] font-semibold tracking-tight text-text">
             {details.name}
           </h2>
-          <span className="rounded-md bg-surface-elevated px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-muted">
-            {TYPE_LABEL[details.type]}
-          </span>
+          <Chip tone={isView ? 'amber' : 'sky'}>{TYPE_LABEL[details.type]}</Chip>
         </div>
 
         <SlidingTabs

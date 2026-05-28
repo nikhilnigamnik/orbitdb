@@ -143,18 +143,14 @@ export function DataGrid({
             : `Sort by ${col.name}`
           return (
             <div
-              aria-sort={
-                isActive ? (orderDir === 'asc' ? 'ascending' : 'descending') : 'none'
-              }
+              aria-sort={isActive ? (orderDir === 'asc' ? 'ascending' : 'descending') : 'none'}
               className={cn(
                 'group/header flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors',
                 isActive && 'bg-surface-elevated/60'
               )}
             >
               <div className="flex min-w-0 items-center gap-1.5">
-                {col.isPrimaryKey && (
-                  <IconKey size={10} className="shrink-0 text-text-subtle" />
-                )}
+                {col.isPrimaryKey && <IconKey size={10} className="shrink-0 text-text-subtle" />}
                 <div className="flex min-w-0 flex-col leading-tight">
                   <span
                     className={cn(
@@ -251,19 +247,19 @@ export function DataGrid({
                 }}
                 title="Edit row"
               >
-                <IconPencil size={11} />
+                <IconPencil stroke={2} />
               </Button>
               <Button
                 size="icon-xs"
                 variant="ghost"
-                className="text-text-muted hover:bg-red-500/10 hover:text-red-400"
+                className="text-text-muted hover:border-transparent hover:bg-linear-to-b hover:from-rose-500/25 hover:to-rose-500/5 hover:text-rose-200 hover:ring-1 hover:ring-inset hover:ring-rose-500/25 hover:shadow-[inset_0_1px_0_rgba(253,164,175,0.35)]"
                 onClick={(e) => {
                   e.stopPropagation()
                   onDeleteRow(row.original)
                 }}
                 title="Delete row"
               >
-                <IconTrash size={11} />
+                <IconTrash stroke={2} />
               </Button>
             </div>
           )

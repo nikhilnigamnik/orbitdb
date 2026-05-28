@@ -13,7 +13,11 @@ import {
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { useCommandPalette } from '@renderer/features/command-palette/store'
-import { loadPinned, togglePinned, type TableRef } from '@renderer/features/database/lib/table-prefs'
+import {
+  loadPinned,
+  togglePinned,
+  type TableRef
+} from '@renderer/features/database/lib/table-prefs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import {
   Collapsible,
@@ -100,14 +104,14 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
   }, [expanded, fetchTables, tablesBySchema])
 
   React.useEffect(() => {
-    if (activeSchema && !expanded.has(activeSchema)) {
-      setExpanded((prev) => {
-        const next = new Set(prev)
-        next.add(activeSchema)
-        return next
-      })
-    }
-  }, [activeSchema, expanded])
+    if (!activeSchema) return
+    setExpanded((prev) => {
+      if (prev.has(activeSchema)) return prev
+      const next = new Set(prev)
+      next.add(activeSchema)
+      return next
+    })
+  }, [activeSchema])
 
   function toggleSchema(schema: string) {
     setExpanded((prev) => {
@@ -122,15 +126,14 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
     navigate(tableRoute(schema, table.name))
   }
 
-  const isMac =
-    typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 px-3 pt-4 pb-3">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10 text-accent">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-linear-to-b from-sky-500/20 to-sky-500/5 text-sky-200 ring-1 ring-inset ring-sky-500/25 shadow-[inset_0_1px_0_rgba(125,211,252,0.35)]">
               <IconDatabase size={13} />
             </div>
             <div className="flex flex-col leading-tight">
@@ -142,7 +145,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
               <Button
                 size="icon-xs"
                 variant="ghost"
-                className="text-text-subtle hover:bg-surface-elevated hover:text-text"
+                tone="neutral"
                 onClick={() => {
                   setTablesBySchema({})
                   onRefresh()
@@ -249,10 +252,8 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
               >
                 <CollapsibleTrigger
                   className={cn(
-                    'group flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[12.5px] font-medium transition-colors',
-                    isSchemaActive
-                      ? 'text-text'
-                      : 'text-text-muted hover:bg-surface-elevated/40 hover:text-text'
+                    'group flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[12.5px] font-medium transition-colors hover:bg-surface-elevated/40',
+                    isSchemaActive ? 'text-text' : 'text-text-muted hover:text-text'
                   )}
                 >
                   <IconChevronRight
@@ -264,9 +265,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                   />
                   <span className="truncate">{schema}</span>
                   {state && !state.isLoading && (
-                    <span className="ml-auto text-[10px] text-text-subtle">
-                      {allTables.length}
-                    </span>
+                    <span className="ml-auto text-[10px] text-text-subtle">{allTables.length}</span>
                   )}
                 </CollapsibleTrigger>
 
@@ -284,8 +283,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                       <SlidingHoverList as="div">
                         {allTables.map((table, idx) => {
                           const isActive = isSchemaActive && activeTable === table.name
-                          const isView =
-                            table.type === 'view' || table.type === 'materialized_view'
+                          const isView = table.type === 'view' || table.type === 'materialized_view'
                           const Icon = isView ? IconEye : IconTable
                           const tableIsPinned = pinnedSet.has(`${schema}.${table.name}`)
                           return (
