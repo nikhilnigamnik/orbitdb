@@ -3,6 +3,7 @@ import {
   IconDatabase,
   IconListDetails,
   IconPlug,
+  IconSchema,
   IconTerminal2,
   IconSettings
 } from '@tabler/icons-react'
@@ -17,6 +18,7 @@ import orbitdbLogo from '@renderer/assets/orbitdb-brand.png'
 const NAV_ITEMS = [
   { to: ROUTES.connections, label: 'Connections', icon: IconPlug, end: true },
   { to: ROUTES.database, label: 'Browser', icon: IconDatabase, end: false },
+  { to: ROUTES.diagram, label: 'Diagram', icon: IconSchema, end: false },
   { to: ROUTES.query, label: 'Query', icon: IconTerminal2, end: false },
   { to: ROUTES.logs, label: 'Query log', icon: IconListDetails, end: false }
 ]
@@ -28,11 +30,16 @@ export function Sidebar() {
   const hasUpdate = !!result?.hasUpdate
 
   const isBrowserActive = pathname.startsWith(ROUTES.database)
+  const isDiagramActive = pathname.startsWith(ROUTES.diagram)
   const isQueryActive = pathname.startsWith(ROUTES.query)
   const isLogsActive = pathname.startsWith(ROUTES.logs)
   const isSettingsActive = pathname.startsWith(ROUTES.settings)
   const isConnectionsActive =
-    !isBrowserActive && !isQueryActive && !isLogsActive && !isSettingsActive
+    !isBrowserActive &&
+    !isDiagramActive &&
+    !isQueryActive &&
+    !isLogsActive &&
+    !isSettingsActive
 
   return (
     <aside className="m-1 flex h-[calc(100vh-0.5rem)] w-14 shrink-0 flex-col items-center rounded-xl bg-surface shadow-lg shadow-black/20">
@@ -47,10 +54,13 @@ export function Sidebar() {
               ? isConnectionsActive
               : to === ROUTES.database
                 ? isBrowserActive
-                : to === ROUTES.query
-                  ? isQueryActive
-                  : isLogsActive
-          const isDisabled = (to === ROUTES.database || to === ROUTES.query) && !active
+                : to === ROUTES.diagram
+                  ? isDiagramActive
+                  : to === ROUTES.query
+                    ? isQueryActive
+                    : isLogsActive
+          const isDisabled =
+            (to === ROUTES.database || to === ROUTES.diagram || to === ROUTES.query) && !active
           return (
             <Tooltip key={to}>
               <TooltipTrigger asChild>

@@ -2,10 +2,15 @@ export const ROUTES = {
   connections: '/',
   database: '/database',
   table: '/database/table',
+  diagram: '/diagram',
   query: '/query',
   logs: '/logs',
   settings: '/settings'
 } as const
+
+export function diagramRoute(schema: string): string {
+  return `${ROUTES.diagram}?schema=${encodeURIComponent(schema)}`
+}
 
 export function tableRoute(schema: string, name: string): string {
   return `${ROUTES.table}?schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(name)}`

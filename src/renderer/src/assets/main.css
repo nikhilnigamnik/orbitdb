@@ -23,6 +23,25 @@
   --color-accent: #4878ea;
 }
 
+.orbit-flow {
+  --xy-controls-button-background-color: var(--color-surface);
+  --xy-controls-button-background-color-hover: var(--color-surface-elevated);
+  --xy-controls-button-color: var(--color-text-muted);
+  --xy-controls-button-color-hover: var(--color-text);
+  --xy-controls-button-border-color: var(--color-border);
+  --xy-controls-box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  --xy-minimap-background-color: var(--color-surface);
+  --xy-minimap-mask-background-color: rgba(0, 0, 0, 0.5);
+  --xy-minimap-node-background-color: rgba(125, 152, 248, 0.5);
+  --xy-minimap-node-stroke-color: transparent;
+
+  --xy-edge-stroke: var(--color-border-strong);
+  --xy-edge-stroke-selected: var(--color-accent);
+
+  --xy-attribution-background-color: transparent;
+}
+
 @layer base {
   :root {
     interpolate-size: allow-keywords;
