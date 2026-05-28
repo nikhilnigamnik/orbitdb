@@ -37,6 +37,7 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
   const [columns, setColumns] = React.useState<ColumnInfo[]>(details.columns)
   const [totalEstimate, setTotalEstimate] = React.useState<number | null>(details.estimatedRows)
   const [isLoading, setIsLoading] = React.useState(true)
+  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [offset, setOffset] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE)
@@ -97,30 +98,100 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
 
   const canMutate = details.type === 'table' && details.primaryKey.length > 0
 
+  const requestIdRef = React.useRef(0)
+  const prefetchCacheRef = React.useRef<{ key: string; data: RowsResult } | null>(null)
+
   const load = React.useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const data: RowsResult = await unwrap(
-        window.api.db.getRows({
-          connectionId,
-          schema: details.schema,
-          table: details.name,
-          limit: pageSize,
-          offset,
-          orderBy: orderBy ?? undefined,
-          orderDir,
-          filters
-        })
-      )
+    const requestId = ++requestIdRef.current
+    const queryKey = JSON.stringify({
+      connectionId,
+      schema: details.schema,
+      table: details.name,
+      pageSize,
+      offset,
+      orderBy,
+      orderDir,
+      filters
+    })
+
+    let data: RowsResult
+    const cached = prefetchCacheRef.current
+    if (cached?.key === queryKey) {
+      data = cached.data
+      prefetchCacheRef.current = null
       setRows(data.rows)
       setColumns(data.columns)
       setTotalEstimate(data.totalEstimate)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
+      setHasLoadedOnce(true)
       setIsLoading(false)
+      setError(null)
+    } else {
+      prefetchCacheRef.current = null
+      setIsLoading(true)
+      setError(null)
+      try {
+        data = await unwrap(
+          window.api.db.getRows({
+            connectionId,
+            schema: details.schema,
+            table: details.name,
+            limit: pageSize,
+            offset,
+            orderBy: orderBy ?? undefined,
+            orderDir,
+            filters
+          })
+        )
+        if (requestId !== requestIdRef.current) return
+        setRows(data.rows)
+        setColumns(data.columns)
+        setTotalEstimate(data.totalEstimate)
+        setHasLoadedOnce(true)
+      } catch (err) {
+        if (requestId !== requestIdRef.current) return
+        setError(err instanceof Error ? err.message : String(err))
+        return
+      } finally {
+        if (requestId === requestIdRef.current) setIsLoading(false)
+      }
     }
+
+    const nextOffset = offset + pageSize
+    const hasNextPage =
+      data.rows.length === pageSize &&
+      (data.totalEstimate == null || nextOffset < data.totalEstimate)
+    if (!hasNextPage) return
+
+    const nextKey = JSON.stringify({
+      connectionId,
+      schema: details.schema,
+      table: details.name,
+      pageSize,
+      offset: nextOffset,
+      orderBy,
+      orderDir,
+      filters
+    })
+
+    void (async () => {
+      try {
+        const nextData: RowsResult = await unwrap(
+          window.api.db.getRows({
+            connectionId,
+            schema: details.schema,
+            table: details.name,
+            limit: pageSize,
+            offset: nextOffset,
+            orderBy: orderBy ?? undefined,
+            orderDir,
+            filters
+          })
+        )
+        prefetchCacheRef.current = { key: nextKey, data: nextData }
+      } catch {
+        // silent — prefetch failures shouldn't surface
+      }
+    })()
   }, [connectionId, details.schema, details.name, pageSize, offset, orderBy, orderDir, filters])
 
   React.useEffect(() => {
@@ -128,6 +199,9 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
     setOrderBy(null)
     setOrderDir('asc')
     setFilters([])
+    setRows([])
+    setHasLoadedOnce(false)
+    prefetchCacheRef.current = null
   }, [details.schema, details.name])
 
   React.useEffect(() => {
@@ -327,6 +401,7 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
           rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}
           isLoading={isLoading}
+          isInitialLoad={isLoading && !hasLoadedOnce}
           fkColumns={fkByColumn}
           onOpenForeignKey={openForeignKey}
         />

@@ -145,6 +145,8 @@ export interface DistinctValuesOptions {
   search?: string
 }
 
+export const MAX_QUERY_RESULT_ROWS = 10_000
+
 export interface QueryResult {
   success: boolean
   error?: string
@@ -153,6 +155,7 @@ export interface QueryResult {
   rowCount: number | null
   command: string | null
   durationMs: number
+  truncated: boolean
 }
 
 export interface OperationResult<T = void> {

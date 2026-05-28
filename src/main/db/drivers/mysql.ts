@@ -4,30 +4,43 @@ import mysql, {
   type RowDataPacket,
   type ResultSetHeader
 } from 'mysql2/promise'
-import type {
-  ColumnInfo,
-  ConnectionInput,
-  DistinctValuesOptions,
-  ForeignKeyInfo,
-  GetRowsOptions,
-  IndexInfo,
-  QueryResult,
-  RowDelete,
-  RowMutation,
-  RowUpdate,
-  RowsResult,
-  RunQueryOptions,
-  SavedConnection,
-  SchemaInfo,
-  TableDetails,
-  TableInfo,
-  TestConnectionResult
+import {
+  MAX_QUERY_RESULT_ROWS,
+  type ColumnInfo,
+  type ConnectionInput,
+  type DistinctValuesOptions,
+  type ForeignKeyInfo,
+  type GetRowsOptions,
+  type IndexInfo,
+  type QueryResult,
+  type RowDelete,
+  type RowMutation,
+  type RowUpdate,
+  type RowsResult,
+  type RunQueryOptions,
+  type SavedConnection,
+  type SchemaInfo,
+  type TableDetails,
+  type TableInfo,
+  type TestConnectionResult
 } from '../../../shared/types'
 import { getConnection } from '../../store/connections-store'
 import { recordQuery } from '../query-log'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
 const pools = new Map<string, Pool>()
+const tableDetailsCache = new Map<string, TableDetails>()
+
+function tableCacheKey(connectionId: string, schema: string, table: string): string {
+  return `${connectionId} ${schema} ${table}`
+}
+
+function invalidateTableDetailsForConnection(connectionId: string): void {
+  const prefix = `${connectionId} `
+  for (const key of tableDetailsCache.keys()) {
+    if (key.startsWith(prefix)) tableDetailsCache.delete(key)
+  }
+}
 
 function toPoolConfig(input: ConnectionInput): PoolOptions {
   return {
@@ -104,6 +117,7 @@ function instrumentMysqlPool(pool: Pool, connectionId: string): void {
 
 async function disconnectPool(connectionId: string): Promise<void> {
   const pool = pools.get(connectionId)
+  invalidateTableDetailsForConnection(connectionId)
   if (!pool) return
   pools.delete(connectionId)
   try {
@@ -194,6 +208,10 @@ async function tableDetails(
   schema: string,
   table: string
 ): Promise<TableDetails> {
+  const cacheKey = tableCacheKey(connectionId, schema, table)
+  const cached = tableDetailsCache.get(cacheKey)
+  if (cached) return cached
+
   const pool = getPool(connectionId)
 
   const [tableMeta] = await pool.query<RowDataPacket[]>(
@@ -306,7 +324,7 @@ async function tableDetails(
     onUpdate: String(r.on_update ?? 'NO ACTION')
   }))
 
-  return {
+  const result: TableDetails = {
     schema,
     name: table,
     type,
@@ -316,6 +334,8 @@ async function tableDetails(
     foreignKeys,
     estimatedRows: Number.isFinite(estimatedRows ?? NaN) ? estimatedRows : null
   }
+  tableDetailsCache.set(cacheKey, result)
+  return result
 }
 
 function quoteIdent(name: string): string {
@@ -517,16 +537,20 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
       const [result, fields] = await conn.query(opts.sql, opts.params)
       const command = detectCommand(opts.sql)
       if (Array.isArray(result)) {
+        const allRows = result as unknown as Record<string, unknown>[]
+        const truncated = allRows.length > MAX_QUERY_RESULT_ROWS
+        const rows = truncated ? allRows.slice(0, MAX_QUERY_RESULT_ROWS) : allRows
         return {
           success: true,
-          rows: result as unknown as Record<string, unknown>[],
+          rows,
           fields: (fields ?? []).map((f) => ({
             name: String(f.name),
             dataTypeID: typeof f.columnType === 'number' ? f.columnType : 0
           })),
-          rowCount: result.length,
+          rowCount: allRows.length,
           command,
-          durationMs: Date.now() - started
+          durationMs: Date.now() - started,
+          truncated
         }
       }
       const header = result as ResultSetHeader
@@ -536,7 +560,8 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
         fields: [],
         rowCount: header.affectedRows ?? null,
         command,
-        durationMs: Date.now() - started
+        durationMs: Date.now() - started,
+        truncated: false
       }
     } catch (err) {
       return {
@@ -546,7 +571,8 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
         fields: [],
         rowCount: null,
         command: null,
-        durationMs: Date.now() - started
+        durationMs: Date.now() - started,
+        truncated: false
       }
     }
   } finally {

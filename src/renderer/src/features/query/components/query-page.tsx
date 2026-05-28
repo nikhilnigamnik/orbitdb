@@ -133,7 +133,8 @@ export function QueryPage() {
         fields: [],
         rowCount: null,
         command: null,
-        durationMs: 0
+        durationMs: 0,
+        truncated: false
       })
     } finally {
       setIsRunning(false)

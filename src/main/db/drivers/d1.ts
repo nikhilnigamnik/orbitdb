@@ -1,27 +1,41 @@
-import type {
-  ColumnInfo,
-  ConnectionInput,
-  DistinctValuesOptions,
-  ForeignKeyInfo,
-  GetRowsOptions,
-  IndexInfo,
-  QueryResult,
-  RowDelete,
-  RowMutation,
-  RowUpdate,
-  RowsResult,
-  RunQueryOptions,
-  SavedConnection,
-  SchemaInfo,
-  TableDetails,
-  TableInfo,
-  TestConnectionResult
+import {
+  MAX_QUERY_RESULT_ROWS,
+  type ColumnInfo,
+  type ConnectionInput,
+  type DistinctValuesOptions,
+  type ForeignKeyInfo,
+  type GetRowsOptions,
+  type IndexInfo,
+  type QueryResult,
+  type RowDelete,
+  type RowMutation,
+  type RowUpdate,
+  type RowsResult,
+  type RunQueryOptions,
+  type SavedConnection,
+  type SchemaInfo,
+  type TableDetails,
+  type TableInfo,
+  type TestConnectionResult
 } from '../../../shared/types'
 import { getConnection } from '../../store/connections-store'
 import { recordQuery } from '../query-log'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
 const CF_API = 'https://api.cloudflare.com/client/v4'
+
+const tableDetailsCache = new Map<string, TableDetails>()
+
+function tableCacheKey(connectionId: string, schema: string, table: string): string {
+  return `${connectionId} ${schema} ${table}`
+}
+
+function invalidateTableDetailsForConnection(connectionId: string): void {
+  const prefix = `${connectionId} `
+  for (const key of tableDetailsCache.keys()) {
+    if (key.startsWith(prefix)) tableDetailsCache.delete(key)
+  }
+}
 
 interface D1QueryMeta {
   duration?: number
@@ -199,8 +213,8 @@ async function describeActive(saved: SavedConnection): Promise<ActiveMeta> {
 }
 
 async function disconnectPool(connectionId: string): Promise<void> {
-  // D1 is stateless HTTP — nothing to close.
-  void connectionId
+  // D1 is stateless HTTP — nothing to close, but still flush cached schema.
+  invalidateTableDetailsForConnection(connectionId)
 }
 
 async function disconnectAll(): Promise<void> {
@@ -243,6 +257,10 @@ async function tableDetails(
   schema: string,
   table: string
 ): Promise<TableDetails> {
+  const cacheKey = tableCacheKey(connectionId, schema, table)
+  const cached = tableDetailsCache.get(cacheKey)
+  if (cached) return cached
+
   const saved = loadSaved(connectionId)
 
   const metaEntry = await callD1<{ type: string; sql: string | null }>(
@@ -356,7 +374,7 @@ async function tableDetails(
     }
   })
 
-  return {
+  const result: TableDetails = {
     schema,
     name: table,
     type,
@@ -366,6 +384,8 @@ async function tableDetails(
     foreignKeys,
     estimatedRows: null
   }
+  tableDetailsCache.set(cacheKey, result)
+  return result
 }
 
 async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
@@ -536,13 +556,16 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   try {
     const entry = await callD1(saved, opts.sql, opts.params ?? [], controller.signal)
     const fieldNames = entry.results[0] ? Object.keys(entry.results[0]) : []
+    const truncated = entry.results.length > MAX_QUERY_RESULT_ROWS
+    const rows = truncated ? entry.results.slice(0, MAX_QUERY_RESULT_ROWS) : entry.results
     return {
       success: true,
-      rows: entry.results,
+      rows,
       fields: fieldNames.map((name) => ({ name, dataTypeID: 0 })),
       rowCount: entry.results.length > 0 ? entry.results.length : (entry.meta.changes ?? null),
       command: detectCommand(opts.sql),
-      durationMs: Date.now() - started
+      durationMs: Date.now() - started,
+      truncated
     }
   } catch (err) {
     return {
@@ -552,7 +575,8 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
       fields: [],
       rowCount: null,
       command: null,
-      durationMs: Date.now() - started
+      durationMs: Date.now() - started,
+      truncated: false
     }
   } finally {
     if (opts.queryId) d1Inflight.delete(opts.queryId)

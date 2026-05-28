@@ -46,6 +46,7 @@ interface DataGridProps {
   rowSelection?: RowSelectionState
   onRowSelectionChange?: (selection: RowSelectionState) => void
   isLoading?: boolean
+  isInitialLoad?: boolean
   fkColumns?: Map<string, ForeignKeyTarget>
   onOpenForeignKey?: (column: string, value: unknown) => void
 }
@@ -67,6 +68,7 @@ export function DataGrid({
   rowSelection: controlledRowSelection,
   onRowSelectionChange,
   isLoading = false,
+  isInitialLoad = false,
   fkColumns,
   onOpenForeignKey
 }: DataGridProps) {
@@ -240,7 +242,7 @@ export function DataGrid({
               <Button
                 size="icon-xs"
                 variant="ghost"
-                className="text-text-muted hover:bg-surface-elevated hover:text-text"
+                className="text-text-muted hover:border-transparent hover:bg-linear-to-b hover:from-neutral-500/25 hover:to-neutral-500/5 hover:text-neutral-200 hover:ring-1 hover:ring-inset hover:ring-neutral-500/25 hover:shadow-[inset_0_1px_0_rgba(229,229,229,0.25)]"
                 onClick={(e) => {
                   e.stopPropagation()
                   onEditRow(row.original)
@@ -292,7 +294,7 @@ export function DataGrid({
 
   const visibleColCount = tableColumns.length
 
-  if (isLoading) {
+  if (isInitialLoad) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center text-text-subtle">
         <IconLoader stroke={2} size={22} className="animate-spin" />
@@ -301,7 +303,12 @@ export function DataGrid({
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto">
+    <div
+      className={cn(
+        'min-h-0 flex-1 overflow-auto transition-opacity duration-150',
+        isLoading && 'pointer-events-none opacity-50'
+      )}
+    >
       <table className="min-w-full border-separate border-spacing-0 text-[12.5px]">
         <thead className="sticky top-0 z-10">
           {table.getHeaderGroups().map((headerGroup) => (
