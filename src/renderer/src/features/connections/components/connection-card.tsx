@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { IconDotsVertical, IconLoader, IconLock, IconPencil, IconTrash } from '@tabler/icons-react'
+import { IconDotsVertical, IconLock, IconPencil, IconTrash } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Chip } from '@renderer/components/ui/chip'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { Popover } from '@renderer/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL } from '@renderer/config/site'
@@ -164,7 +165,7 @@ export function ConnectionCard({
       >
         {isConnecting ? (
           <>
-            <IconLoader stroke={2} size={12} className="animate-spin" />
+            <Spinner size={12} />
             <span>Connecting…</span>
           </>
         ) : isActive ? (

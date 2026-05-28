@@ -146,7 +146,7 @@ export function ConnectionsPage() {
                 disabled={isLoading}
                 title="Refresh"
               >
-                <IconRefresh size={14} className={isLoading ? 'animate-spin' : ''} />
+                {isLoading ? <Spinner size={14} /> : <IconRefresh size={14} />}
                 Refresh
               </Button>
             </div>

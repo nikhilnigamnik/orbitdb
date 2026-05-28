@@ -14,7 +14,6 @@ function createWindow(): void {
     height: 800,
     minWidth: 960,
     minHeight: 600,
-    show: false,
     autoHideMenuBar: true,
     title: APP_NAME,
     backgroundColor: '#0e0e0f',
@@ -23,10 +22,6 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
-  })
-
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
