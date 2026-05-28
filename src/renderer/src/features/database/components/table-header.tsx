@@ -28,7 +28,7 @@ export function TableHeader({ details, activeTab, onChangeTab }: TableHeaderProp
               'flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-linear-to-b ring-1 ring-inset',
               isView
                 ? 'from-amber-500/20 to-amber-500/5 text-amber-200 ring-amber-500/25 shadow-[inset_0_1px_0_rgba(252,211,77,0.35)]'
-                : 'from-sky-500/20 to-sky-500/5 text-sky-200 ring-sky-500/25 shadow-[inset_0_1px_0_rgba(125,211,252,0.35)]'
+                : 'from-accent/25 to-accent/5 text-accent ring-accent/30 shadow-[inset_0_1px_0_rgba(125,152,248,0.4)]'
             )}
           >
             <Icon size={14} />
@@ -36,7 +36,7 @@ export function TableHeader({ details, activeTab, onChangeTab }: TableHeaderProp
           <h2 className="truncate text-[18px] font-semibold tracking-tight text-text">
             {details.name}
           </h2>
-          <Chip tone={isView ? 'amber' : 'sky'}>{TYPE_LABEL[details.type]}</Chip>
+          <Chip tone={isView ? 'amber' : 'accent'}>{TYPE_LABEL[details.type]}</Chip>
         </div>
 
         <SlidingTabs

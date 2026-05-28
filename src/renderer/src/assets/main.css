@@ -166,6 +166,16 @@
   --animate-slide-right-and-fade: slideRightAndFade 150ms cubic-bezier(0.16, 1, 0.3, 1);
   --animate-collapsible-down: collapsibleDown 220ms cubic-bezier(0.16, 1, 0.3, 1);
   --animate-collapsible-up: collapsibleUp 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shimmer: shimmer 1.6s linear infinite;
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
 
   @keyframes collapsibleDown {
     from {

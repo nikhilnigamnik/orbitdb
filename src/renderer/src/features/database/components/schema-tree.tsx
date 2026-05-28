@@ -25,6 +25,7 @@ import {
   CollapsibleTrigger
 } from '@renderer/components/ui/collapsible'
 import { SlidingHoverList } from '@renderer/components/ui/sliding-hover-list'
+import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Kbd } from '@renderer/components/ui/kbd'
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
@@ -133,7 +134,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
       <div className="shrink-0 px-3 pt-4 pb-3">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-linear-to-b from-sky-500/20 to-sky-500/5 text-sky-200 ring-1 ring-inset ring-sky-500/25 shadow-[inset_0_1px_0_rgba(125,211,252,0.35)]">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-linear-to-b from-accent/25 to-accent/5 text-accent ring-1 ring-inset ring-accent/30 shadow-[inset_0_1px_0_rgba(125,152,248,0.4)]">
               <IconDatabase size={13} />
             </div>
             <div className="flex flex-col leading-tight">
@@ -227,9 +228,11 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
             </SlidingHoverList>
           </div>
         )}
-        {isLoading && schemas.length === 0 ? (
-          <div className="flex items-center justify-center py-10 text-text-subtle">
-            <IconLoader stroke={2} size={18} className="animate-spin" />
+        {isLoading ? (
+          <div className="flex flex-col gap-1">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-7 w-full rounded-md" />
+            ))}
           </div>
         ) : schemas.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-1 py-10 px-4 text-center">
