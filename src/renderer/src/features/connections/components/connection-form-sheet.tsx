@@ -210,40 +210,6 @@ export function ConnectionFormSheet({
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-4">
-            <FormField
-              label="Connection URL"
-              htmlFor="conn-url"
-              hint="Paste a postgres:// or mysql:// URL to autofill the fields below."
-              error={urlIsInvalid ? 'Not a valid postgres:// or mysql:// URL' : undefined}
-            >
-              <div className="relative">
-                <IconLink
-                  size={13}
-                  className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
-                />
-                <Input
-                  id="conn-url"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  onPaste={(e) => {
-                    const text = e.clipboardData.getData('text')
-                    if (text && parseConnectionUrl(text)) {
-                      e.preventDefault()
-                      applyConnectionUrl(text)
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      applyConnectionUrl(urlInput)
-                    }
-                  }}
-                  placeholder="postgres://user:password@host:5432/db"
-                  className="pl-8 font-mono"
-                />
-              </div>
-            </FormField>
-
             <FormField label="Engine">
               <div className="grid grid-cols-3 gap-2">
                 {ENGINES.map((engine) => {
@@ -305,6 +271,50 @@ export function ConnectionFormSheet({
                 })}
               </div>
             </FormField>
+
+            {values.engine !== 'd1' && (
+              <FormField
+                label="Connection URL"
+                htmlFor="conn-url"
+                hint={`Paste a ${values.engine === 'mysql' ? 'mysql://' : 'postgres://'} URL to autofill the fields below.`}
+                error={
+                  urlIsInvalid
+                    ? `Not a valid ${values.engine === 'mysql' ? 'mysql://' : 'postgres://'} URL`
+                    : undefined
+                }
+              >
+                <div className="relative">
+                  <IconLink
+                    size={13}
+                    className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
+                  />
+                  <Input
+                    id="conn-url"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    onPaste={(e) => {
+                      const text = e.clipboardData.getData('text')
+                      if (text && parseConnectionUrl(text)) {
+                        e.preventDefault()
+                        applyConnectionUrl(text)
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        applyConnectionUrl(urlInput)
+                      }
+                    }}
+                    placeholder={
+                      values.engine === 'mysql'
+                        ? 'mysql://user:password@host:3306/db'
+                        : 'postgres://user:password@host:5432/db'
+                    }
+                    className="pl-8 font-mono"
+                  />
+                </div>
+              </FormField>
+            )}
 
             <FormField label="Display name" htmlFor="conn-name" error={errors.name}>
               <Input
