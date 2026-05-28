@@ -59,7 +59,10 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle(
     'connections:update',
-    wrap(async (id: string, input: ConnectionInput) => updateConnection(id, input))
+    wrap(async (id: string, input: ConnectionInput) => {
+      await disconnectPool(id)
+      return updateConnection(id, input)
+    })
   )
   ipcMain.handle(
     'connections:delete',

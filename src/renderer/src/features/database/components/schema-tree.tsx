@@ -20,6 +20,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger
 } from '@renderer/components/ui/collapsible'
+import { SlidingHoverList } from '@renderer/components/ui/sliding-hover-list'
+import { Kbd } from '@renderer/components/ui/kbd'
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { formatNumber } from '@renderer/lib/format'
@@ -162,12 +164,8 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
           <IconSearch size={12} className="shrink-0" />
           <span className="flex-1 truncate">Search tables…</span>
           <span className="flex shrink-0 items-center gap-0.5">
-            <kbd className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-border bg-surface px-1 font-mono text-[10px] leading-none text-text-subtle">
-              {isMac ? '⌘' : 'Ctrl'}
-            </kbd>
-            <kbd className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-border bg-surface px-1 font-mono text-[10px] leading-none text-text-subtle">
-              K
-            </kbd>
+            <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
+            <Kbd>K</Kbd>
           </span>
         </button>
       </div>
@@ -178,52 +176,52 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
             <div className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-text-subtle">
               Pinned
             </div>
-            {pinned.map((pin) => {
-              const isActive = activeSchema === pin.schema && activeTable === pin.table
-              return (
-                <div
-                  key={`${pin.schema}.${pin.table}`}
-                  className={cn(
-                    'group/row flex w-full items-center gap-1 rounded-md',
-                    isActive
-                      ? 'bg-surface-elevated text-text'
-                      : 'text-text-muted hover:bg-surface-elevated/50 hover:text-text'
-                  )}
-                >
-                  <button
-                    onClick={() =>
-                      navigate(tableRoute(pin.schema, pin.table))
-                    }
-                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px]"
-                    title={`${pin.schema}.${pin.table}`}
+            <SlidingHoverList as="div">
+              {pinned.map((pin, idx) => {
+                const isActive = activeSchema === pin.schema && activeTable === pin.table
+                return (
+                  <SlidingHoverList.Item
+                    as="div"
+                    key={`${pin.schema}.${pin.table}`}
+                    index={idx}
+                    className={cn(
+                      'group/row flex w-full items-center gap-1 rounded-md',
+                      isActive ? 'bg-surface-elevated text-text' : 'text-text-muted hover:text-text'
+                    )}
                   >
-                    <IconTable
-                      size={12}
-                      className={cn(
-                        'shrink-0',
-                        isActive ? 'text-text-muted' : 'text-text-subtle'
-                      )}
-                    />
-                    <span className="truncate">{pin.table}</span>
-                    <span className="ml-auto truncate font-mono text-[9.5px] text-text-subtle">
-                      {pin.schema}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleTogglePin(pin)
-                    }}
-                    className="mr-1 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-amber-300/80 transition-colors hover:bg-surface hover:text-text"
-                    aria-label="Unpin table"
-                    title="Unpin table"
-                  >
-                    <IconPinFilled size={11} />
-                  </button>
-                </div>
-              )
-            })}
+                    <button
+                      onClick={() => navigate(tableRoute(pin.schema, pin.table))}
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px]"
+                      title={`${pin.schema}.${pin.table}`}
+                    >
+                      <IconTable
+                        size={12}
+                        className={cn(
+                          'shrink-0',
+                          isActive ? 'text-text-muted' : 'text-text-subtle'
+                        )}
+                      />
+                      <span className="truncate">{pin.table}</span>
+                      <span className="ml-auto truncate font-mono text-[9.5px] text-text-subtle">
+                        {pin.schema}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleTogglePin(pin)
+                      }}
+                      className="mr-1 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-amber-300/80 transition-colors hover:bg-surface hover:text-text"
+                      aria-label="Unpin table"
+                      title="Unpin table"
+                    >
+                      <IconPinFilled size={11} />
+                    </button>
+                  </SlidingHoverList.Item>
+                )
+              })}
+            </SlidingHoverList>
           </div>
         )}
         {isLoading && schemas.length === 0 ? (
@@ -283,72 +281,77 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                     ) : allTables.length === 0 ? (
                       <p className="px-3 py-1.5 text-[11px] text-text-subtle">Empty schema</p>
                     ) : (
-                      allTables.map((table) => {
-                        const isActive = isSchemaActive && activeTable === table.name
-                        const isView = table.type === 'view' || table.type === 'materialized_view'
-                        const Icon = isView ? IconEye : IconTable
-                        const tableIsPinned = pinnedSet.has(`${schema}.${table.name}`)
-                        return (
-                          <div
-                            key={table.name}
-                            className={cn(
-                              'group/row flex w-full items-center gap-1 rounded-md',
-                              isActive
-                                ? 'bg-surface-elevated text-text'
-                                : 'text-text-muted hover:bg-surface-elevated/50 hover:text-text'
-                            )}
-                          >
-                            <button
-                              onClick={() => selectTable(schema, table)}
-                              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px]"
-                              title={table.name}
-                            >
-                              <Icon
-                                size={12}
-                                className={cn(
-                                  'shrink-0',
-                                  isActive ? 'text-text-muted' : 'text-text-subtle'
-                                )}
-                              />
-                              <span className="truncate">{table.name}</span>
-                              {isView && (
-                                <span className="ml-auto rounded bg-surface-elevated px-1 py-0 text-[9px] font-medium uppercase tracking-wide text-text-subtle">
-                                  view
-                                </span>
+                      <SlidingHoverList as="div">
+                        {allTables.map((table, idx) => {
+                          const isActive = isSchemaActive && activeTable === table.name
+                          const isView =
+                            table.type === 'view' || table.type === 'materialized_view'
+                          const Icon = isView ? IconEye : IconTable
+                          const tableIsPinned = pinnedSet.has(`${schema}.${table.name}`)
+                          return (
+                            <SlidingHoverList.Item
+                              as="div"
+                              key={table.name}
+                              index={idx}
+                              className={cn(
+                                'group/row flex w-full items-center gap-1 rounded-md',
+                                isActive
+                                  ? 'bg-surface-elevated text-text'
+                                  : 'text-text-muted hover:text-text'
                               )}
-                              {!isView &&
-                                !tableIsPinned &&
-                                table.estimatedRows != null &&
-                                table.estimatedRows > 0 && (
-                                  <span className="ml-auto font-mono text-[10px] text-text-subtle opacity-0 transition-opacity group-hover/row:opacity-100">
-                                    {formatNumber(table.estimatedRows)}
+                            >
+                              <button
+                                onClick={() => selectTable(schema, table)}
+                                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px]"
+                                title={table.name}
+                              >
+                                <Icon
+                                  size={12}
+                                  className={cn(
+                                    'shrink-0',
+                                    isActive ? 'text-text-muted' : 'text-text-subtle'
+                                  )}
+                                />
+                                <span className="truncate">{table.name}</span>
+                                {isView && (
+                                  <span className="ml-auto rounded bg-surface-elevated px-1 py-0 text-[9px] font-medium uppercase tracking-wide text-text-subtle">
+                                    view
                                   </span>
                                 )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleTogglePin({ schema, table: table.name })
-                              }}
-                              className={cn(
-                                'mr-1 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-text-subtle transition-opacity hover:bg-surface hover:text-text',
-                                tableIsPinned
-                                  ? 'opacity-100 text-amber-300/80'
-                                  : 'opacity-0 group-hover/row:opacity-100'
-                              )}
-                              aria-label={tableIsPinned ? 'Unpin table' : 'Pin table'}
-                              title={tableIsPinned ? 'Unpin table' : 'Pin table'}
-                            >
-                              {tableIsPinned ? (
-                                <IconPinFilled size={11} />
-                              ) : (
-                                <IconPin size={11} />
-                              )}
-                            </button>
-                          </div>
-                        )
-                      })
+                                {!isView &&
+                                  !tableIsPinned &&
+                                  table.estimatedRows != null &&
+                                  table.estimatedRows > 0 && (
+                                    <span className="ml-auto font-mono text-[10px] text-text-subtle opacity-0 transition-opacity group-hover/row:opacity-100">
+                                      {formatNumber(table.estimatedRows)}
+                                    </span>
+                                  )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleTogglePin({ schema, table: table.name })
+                                }}
+                                className={cn(
+                                  'mr-1 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-text-subtle transition-opacity hover:bg-surface hover:text-text',
+                                  tableIsPinned
+                                    ? 'opacity-100 text-amber-300/80'
+                                    : 'opacity-0 group-hover/row:opacity-100'
+                                )}
+                                aria-label={tableIsPinned ? 'Unpin table' : 'Pin table'}
+                                title={tableIsPinned ? 'Unpin table' : 'Pin table'}
+                              >
+                                {tableIsPinned ? (
+                                  <IconPinFilled size={11} />
+                                ) : (
+                                  <IconPin size={11} />
+                                )}
+                              </button>
+                            </SlidingHoverList.Item>
+                          )
+                        })}
+                      </SlidingHoverList>
                     )}
                   </div>
                 </CollapsibleContent>

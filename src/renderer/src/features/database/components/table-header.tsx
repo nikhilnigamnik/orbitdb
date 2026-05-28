@@ -1,4 +1,5 @@
 import { IconTable, IconEye } from '@tabler/icons-react'
+import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { cn } from '@renderer/lib/utils'
 import type { TableDetails } from '@renderer/types'
 
@@ -37,40 +38,15 @@ export function TableHeader({ details, activeTab, onChangeTab }: TableHeaderProp
           </span>
         </div>
 
-        <div className="flex shrink-0 gap-1 rounded-lg border border-border bg-surface-elevated/40 p-0.5">
-          <TabButton active={activeTab === 'data'} onClick={() => onChangeTab('data')}>
-            Data
-          </TabButton>
-          <TabButton active={activeTab === 'structure'} onClick={() => onChangeTab('structure')}>
-            Structure
-          </TabButton>
-        </div>
+        <SlidingTabs
+          tabs={[
+            { id: 'data', label: 'Data' },
+            { id: 'structure', label: 'Structure' }
+          ]}
+          value={activeTab}
+          onChange={onChangeTab}
+        />
       </div>
     </div>
-  )
-}
-
-function TabButton({
-  active,
-  onClick,
-  children
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'cursor-pointer rounded-md px-3 py-1 text-[12px] font-medium transition-colors',
-        active
-          ? 'bg-surface text-text shadow-sm'
-          : 'text-text-muted hover:text-text'
-      )}
-    >
-      {children}
-    </button>
   )
 }

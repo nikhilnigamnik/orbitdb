@@ -156,13 +156,7 @@ export function ConnectionsPage() {
             <h2 className="text-2xl font-bold leading-none tracking-tight text-text">
               Connections
             </h2>
-            <Button
-              size="sm"
-              className="rounded-lg bg-accent px-3.5 text-white hover:bg-accent/90"
-              onClick={openCreate}
-            >
-              Add new
-            </Button>
+            <Button onClick={openCreate}>Add new</Button>
           </div>
 
           <div className="mt-5 flex items-center justify-between gap-4">

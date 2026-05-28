@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { Kbd } from '@renderer/components/ui/kbd'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { useCommandPalette } from '@renderer/features/command-palette/store'
 
@@ -34,10 +34,3 @@ export function CmdKHint({ label = 'Open command palette', className }: CmdKHint
   )
 }
 
-function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-border bg-surface px-1 font-mono text-[10px] leading-none text-text-subtle">
-      {children}
-    </span>
-  )
-}

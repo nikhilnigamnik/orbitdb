@@ -1,7 +1,6 @@
 import * as React from 'react'
 import {
   IconArrowLeft,
-  IconCheck,
   IconDatabase,
   IconFilter2,
   IconLoader,
@@ -9,12 +8,14 @@ import {
   IconSearch,
   IconX
 } from '@tabler/icons-react'
-import { AnimatedSize } from '@renderer/components/ui/animated-size'
 import { Popover } from '@renderer/components/ui/popover'
+import { SlidingHoverList } from '@renderer/components/ui/sliding-hover-list'
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { formatCellValue } from '@renderer/lib/format'
 import type { ColumnInfo, RowFilter } from '@renderer/types'
+import { Button } from '@renderer/components/ui/button'
+import { Input } from '@renderer/components/ui/input'
 
 interface FiltersBarProps {
   connectionId: string
@@ -57,6 +58,9 @@ export function FiltersBar({
   const [valuesLoading, setValuesLoading] = React.useState(false)
   const [valuesError, setValuesError] = React.useState<string | null>(null)
 
+  const panelRef = React.useRef<HTMLDivElement>(null)
+  const [panelHeight, setPanelHeight] = React.useState<number | undefined>(undefined)
+
   const hasFilters = filters.length > 0
 
   const filteredColumns = React.useMemo(() => {
@@ -65,40 +69,41 @@ export function FiltersBar({
     return columns.filter((c) => c.name.toLowerCase().includes(q))
   }, [columns, columnSearch])
 
+  React.useLayoutEffect(() => {
+    const target = panelRef.current
+    if (target) setPanelHeight(target.scrollHeight)
+  }, [editingColumn, filteredColumns, values, valuesLoading, valuesError, operator, valueSearch])
+
   React.useEffect(() => {
     if (!editingColumn) return
     let cancelled = false
     setValuesLoading(true)
     setValuesError(null)
-    const timer = window.setTimeout(() => {
-      void unwrap(
-        window.api.db.columnDistinct({
-          connectionId,
-          schema,
-          table,
-          column: editingColumn.name,
-          search: valueSearch.trim() || undefined,
-          limit: 100
-        })
-      )
-        .then((rows) => {
-          if (cancelled) return
-          setValues(rows)
-        })
-        .catch((err) => {
-          if (cancelled) return
-          setValuesError(err instanceof Error ? err.message : String(err))
-          setValues([])
-        })
-        .finally(() => {
-          if (!cancelled) setValuesLoading(false)
-        })
-    }, 180)
+    void unwrap(
+      window.api.db.columnDistinct({
+        connectionId,
+        schema,
+        table,
+        column: editingColumn.name,
+        limit: 5
+      })
+    )
+      .then((rows) => {
+        if (cancelled) return
+        setValues(rows)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setValuesError(err instanceof Error ? err.message : String(err))
+        setValues([])
+      })
+      .finally(() => {
+        if (!cancelled) setValuesLoading(false)
+      })
     return () => {
       cancelled = true
-      window.clearTimeout(timer)
     }
-  }, [editingColumn, valueSearch, connectionId, schema, table])
+  }, [editingColumn, connectionId, schema, table])
 
   function resetEditor() {
     setEditingColumn(null)
@@ -180,171 +185,167 @@ export function FiltersBar({
           sideOffset={6}
           popoverContentClassName="w-[min(28rem,calc(100vw-2rem))]"
           content={
-            <AnimatedSize>
-              {editingColumn ? (
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2 border-b border-border px-2 py-1">
-                    <button
-                      type="button"
-                      onClick={resetEditor}
-                      aria-label="Back to columns"
-                      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-text-subtle hover:bg-surface-elevated hover:text-text"
-                    >
-                      <IconArrowLeft size={14} />
-                    </button>
-                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                      <IconDatabase size={12} className="text-text-subtle" />
-                      <span className="truncate text-[13px] font-medium text-text">
-                        {editingColumn.name}
-                      </span>
-                      <span className="font-mono text-[10.5px] text-text-subtle">
-                        {editingColumn.udtName || editingColumn.dataType}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1 border-b border-border px-2 py-2">
-                    {OPERATORS.map((op) => (
+            <div
+              style={{
+                height: panelHeight ?? 'auto',
+                transition: 'height 200ms ease-out'
+              }}
+              className="overflow-hidden"
+            >
+              <div ref={panelRef}>
+                {editingColumn ? (
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2 border-b border-border px-2 py-1">
                       <button
-                        key={op.value}
                         type="button"
-                        onClick={() => setOperator(op.value)}
-                        className={cn(
-                          'cursor-pointer rounded-md border px-2 py-0.5 font-mono text-[11.5px]',
-                          op.value === operator
-                            ? 'border-border-strong bg-surface-elevated text-text'
-                            : 'border-border bg-surface-elevated/30 text-text-muted hover:bg-surface-elevated hover:text-text'
-                        )}
+                        onClick={resetEditor}
+                        aria-label="Back to columns"
+                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-text-subtle hover:bg-surface-elevated hover:text-text"
                       >
-                        {op.label}
+                        <IconArrowLeft size={14} />
                       </button>
-                    ))}
-                  </div>
+                      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                        <IconDatabase size={12} className="text-text-subtle" />
+                        <span className="truncate text-[13px] font-medium text-text">
+                          {editingColumn.name}
+                        </span>
+                        <span className="font-mono text-[10.5px] text-text-subtle">
+                          {editingColumn.udtName || editingColumn.dataType}
+                        </span>
+                      </div>
+                    </div>
 
-                  {!isUnary && (
-                    <div className="border-b border-border px-2 py-1.5">
+                    <div className="flex flex-wrap gap-1 border-b border-border px-2 py-2">
+                      {OPERATORS.map((op) => (
+                        <button
+                          key={op.value}
+                          type="button"
+                          onClick={() => setOperator(op.value)}
+                          className={cn(
+                            'cursor-pointer rounded-md border px-2 py-0.5 font-mono text-[11.5px]',
+                            op.value === operator
+                              ? 'border-border-strong bg-surface-elevated text-text'
+                              : 'border-border bg-surface-elevated/30 text-text-muted hover:bg-surface-elevated hover:text-text'
+                          )}
+                        >
+                          {op.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {isUnary ? (
+                      <div className="p-2">
+                        <button
+                          type="button"
+                          onClick={() => commitFilter('')}
+                          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-accent px-2 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-accent/90"
+                        >
+                          Apply &ldquo;{operatorMeta?.label}&rdquo;
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2 p-2">
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            autoFocus
+                            value={valueSearch}
+                            onChange={(e) => setValueSearch(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && canCommitFreeText) {
+                                e.preventDefault()
+                                commitFilter(valueSearch)
+                              }
+                            }}
+                            placeholder="Enter value…"
+                          />
+                          <Button onClick={() => commitFilter(valueSearch)}>Apply</Button>
+                        </div>
+
+                        {valuesLoading ? (
+                          <div className="flex items-center justify-center py-1 text-text-subtle">
+                            <IconLoader stroke={2} size={14} className="animate-spin" />
+                          </div>
+                        ) : valuesError ? (
+                          <p className="text-[10.5px] text-red-300/80">{valuesError}</p>
+                        ) : values.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9.5px] font-medium uppercase tracking-wider text-text-subtle">
+                              Suggestions
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {values.map((value, i) => {
+                                const display = value === null ? 'NULL' : formatCellValue(value)
+                                return (
+                                  <button
+                                    key={`${display}-${i}`}
+                                    type="button"
+                                    onClick={() => commitFilter(value)}
+                                    className={cn(
+                                      'max-w-full cursor-pointer truncate rounded-md border border-border bg-surface-elevated/40 px-2 py-0.5 font-mono text-[11.5px] transition-colors hover:border-border-strong hover:bg-surface-elevated',
+                                      value === null
+                                        ? 'italic text-text-subtle'
+                                        : 'text-text-muted hover:text-text'
+                                    )}
+                                  >
+                                    {display}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    <div className="border-b border-border px-2 py-1">
                       <div className="relative">
                         <IconSearch
-                          size={14}
+                          size={12}
                           className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
                         />
                         <input
                           autoFocus
-                          value={valueSearch}
-                          onChange={(e) => setValueSearch(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && canCommitFreeText) {
-                              e.preventDefault()
-                              commitFilter(valueSearch)
-                            }
-                          }}
-                          placeholder="Type a value or pick below…"
-                          className="w-full rounded-md bg-transparent pl-8 pr-2 text-[13px] text-text outline-none placeholder:text-text-subtle"
+                          value={columnSearch}
+                          onChange={(e) => setColumnSearch(e.target.value)}
+                          placeholder="Select column to filter…"
+                          className="h-8 w-full rounded-md bg-transparent pl-8 pr-2 text-[13px] text-text outline-none placeholder:text-text-subtle"
                         />
                       </div>
                     </div>
-                  )}
 
-                  <div className="max-h-72 overflow-y-auto p-1">
-                    {isUnary ? (
-                      <button
-                        type="button"
-                        onClick={() => commitFilter('')}
-                        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md px-2 py-2 text-[12.5px] font-medium text-text transition-colors hover:bg-surface-elevated"
-                      >
-                        <IconCheck size={13} />
-                        Apply &ldquo;{operatorMeta?.label}&rdquo;
-                      </button>
-                    ) : valuesLoading ? (
-                      <div className="flex items-center justify-center py-6 text-text-subtle">
-                        <IconLoader stroke={2} size={16} className="animate-spin" />
-                      </div>
-                    ) : valuesError ? (
-                      <p className="px-2 py-3 text-center text-[11.5px] text-red-300/80">
-                        {valuesError}
-                      </p>
-                    ) : values.length === 0 ? (
-                      <div className="px-2 py-3 text-center">
-                        <p className="text-[11.5px] text-text-subtle">
-                          {valueSearch ? 'No matches' : 'No values'}
+                    <div className="max-h-80 overflow-y-auto p-1">
+                      {filteredColumns.length === 0 ? (
+                        <p className="px-2 py-3 text-center text-[11.5px] text-text-subtle">
+                          No columns match &ldquo;{columnSearch}&rdquo;
                         </p>
-                        {valueSearch && (
-                          <button
-                            type="button"
-                            onClick={() => commitFilter(valueSearch)}
-                            className="mt-1.5 cursor-pointer rounded-md border border-border bg-surface-elevated/60 px-2 py-1 text-[11.5px] text-text hover:bg-surface-elevated"
-                          >
-                            Use &ldquo;{valueSearch}&rdquo;
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      values.map((value, i) => {
-                        const display = value === null ? 'NULL' : formatCellValue(value)
-                        return (
-                          <button
-                            key={`${display}-${i}`}
-                            type="button"
-                            onClick={() => commitFilter(value)}
-                            className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-elevated"
-                          >
-                            <span
-                              className={cn(
-                                'flex-1 truncate font-mono text-[12.5px]',
-                                value === null ? 'italic text-text-subtle' : 'text-text'
-                              )}
-                            >
-                              {display}
-                            </span>
-                          </button>
-                        )
-                      })
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col">
-                  <div className="border-b border-border px-2 py-1">
-                    <div className="relative">
-                      <IconSearch
-                        size={12}
-                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
-                      />
-                      <input
-                        autoFocus
-                        value={columnSearch}
-                        onChange={(e) => setColumnSearch(e.target.value)}
-                        placeholder="Select column to filter…"
-                        className="h-8 w-full rounded-md bg-transparent pl-8 pr-2 text-[13px] text-text outline-none placeholder:text-text-subtle"
-                      />
+                      ) : (
+                        <SlidingHoverList as="div">
+                          {filteredColumns.map((col, i) => (
+                            <SlidingHoverList.Item as="div" key={col.name} index={i}>
+                              <button
+                                type="button"
+                                onClick={() => openColumn(col)}
+                                className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left"
+                              >
+                                <IconDatabase size={14} className="shrink-0 text-text-subtle" />
+                                <span className="flex-1 truncate text-[13px] text-text">
+                                  {col.name}
+                                </span>
+                                <span className="font-mono text-[11px] text-text-subtle">
+                                  {col.udtName || col.dataType}
+                                </span>
+                              </button>
+                            </SlidingHoverList.Item>
+                          ))}
+                        </SlidingHoverList>
+                      )}
                     </div>
                   </div>
-
-                  <div className="max-h-80 overflow-y-auto p-1">
-                    {filteredColumns.length === 0 ? (
-                      <p className="px-2 py-3 text-center text-[11.5px] text-text-subtle">
-                        No columns match &ldquo;{columnSearch}&rdquo;
-                      </p>
-                    ) : (
-                      filteredColumns.map((col) => (
-                        <button
-                          key={col.name}
-                          type="button"
-                          onClick={() => openColumn(col)}
-                          className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-elevated"
-                        >
-                          <IconDatabase size={14} className="shrink-0 text-text-subtle" />
-                          <span className="flex-1 truncate text-[13px] text-text">{col.name}</span>
-                          <span className="font-mono text-[11px] text-text-subtle">
-                            {col.udtName || col.dataType}
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </AnimatedSize>
+                )}
+              </div>
+            </div>
           }
         >
           <button

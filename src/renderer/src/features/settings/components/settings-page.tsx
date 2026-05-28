@@ -8,6 +8,7 @@ import {
 import { Button } from '@renderer/components/ui/button'
 import { unwrap } from '@renderer/lib/ipc'
 import { useUpdateCheck } from '@renderer/features/settings/store'
+import { Chip } from '@renderer/components/ui/chip'
 
 function formatRelative(date: Date | null): string {
   if (!date) return 'never'
@@ -60,13 +61,13 @@ export function SettingsPage() {
 
         <Section title="About">
           <Row label="Version">
-            <span className="font-mono text-[12px] text-text">v{currentVersion}</span>
+            <Chip tone="neutral">v{currentVersion}</Chip>
           </Row>
         </Section>
 
         <Section title="Updates">
           <Row label="Update channel">
-            <span className="font-mono text-[12px] text-text-muted">GitHub Releases</span>
+            <Chip tone="neutral">GitHub Releases</Chip>
           </Row>
 
           <div className="rounded-lg border border-border bg-surface-elevated/30 p-4">

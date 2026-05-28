@@ -88,8 +88,7 @@ export function ConnectionFormSheet({
   const [testResult, setTestResult] = React.useState<TestConnectionResult | null>(null)
   const [urlInput, setUrlInput] = React.useState('')
 
-  const urlIsInvalid =
-    urlInput.trim().length > 0 && parseConnectionUrl(urlInput) === null
+  const urlIsInvalid = urlInput.trim().length > 0 && parseConnectionUrl(urlInput) === null
 
   function applyConnectionUrl(input: string) {
     const trimmed = input.trim()
@@ -258,9 +257,9 @@ export function ConnectionFormSheet({
                       onClick={() => changeEngine(engine)}
                       aria-pressed={isSelected}
                       className={cn(
-                        'group relative flex cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border bg-surface px-2 py-3 text-center shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] transition-all',
+                        'group relative flex cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border bg-surface px-2 py-3 text-center shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] transition-all',
                         isSelected
-                          ? 'border-accent/60 bg-accent/4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]'
+                          ? 'border-border-strong bg-surface-elevated/60 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]'
                           : 'border-border hover:border-border-strong hover:bg-surface-elevated/50'
                       )}
                     >
@@ -285,7 +284,7 @@ export function ConnectionFormSheet({
                       <span
                         aria-hidden
                         className={cn(
-                          'absolute right-1.5 top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-accent text-white transition-all',
+                          'absolute right-1.5 top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-neutral-200 text-neutral-900 transition-all',
                           isSelected ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
                         )}
                       >

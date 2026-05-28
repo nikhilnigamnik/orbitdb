@@ -12,11 +12,13 @@ import {
   IconCornerDownLeft,
   IconClock
 } from '@tabler/icons-react'
+import { Kbd } from '@renderer/components/ui/kbd'
 import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { ROUTES, tableRoute } from '@renderer/config/routes'
 import { loadRecent, type TableRef } from '@renderer/features/database/lib/table-prefs'
 import type { ActiveConnectionMeta, TableInfo } from '@renderer/types'
+import { Chip } from '@renderer/components/ui/chip'
 
 interface PaletteTable {
   schema: string
@@ -306,17 +308,7 @@ function PaletteItem({
           <span className="truncate font-mono text-[10.5px] text-text-subtle">{secondary}</span>
         )}
       </span>
-      {tag && (
-        <span
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide ${
-            tagTone === 'success'
-              ? 'bg-emerald-500/15 text-emerald-300'
-              : 'bg-surface-elevated text-text-subtle'
-          }`}
-        >
-          {tag}
-        </span>
-      )}
+      {tag && <Chip tone="emerald">{tag}</Chip>}
       {shortcut && (
         <span className="kbd-shortcut flex shrink-0 items-center gap-1 opacity-0 transition-opacity">
           <Kbd>⌘</Kbd>
@@ -324,14 +316,6 @@ function PaletteItem({
         </span>
       )}
     </Command.Item>
-  )
-}
-
-function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded border border-border bg-surface px-1 font-mono text-[10px] leading-none text-text-subtle">
-      {children}
-    </span>
   )
 }
 

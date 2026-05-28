@@ -11,8 +11,10 @@ import {
   IconTrash
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Chip } from '@renderer/components/ui/chip'
 import { Input } from '@renderer/components/ui/input'
 import { Sheet } from '@renderer/components/ui/sheet'
+import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { unwrap } from '@renderer/lib/ipc'
@@ -23,10 +25,12 @@ import { cn } from '@renderer/lib/utils'
 import { formatNumber } from '@renderer/lib/format'
 import type { QueryLogEntry } from '@renderer/types'
 
-const ENGINE_STYLES: Record<QueryLogEntry['engine'], string> = {
-  postgres: 'bg-sky-500/10 text-sky-300',
-  mysql: 'bg-orange-500/10 text-orange-300',
-  d1: 'bg-amber-500/10 text-amber-300'
+type ChipTone = React.ComponentProps<typeof Chip>['tone']
+
+const ENGINE_TONE: Record<QueryLogEntry['engine'], ChipTone> = {
+  postgres: 'sky',
+  mysql: 'orange',
+  d1: 'amber'
 }
 
 const ENGINE_LABEL: Record<QueryLogEntry['engine'], string> = {
@@ -159,26 +163,18 @@ export function LogsPage() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Search SQL or connection…"
-            className="h-8 border-border bg-surface-elevated/40 pl-7 text-[12px] placeholder:text-text-subtle/70 focus-visible:border-accent/40 focus-visible:bg-surface-elevated focus-visible:ring-accent/20"
+            className="pl-7 text-xs"
           />
         </div>
-        <div className="flex items-center gap-1 rounded-md border border-border bg-surface-elevated/30 p-0.5">
-          {(['all', 'success', 'error'] as const).map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => setStatusFilter(option)}
-              className={cn(
-                'cursor-pointer rounded px-2 py-0.5 text-[11px] font-medium capitalize transition-colors',
-                statusFilter === option
-                  ? 'bg-surface-elevated text-text'
-                  : 'text-text-muted hover:text-text'
-              )}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
+        <SlidingTabs
+          tabs={[
+            { id: 'all', label: 'All' },
+            { id: 'success', label: 'Success' },
+            { id: 'error', label: 'Error' }
+          ]}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
@@ -207,31 +203,26 @@ export function LogsPage() {
             >
               <div className="flex items-center gap-2 text-[10.5px]">
                 {entry.success ? (
-                  <span className="flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-400">
+                  <Chip tone="emerald">
                     <IconCheck size={9} />
                     OK
-                  </span>
+                  </Chip>
                 ) : (
-                  <span className="flex items-center gap-1 rounded bg-red-500/10 px-1.5 py-0.5 text-red-400">
+                  <Chip tone="rose">
                     <IconAlertTriangle size={9} />
                     Error
-                  </span>
+                  </Chip>
                 )}
-                <span
-                  className={cn(
-                    'rounded px-1.5 py-0.5 font-mono uppercase tracking-wide',
-                    ENGINE_STYLES[entry.engine]
-                  )}
-                >
-                  {ENGINE_LABEL[entry.engine]}
-                </span>
+                <Chip tone={ENGINE_TONE[entry.engine]}>{ENGINE_LABEL[entry.engine]}</Chip>
                 <span className="truncate text-text-muted">
                   {connectionName(entry.connectionId)}
                 </span>
                 <span className="ml-auto font-mono text-text-subtle">{entry.durationMs} ms</span>
                 {entry.rowCount != null && (
                   <span className="text-text-subtle">
-                    <span className="font-mono text-text-muted">{formatNumber(entry.rowCount)}</span>{' '}
+                    <span className="font-mono text-text-muted">
+                      {formatNumber(entry.rowCount)}
+                    </span>{' '}
                     row{entry.rowCount === 1 ? '' : 's'}
                   </span>
                 )}
@@ -266,24 +257,17 @@ export function LogsPage() {
                 <h2 className="text-[13px] font-semibold text-text">Query detail</h2>
                 <div className="flex flex-wrap items-center gap-2 text-[10.5px]">
                   {selected.success ? (
-                    <span className="flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-400">
+                    <Chip tone="emerald">
                       <IconCheck size={9} />
                       OK
-                    </span>
+                    </Chip>
                   ) : (
-                    <span className="flex items-center gap-1 rounded bg-red-500/10 px-1.5 py-0.5 text-red-400">
+                    <Chip tone="rose">
                       <IconAlertTriangle size={9} />
                       Error
-                    </span>
+                    </Chip>
                   )}
-                  <span
-                    className={cn(
-                      'rounded px-1.5 py-0.5 font-mono uppercase tracking-wide',
-                      ENGINE_STYLES[selected.engine]
-                    )}
-                  >
-                    {ENGINE_LABEL[selected.engine]}
-                  </span>
+                  <Chip tone={ENGINE_TONE[selected.engine]}>{ENGINE_LABEL[selected.engine]}</Chip>
                   <span className="text-text-muted">{connectionName(selected.connectionId)}</span>
                   <span className="font-mono text-text-subtle">{selected.durationMs} ms</span>
                   {selected.rowCount != null && (

@@ -1,13 +1,7 @@
 import * as React from 'react'
-import {
-  IconDotsVertical,
-  IconLoader,
-  IconLock,
-  IconPencil,
-  IconPlugConnected,
-  IconTrash
-} from '@tabler/icons-react'
+import { IconDotsVertical, IconLoader, IconLock, IconPencil, IconTrash } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Chip } from '@renderer/components/ui/chip'
 import { Popover } from '@renderer/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import { DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL } from '@renderer/config/site'
@@ -15,6 +9,8 @@ import { cn } from '@renderer/lib/utils'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 import type { ConnectionHealth } from '../lib/use-connection-health'
 import { ENGINE_ICON } from './engine-icons'
+
+type ChipTone = React.ComponentProps<typeof Chip>['tone']
 
 interface ConnectionCardProps {
   connection: SavedConnection
@@ -50,11 +46,10 @@ const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; iconClass: 
   d1: { bg: 'bg-amber-500/8', iconClass: 'text-amber-300/80' }
 }
 
-const ENVIRONMENT_CHIP: Record<ConnectionEnvironment, string> = {
-  dev: 'bg-linear-to-b from-emerald-500/20 to-emerald-500/5 text-emerald-200 ring-emerald-500/25 shadow-[inset_0_1px_0_rgba(110,231,183,0.35)]',
-  stage:
-    'bg-linear-to-b from-amber-500/20 to-amber-500/5 text-amber-200 ring-amber-500/25 shadow-[inset_0_1px_0_rgba(252,211,77,0.35)]',
-  prod: 'bg-linear-to-b from-rose-500/20 to-rose-500/5 text-rose-200 ring-rose-500/25 shadow-[inset_0_1px_0_rgba(253,164,175,0.35)]'
+const ENVIRONMENT_TONE: Record<ConnectionEnvironment, ChipTone> = {
+  dev: 'emerald',
+  stage: 'amber',
+  prod: 'rose'
 }
 
 function metaParts(connection: SavedConnection): string[] {
@@ -94,9 +89,7 @@ export function ConnectionCard({
     <div
       className={cn(
         'group flex items-center gap-3 rounded-lg border bg-surface px-3.5 py-3 transition-colors',
-        isActive
-          ? 'border-border-strong'
-          : 'border-border hover:border-border-strong hover:bg-surface-elevated/30'
+        isActive ? 'border-border-strong' : 'border-border  hover:bg-surface-elevated/30'
       )}
     >
       <div className="relative shrink-0">
@@ -141,14 +134,7 @@ export function ConnectionCard({
           <span className="truncate text-[13.5px] font-medium leading-tight text-text">
             {connection.name}
           </span>
-          <span
-            className={cn(
-              'shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-[0.08em] ring-1 ring-inset',
-              ENVIRONMENT_CHIP[environment]
-            )}
-          >
-            {ENVIRONMENT_LABEL[environment]}
-          </span>
+          <Chip tone={ENVIRONMENT_TONE[environment]}>{ENVIRONMENT_LABEL[environment]}</Chip>
           {connection.ssl && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -169,19 +155,12 @@ export function ConnectionCard({
         </div>
       </div>
 
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        tone={isActive ? 'emerald' : 'default'}
         onClick={isActive ? onDisconnect : onConnect}
         disabled={isConnecting}
         aria-label={isActive ? 'Disconnect' : isConnecting ? 'Connecting' : 'Connect'}
-        className={cn(
-          'flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11.5px] font-medium transition-colors disabled:cursor-not-allowed',
-          isConnecting
-            ? 'border-border text-text-muted'
-            : isActive
-              ? 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/5'
-              : 'border-border text-text-muted hover:border-border-strong hover:text-text'
-        )}
       >
         {isConnecting ? (
           <>
@@ -190,16 +169,12 @@ export function ConnectionCard({
           </>
         ) : isActive ? (
           <>
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
             <span>Connected</span>
           </>
         ) : (
-          <>
-            <IconPlugConnected size={12} className="opacity-60" />
-            <span>Connect</span>
-          </>
+          <span>Connect</span>
         )}
-      </button>
+      </Button>
 
       <div className="shrink-0">
         <Popover
@@ -236,7 +211,7 @@ export function ConnectionCard({
         >
           <Button
             size="icon-xs"
-            variant="ghost"
+            variant="secondary"
             className="cursor-pointer text-text-muted hover:bg-surface-elevated hover:text-text"
             aria-label="More actions"
           >

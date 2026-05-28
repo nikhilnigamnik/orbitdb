@@ -28,6 +28,7 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
   const refresh = React.useCallback(async () => {
     setIsLoading(true)
     setError(null)
+    setConnectError(null)
     try {
       const data = await unwrap(window.api.connections.list())
       setConnections(data)

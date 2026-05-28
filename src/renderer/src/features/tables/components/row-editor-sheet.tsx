@@ -9,6 +9,7 @@ import { FormField } from '@renderer/components/forms/form-field'
 import { SubmitButton } from '@renderer/components/forms/submit-button'
 import { Badge } from '@renderer/components/ui/badge'
 import type { ColumnInfo } from '@renderer/types'
+import { Chip } from '@renderer/components/ui/chip'
 
 type Mode = 'insert' | 'edit'
 
@@ -178,9 +179,7 @@ export function RowEditorSheet({
                         <Textarea
                           id={`row-${col.name}`}
                           value={field.raw}
-                          onChange={(e) =>
-                            update(col.name, { raw: e.target.value, isNull: false })
-                          }
+                          onChange={(e) => update(col.name, { raw: e.target.value, isNull: false })}
                           placeholder={field.isNull ? 'NULL' : (col.defaultValue ?? '')}
                           disabled={field.isNull}
                           className="font-mono text-xs"
@@ -203,9 +202,7 @@ export function RowEditorSheet({
                           id={`row-${col.name}`}
                           type={inputType}
                           value={field.raw}
-                          onChange={(e) =>
-                            update(col.name, { raw: e.target.value, isNull: false })
-                          }
+                          onChange={(e) => update(col.name, { raw: e.target.value, isNull: false })}
                           placeholder={field.isNull ? 'NULL' : (col.defaultValue ?? '')}
                           disabled={field.isNull}
                         />
@@ -222,7 +219,7 @@ export function RowEditorSheet({
                         NULL
                       </label>
                     )}
-                    {col.isPrimaryKey && <Badge variant="info">PK</Badge>}
+                    {col.isPrimaryKey && <Chip tone="emerald">PK</Chip>}
                   </div>
                 </FormField>
               )

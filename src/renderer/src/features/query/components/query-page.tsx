@@ -13,6 +13,7 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import { format as formatSql } from 'sql-formatter'
 import { Button } from '@renderer/components/ui/button'
+import { Kbd } from '@renderer/components/ui/kbd'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
@@ -287,9 +288,9 @@ export function QueryPage() {
             >
               <IconPlayerPlay size={12} />
               Run
-              <kbd className="ml-1 rounded bg-white/15 px-1 py-0 font-mono text-[10px] text-white/90">
+              <Kbd tone="accent" className="ml-1">
                 ⌘↵
-              </kbd>
+              </Kbd>
             </Button>
           )}
         </div>
@@ -331,7 +332,6 @@ export function QueryPage() {
             <QueryResults result={result} isRunning={isRunning} />
           </div>
         </div>
-
       </div>
     </div>
   )
