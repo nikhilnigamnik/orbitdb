@@ -1,5 +1,11 @@
 import * as React from 'react'
-import { IconDotsVertical, IconLock, IconPencil, IconTrash } from '@tabler/icons-react'
+import {
+  IconDatabase,
+  IconDotsVertical,
+  IconLock,
+  IconPencil,
+  IconTrash
+} from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Chip } from '@renderer/components/ui/chip'
 import { Spinner } from '@renderer/components/ui/spinner'
@@ -47,6 +53,8 @@ const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; iconClass: 
   d1: { bg: 'bg-amber-500/8', iconClass: 'text-amber-300/80' }
 }
 
+const ENGINE_FALLBACK = { bg: 'bg-neutral-500/8', iconClass: 'text-neutral-300/80' }
+
 const ENVIRONMENT_TONE: Record<ConnectionEnvironment, ChipTone> = {
   dev: 'emerald',
   stage: 'amber',
@@ -80,8 +88,8 @@ export function ConnectionCard({
   onRefreshHealth
 }: ConnectionCardProps) {
   const [menuOpen, setMenuOpen] = React.useState(false)
-  const engine = ENGINE_STYLES[connection.engine]
-  const EngineIcon = ENGINE_ICON[connection.engine]
+  const engine = ENGINE_STYLES[connection.engine] ?? ENGINE_FALLBACK
+  const EngineIcon = ENGINE_ICON[connection.engine] ?? IconDatabase
 
   const parts = metaParts(connection)
   const environment = connection.environment ?? DEFAULT_ENVIRONMENT
