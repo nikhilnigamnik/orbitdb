@@ -23,6 +23,7 @@ import {
   disconnectPool,
   getColumnDistinct,
   getRows,
+  getSchemaGraph,
   insertRow,
   listSchemas,
   listTables,
@@ -104,6 +105,10 @@ export function registerIpcHandlers(): void {
     wrap(async (connectionId: string, schema: string, table: string) =>
       tableDetails(connectionId, schema, table)
     )
+  )
+  ipcMain.handle(
+    'db:schema-graph',
+    wrap(async (connectionId: string, schema: string) => getSchemaGraph(connectionId, schema))
   )
 
   ipcMain.handle(

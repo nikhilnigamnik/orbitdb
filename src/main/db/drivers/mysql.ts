@@ -19,6 +19,9 @@ import {
   type RowsResult,
   type RunQueryOptions,
   type SavedConnection,
+  type SchemaGraph,
+  type SchemaGraphEdge,
+  type SchemaGraphTable,
   type SchemaInfo,
   type TableDetails,
   type TableInfo,
@@ -606,6 +609,95 @@ async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]
   return (rows as Array<{ value: unknown }>).map((r) => r.value)
 }
 
+async function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
+  const pool = getPool(connectionId)
+
+  const tablesPromise = pool.query<RowDataPacket[]>(
+    `select table_name as name
+       from information_schema.tables
+      where table_schema = ? and table_type = 'BASE TABLE'
+      order by table_name`,
+    [schema]
+  )
+
+  const columnsPromise = pool.query<RowDataPacket[]>(
+    `select table_name as ` +
+      '`table`' +
+      `,
+            column_name as name,
+            data_type,
+            is_nullable,
+            column_key
+       from information_schema.columns
+      where table_schema = ?
+      order by table_name, ordinal_position`,
+    [schema]
+  )
+
+  const edgesPromise = pool.query<RowDataPacket[]>(
+    `select kcu.constraint_name as name,
+            kcu.table_name as from_table,
+            group_concat(kcu.column_name order by kcu.ordinal_position separator ',') as from_columns,
+            kcu.referenced_table_schema as to_schema,
+            kcu.referenced_table_name as to_table,
+            group_concat(kcu.referenced_column_name order by kcu.ordinal_position separator ',') as to_columns
+       from information_schema.key_column_usage kcu
+      where kcu.table_schema = ?
+        and kcu.referenced_table_name is not null
+      group by kcu.constraint_name,
+               kcu.table_name,
+               kcu.referenced_table_schema,
+               kcu.referenced_table_name
+      order by kcu.table_name, kcu.constraint_name`,
+    [schema]
+  )
+
+  const [[tablesRows], [columnsRows], [edgesRows]] = await Promise.all([
+    tablesPromise,
+    columnsPromise,
+    edgesPromise
+  ])
+
+  const columnsByTable = new Map<string, SchemaGraphTable['columns']>()
+  for (const row of columnsRows) {
+    const tableName = String(row.table)
+    const list = columnsByTable.get(tableName) ?? []
+    list.push({
+      name: String(row.name),
+      dataType: String(row.data_type),
+      isNullable: String(row.is_nullable).toUpperCase() === 'YES',
+      isPrimaryKey: String(row.column_key) === 'PRI'
+    })
+    columnsByTable.set(tableName, list)
+  }
+
+  const tables: SchemaGraphTable[] = tablesRows.map((t) => ({
+    schema,
+    name: String(t.name),
+    columns: columnsByTable.get(String(t.name)) ?? []
+  }))
+
+  const edges: SchemaGraphEdge[] = edgesRows.map((e) => ({
+    name: String(e.name),
+    from: {
+      schema,
+      table: String(e.from_table),
+      columns: String(e.from_columns ?? '')
+        .split(',')
+        .filter(Boolean)
+    },
+    to: {
+      schema: String(e.to_schema),
+      table: String(e.to_table),
+      columns: String(e.to_columns ?? '')
+        .split(',')
+        .filter(Boolean)
+    }
+  }))
+
+  return { schema, tables, edges }
+}
+
 export const mysqlDriver: DatabaseDriver = {
   test,
   describeActive,
@@ -614,6 +706,7 @@ export const mysqlDriver: DatabaseDriver = {
   listSchemas,
   listTables,
   tableDetails,
+  getSchemaGraph,
   getRows,
   insertRow,
   updateRow,

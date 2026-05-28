@@ -14,6 +14,7 @@ import type {
   RowsResult,
   RunQueryOptions,
   SavedConnection,
+  SchemaGraph,
   SchemaInfo,
   TableDetails,
   TableInfo,
@@ -43,6 +44,8 @@ const api = {
       invoke<TableInfo[]>('db:list-tables', connectionId, schema),
     tableDetails: (connectionId: string, schema: string, table: string) =>
       invoke<TableDetails>('db:table-details', connectionId, schema, table),
+    schemaGraph: (connectionId: string, schema: string) =>
+      invoke<SchemaGraph>('db:schema-graph', connectionId, schema),
     getRows: (opts: GetRowsOptions) => invoke<RowsResult>('db:rows-get', opts),
     insertRow: (opts: RowMutation) => invoke<Record<string, unknown>>('db:row-insert', opts),
     updateRow: (opts: RowUpdate) => invoke<Record<string, unknown>>('db:row-update', opts),

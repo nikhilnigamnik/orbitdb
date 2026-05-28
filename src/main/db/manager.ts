@@ -10,6 +10,7 @@ import type {
   RowsResult,
   RunQueryOptions,
   SavedConnection,
+  SchemaGraph,
   SchemaInfo,
   TableDetails,
   TableInfo,
@@ -69,6 +70,10 @@ export function tableDetails(
   table: string
 ): Promise<TableDetails> {
   return driverForConnection(connectionId).tableDetails(connectionId, schema, table)
+}
+
+export function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
+  return driverForConnection(connectionId).getSchemaGraph(connectionId, schema)
 }
 
 export function getRows(opts: GetRowsOptions): Promise<RowsResult> {

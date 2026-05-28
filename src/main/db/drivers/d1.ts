@@ -13,6 +13,9 @@ import {
   type RowsResult,
   type RunQueryOptions,
   type SavedConnection,
+  type SchemaGraph,
+  type SchemaGraphEdge,
+  type SchemaGraphTable,
   type SchemaInfo,
   type TableDetails,
   type TableInfo,
@@ -606,6 +609,77 @@ async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]
   return entry.results.map((r) => r.value)
 }
 
+async function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
+  const saved = loadSaved(connectionId)
+
+  const tableList = await callD1<{ name: string }>(
+    saved,
+    `select name from sqlite_master
+      where type = 'table'
+        and name not like 'sqlite_%'
+        and name not like '_cf_%'
+      order by name`
+  )
+  const tableNames = tableList.results.map((r) => String(r.name))
+
+  const perTable = await Promise.all(
+    tableNames.map(async (tableName) => {
+      const ident = quoteIdent(tableName)
+      const [colEntry, fkEntry] = await Promise.all([
+        callD1<{ name: string; type: string; notnull: number; pk: number }>(
+          saved,
+          `pragma table_info(${ident})`
+        ),
+        callD1<{ id: number; seq: number; table: string; from: string; to: string }>(
+          saved,
+          `pragma foreign_key_list(${ident})`
+        )
+      ])
+      return { tableName, colEntry, fkEntry }
+    })
+  )
+
+  const tables: SchemaGraphTable[] = []
+  const edges: SchemaGraphEdge[] = []
+
+  for (const { tableName, colEntry, fkEntry } of perTable) {
+    tables.push({
+      schema,
+      name: tableName,
+      columns: colEntry.results.map((c) => ({
+        name: String(c.name),
+        dataType: String(c.type || 'TEXT'),
+        isNullable: Number(c.notnull) === 0,
+        isPrimaryKey: Number(c.pk) > 0
+      }))
+    })
+
+    const fkGroups = new Map<number, { table: string; pairs: { from: string; to: string; seq: number }[] }>()
+    for (const fk of fkEntry.results) {
+      const id = Number(fk.id)
+      const existing = fkGroups.get(id)
+      if (existing) {
+        existing.pairs.push({ from: String(fk.from), to: String(fk.to), seq: Number(fk.seq) })
+      } else {
+        fkGroups.set(id, {
+          table: String(fk.table),
+          pairs: [{ from: String(fk.from), to: String(fk.to), seq: Number(fk.seq) }]
+        })
+      }
+    }
+    for (const [id, group] of fkGroups) {
+      const sorted = group.pairs.sort((a, b) => a.seq - b.seq)
+      edges.push({
+        name: `${tableName}_fk_${id}`,
+        from: { schema, table: tableName, columns: sorted.map((p) => p.from) },
+        to: { schema, table: group.table, columns: sorted.map((p) => p.to) }
+      })
+    }
+  }
+
+  return { schema, tables, edges }
+}
+
 export const d1Driver: DatabaseDriver = {
   test,
   describeActive,
@@ -614,6 +688,7 @@ export const d1Driver: DatabaseDriver = {
   listSchemas,
   listTables,
   tableDetails,
+  getSchemaGraph,
   getRows,
   insertRow,
   updateRow,

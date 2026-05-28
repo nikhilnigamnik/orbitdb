@@ -9,6 +9,7 @@ import type {
   RowsResult,
   RunQueryOptions,
   SavedConnection,
+  SchemaGraph,
   SchemaInfo,
   TableDetails,
   TableInfo,
@@ -30,6 +31,7 @@ export interface DatabaseDriver {
   listSchemas(connectionId: string): Promise<SchemaInfo[]>
   listTables(connectionId: string, schema: string): Promise<TableInfo[]>
   tableDetails(connectionId: string, schema: string, table: string): Promise<TableDetails>
+  getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph>
 
   getRows(opts: GetRowsOptions): Promise<RowsResult>
   insertRow(opts: RowMutation): Promise<Record<string, unknown>>

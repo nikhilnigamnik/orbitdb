@@ -81,6 +81,31 @@ export interface TableDetails {
   estimatedRows: number | null
 }
 
+export interface SchemaGraphColumn {
+  name: string
+  dataType: string
+  isNullable: boolean
+  isPrimaryKey: boolean
+}
+
+export interface SchemaGraphTable {
+  schema: string
+  name: string
+  columns: SchemaGraphColumn[]
+}
+
+export interface SchemaGraphEdge {
+  name: string
+  from: { schema: string; table: string; columns: string[] }
+  to: { schema: string; table: string; columns: string[] }
+}
+
+export interface SchemaGraph {
+  schema: string
+  tables: SchemaGraphTable[]
+  edges: SchemaGraphEdge[]
+}
+
 export type SortDirection = 'asc' | 'desc'
 
 export interface RowFilter {
