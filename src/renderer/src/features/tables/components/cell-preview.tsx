@@ -3,7 +3,7 @@ import * as HoverCardPrimitive from '@radix-ui/react-hover-card'
 import { IconArrowsMaximize, IconCheck, IconCopy } from '@tabler/icons-react'
 import { formatDistanceToNow } from 'date-fns'
 import { Chip } from '@renderer/components/ui/chip'
-import { CellValueModal } from './cell-value-modal'
+import { CellValueSheet } from './cell-value-sheet'
 
 interface CellPreviewProps {
   value: unknown
@@ -197,7 +197,7 @@ export function CellPreview({ value, display, columnName, children }: CellPrevie
       </HoverCardPrimitive.Root>
 
       {!dateValue && (
-        <CellValueModal
+        <CellValueSheet
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           value={value}

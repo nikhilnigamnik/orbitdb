@@ -1,12 +1,12 @@
 import * as React from 'react'
 import { IconCheck, IconCopy, IconTextWrap } from '@tabler/icons-react'
-import { Modal } from '@renderer/components/ui/modal'
+import { Sheet } from '@renderer/components/ui/sheet'
 import { Button } from '@renderer/components/ui/button'
 import { Chip } from '@renderer/components/ui/chip'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { cn } from '@renderer/lib/utils'
 
-interface CellValueModalProps {
+interface CellValueSheetProps {
   isOpen: boolean
   onClose: () => void
   value: unknown
@@ -53,13 +53,13 @@ function tryFormatJson(value: unknown): string | null {
   return null
 }
 
-export function CellValueModal({
+export function CellValueSheet({
   isOpen,
   onClose,
   value,
   display,
   columnName
-}: CellValueModalProps) {
+}: CellValueSheetProps) {
   const [mode, setMode] = React.useState<ViewMode>('formatted')
   const [wrap, setWrap] = React.useState(true)
   const [copied, setCopied] = React.useState(false)
@@ -94,65 +94,84 @@ export function CellValueModal({
   }
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={columnName ?? 'Value'}
-      description={`${isJson ? 'JSON' : 'Text'} · ${raw.length.toLocaleString()} chars · ${lineCount.toLocaleString()} ${lineCount === 1 ? 'line' : 'lines'}`}
-      size="lg"
-      footer={
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-text-muted hover:bg-surface-elevated hover:text-text"
-          onClick={copy}
-        >
-          {copied ? <IconCheck size={12} className="text-emerald-400" /> : <IconCopy size={12} />}
-          {copied ? 'Copied' : 'Copy'}
-        </Button>
-      }
-    >
-      <div className="flex h-full min-h-0 flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          {isJson ? (
-            <SlidingTabs
-              tabs={[
-                { id: 'formatted', label: 'Formatted' },
-                { id: 'raw', label: 'Raw' }
-              ]}
-              value={mode}
-              onChange={(id) => setMode(id as ViewMode)}
-            />
-          ) : (
-            <Chip tone="neutral">Text</Chip>
-          )}
+    <Sheet
+      openSheet={isOpen}
+      setOpenSheet={(open) => {
+        if (!open) onClose()
+      }}
+      side="right"
+      sheetContentClassName="sm:max-w-2xl"
+      content={
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="flex shrink-0 flex-col gap-0.5 border-b border-border px-4 py-3 pr-12">
+            <h2 className="truncate text-[13px] font-semibold text-text">
+              {columnName ?? 'Value'}
+            </h2>
+            <p className="text-[11px] text-text-subtle">
+              {isJson ? 'JSON' : 'Text'} · {raw.length.toLocaleString()} chars ·{' '}
+              {lineCount.toLocaleString()} {lineCount === 1 ? 'line' : 'lines'}
+            </p>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setWrap((w) => !w)}
-            title={wrap ? 'Disable wrapping' : 'Wrap lines'}
-            aria-pressed={wrap}
-            className={cn(
-              'flex h-7 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium transition-colors',
-              wrap
-                ? 'border-border bg-surface-elevated text-text'
-                : 'border-transparent text-text-subtle hover:bg-surface-elevated hover:text-text'
-            )}
-          >
-            <IconTextWrap size={13} />
-            Wrap
-          </button>
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-4 py-4">
+            <div className="flex items-center justify-between gap-3">
+              {isJson ? (
+                <SlidingTabs
+                  tabs={[
+                    { id: 'formatted', label: 'Formatted' },
+                    { id: 'raw', label: 'Raw' }
+                  ]}
+                  value={mode}
+                  onChange={(id) => setMode(id as ViewMode)}
+                />
+              ) : (
+                <Chip tone="neutral">Text</Chip>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setWrap((w) => !w)}
+                title={wrap ? 'Disable wrapping' : 'Wrap lines'}
+                aria-pressed={wrap}
+                className={cn(
+                  'flex h-7 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium transition-colors',
+                  wrap
+                    ? 'border-border bg-surface-elevated text-text'
+                    : 'border-transparent text-text-subtle hover:bg-surface-elevated hover:text-text'
+                )}
+              >
+                <IconTextWrap size={13} />
+                Wrap
+              </button>
+            </div>
+
+            <pre
+              className={cn(
+                'min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3.5 py-3 font-mono text-[12px] leading-relaxed text-text',
+                wrap ? 'whitespace-pre-wrap wrap-anywhere' : 'whitespace-pre'
+              )}
+            >
+              {shown}
+            </pre>
+          </div>
+
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface-elevated/20 px-4 py-3">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-text-muted hover:bg-surface-elevated hover:text-text"
+              onClick={copy}
+            >
+              {copied ? (
+                <IconCheck size={12} className="text-emerald-400" />
+              ) : (
+                <IconCopy size={12} />
+              )}
+              {copied ? 'Copied' : 'Copy'}
+            </Button>
+          </div>
         </div>
-
-        <pre
-          className={cn(
-            'min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3.5 py-3 font-mono text-[12px] leading-relaxed text-text',
-            wrap ? 'whitespace-pre-wrap wrap-anywhere' : 'whitespace-pre'
-          )}
-        >
-          {shown}
-        </pre>
-      </div>
-    </Modal>
+      }
+    />
   )
 }

@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { IconAlertTriangle } from '@tabler/icons-react'
-import { Modal } from '@renderer/components/ui/modal'
+import { Sheet } from '@renderer/components/ui/sheet'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Switch } from '@renderer/components/ui/switch'
@@ -172,179 +172,190 @@ export function DdlDialog({
   }
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={() => {
-        if (!isExecuting) onClose()
+    <Sheet
+      openSheet={isOpen}
+      setOpenSheet={(open) => {
+        if (!open && !isExecuting) onClose()
       }}
-      title={TITLES[kind]}
-      description={`${schema}.${table}`}
-      size="md"
-      footer={
-        <>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-text-muted hover:bg-surface-elevated hover:text-text"
-            onClick={onClose}
-            disabled={isExecuting}
-          >
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            className={
-              isDestructive
-                ? 'bg-red-500 text-white hover:bg-red-500/90'
-                : 'bg-accent text-white hover:bg-accent/90'
-            }
-            onClick={handleConfirm}
-            disabled={!operation || !sql || isExecuting}
-          >
-            {isExecuting ? 'Running…' : isDestructive ? 'Run & drop' : 'Run statement'}
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-5">
-        {kind === 'add-column' && (
-          <div className="flex flex-col gap-4">
-            <Field label="Column name">
-              <Input
-                value={colName}
-                onChange={(e) => setColName(e.target.value)}
-                placeholder="e.g. status"
-                autoFocus
-              />
-            </Field>
-            <Field
-              label="Data type"
-              hint="Raw SQL type — e.g. text, varchar(255), integer, boolean"
-            >
-              <Input
-                value={dataType}
-                onChange={(e) => setDataType(e.target.value)}
-                placeholder="e.g. text"
-                className="font-mono"
-              />
-            </Field>
-            <Field label="Default value" hint="Optional raw expression — e.g. 0, 'active', now()">
-              <Input
-                value={defaultValue}
-                onChange={(e) => setDefaultValue(e.target.value)}
-                placeholder="leave empty for none"
-                className="font-mono"
-              />
-            </Field>
-            <ToggleRow
-              label="Nullable"
-              hint="Allow NULL values in this column"
-              checked={isNullable}
-              onChange={setIsNullable}
-            />
-          </div>
-        )}
-
-        {kind === 'rename-column' && (
-          <Field label="New column name" hint={`Renaming "${target}"`}>
-            <Input
-              value={renameTo}
-              onChange={(e) => setRenameTo(e.target.value)}
-              placeholder="new name"
-              autoFocus
-            />
-          </Field>
-        )}
-
-        {kind === 'rename-table' && (
-          <Field label="New table name">
-            <Input
-              value={renameTo}
-              onChange={(e) => setRenameTo(e.target.value)}
-              placeholder="new name"
-              autoFocus
-            />
-          </Field>
-        )}
-
-        {kind === 'create-index' && (
-          <div className="flex flex-col gap-4">
-            <Field label="Index name">
-              <Input
-                value={indexName}
-                onChange={(e) => setIndexName(e.target.value)}
-                placeholder={`e.g. idx_${table}_col`}
-                autoFocus
-              />
-            </Field>
-            <Field label="Columns" hint="Pick one or more, in index order">
-              <div className="flex max-h-48 flex-col gap-0.5 overflow-auto rounded-md border border-border p-1">
-                {columns.map((col) => {
-                  const checked = indexColumns.includes(col.name)
-                  return (
-                    <label
-                      key={col.name}
-                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[12.5px] text-text-muted transition-colors hover:bg-surface-elevated"
-                    >
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={(v) => toggleIndexColumn(col.name, !!v)}
-                      />
-                      <span className="font-medium text-text">{col.name}</span>
-                      <span className="font-mono text-[10.5px] text-text-subtle">
-                        {col.dataType}
-                      </span>
-                    </label>
-                  )
-                })}
-              </div>
-            </Field>
-            <ToggleRow
-              label="Unique"
-              hint="Enforce uniqueness across the indexed columns"
-              checked={isUnique}
-              onChange={setIsUnique}
-            />
-          </div>
-        )}
-
-        {isDestructive && (
-          <div className="flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2.5 text-[12px] text-rose-200">
-            <IconAlertTriangle size={15} className="mt-px shrink-0" stroke={2} />
-            <span>
-              {kind === 'drop-column'
-                ? `Dropping column "${target}" permanently removes its data.`
-                : `Dropping index "${target}" cannot be undone from here.`}
-            </span>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-            Generated SQL
-          </span>
-          {previewError ? (
-            <p className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-[12px] text-rose-200">
-              {previewError}
+      side="right"
+      sheetContentClassName="sm:max-w-md"
+      content={
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="flex shrink-0 flex-col gap-0.5 border-b border-border px-4 py-3 pr-12">
+            <h2 className="text-[13px] font-semibold text-text">{TITLES[kind]}</h2>
+            <p className="text-[11px] text-text-subtle">
+              {schema}.{table}
             </p>
-          ) : (
-            <pre className="min-h-[3.5rem] overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3 py-2.5 font-mono text-[12px] leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
-              {sql || (
-                <span className="text-text-subtle">
-                  Fill in the fields to preview the statement.
-                </span>
-              )}
-            </pre>
-          )}
-        </div>
+          </div>
 
-        {execError && (
-          <p className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-[12px] text-rose-200">
-            {execError}
-          </p>
-        )}
-      </div>
-    </Modal>
+          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto px-4 py-4">
+            {kind === 'add-column' && (
+              <div className="flex flex-col gap-4">
+                <Field label="Column name">
+                  <Input
+                    value={colName}
+                    onChange={(e) => setColName(e.target.value)}
+                    placeholder="e.g. status"
+                    autoFocus
+                  />
+                </Field>
+                <Field
+                  label="Data type"
+                  hint="Raw SQL type — e.g. text, varchar(255), integer, boolean"
+                >
+                  <Input
+                    value={dataType}
+                    onChange={(e) => setDataType(e.target.value)}
+                    placeholder="e.g. text"
+                    className="font-mono"
+                  />
+                </Field>
+                <Field
+                  label="Default value"
+                  hint="Optional raw expression — e.g. 0, 'active', now()"
+                >
+                  <Input
+                    value={defaultValue}
+                    onChange={(e) => setDefaultValue(e.target.value)}
+                    placeholder="leave empty for none"
+                    className="font-mono"
+                  />
+                </Field>
+                <ToggleRow
+                  label="Nullable"
+                  hint="Allow NULL values in this column"
+                  checked={isNullable}
+                  onChange={setIsNullable}
+                />
+              </div>
+            )}
+
+            {kind === 'rename-column' && (
+              <Field label="New column name" hint={`Renaming "${target}"`}>
+                <Input
+                  value={renameTo}
+                  onChange={(e) => setRenameTo(e.target.value)}
+                  placeholder="new name"
+                  autoFocus
+                />
+              </Field>
+            )}
+
+            {kind === 'rename-table' && (
+              <Field label="New table name">
+                <Input
+                  value={renameTo}
+                  onChange={(e) => setRenameTo(e.target.value)}
+                  placeholder="new name"
+                  autoFocus
+                />
+              </Field>
+            )}
+
+            {kind === 'create-index' && (
+              <div className="flex flex-col gap-4">
+                <Field label="Index name">
+                  <Input
+                    value={indexName}
+                    onChange={(e) => setIndexName(e.target.value)}
+                    placeholder={`e.g. idx_${table}_col`}
+                    autoFocus
+                  />
+                </Field>
+                <Field label="Columns" hint="Pick one or more, in index order">
+                  <div className="flex max-h-48 flex-col gap-0.5 overflow-auto rounded-md border border-border p-1">
+                    {columns.map((col) => {
+                      const checked = indexColumns.includes(col.name)
+                      return (
+                        <label
+                          key={col.name}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[12.5px] text-text-muted transition-colors hover:bg-surface-elevated"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) => toggleIndexColumn(col.name, !!v)}
+                          />
+                          <span className="font-medium text-text">{col.name}</span>
+                          <span className="font-mono text-[10.5px] text-text-subtle">
+                            {col.dataType}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </Field>
+                <ToggleRow
+                  label="Unique"
+                  hint="Enforce uniqueness across the indexed columns"
+                  checked={isUnique}
+                  onChange={setIsUnique}
+                />
+              </div>
+            )}
+
+            {isDestructive && (
+              <div className="flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2.5 text-[12px] text-rose-200">
+                <IconAlertTriangle size={15} className="mt-px shrink-0" stroke={2} />
+                <span>
+                  {kind === 'drop-column'
+                    ? `Dropping column "${target}" permanently removes its data.`
+                    : `Dropping index "${target}" cannot be undone from here.`}
+                </span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                Generated SQL
+              </span>
+              {previewError ? (
+                <p className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-[12px] text-rose-200">
+                  {previewError}
+                </p>
+              ) : (
+                <pre className="min-h-14 overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3 py-2.5 font-mono text-[12px] leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
+                  {sql || (
+                    <span className="text-text-subtle">
+                      Fill in the fields to preview the statement.
+                    </span>
+                  )}
+                </pre>
+              )}
+            </div>
+
+            {execError && (
+              <p className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-[12px] text-rose-200">
+                {execError}
+              </p>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface-elevated/20 px-4 py-3">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-text-muted hover:bg-surface-elevated hover:text-text"
+              onClick={onClose}
+              disabled={isExecuting}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className={
+                isDestructive
+                  ? 'bg-red-500 text-white hover:bg-red-500/90'
+                  : 'bg-accent text-white hover:bg-accent/90'
+              }
+              onClick={handleConfirm}
+              disabled={!operation || !sql || isExecuting}
+            >
+              {isExecuting ? 'Running…' : isDestructive ? 'Run & drop' : 'Run statement'}
+            </Button>
+          </div>
+        </div>
+      }
+    />
   )
 }
 
