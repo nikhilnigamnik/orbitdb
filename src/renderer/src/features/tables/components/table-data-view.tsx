@@ -406,7 +406,7 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
           onOpenForeignKey={openForeignKey}
         />
 
-        {canMutate && selectedCount > 0 && (
+        {selectedCount > 0 && (
           <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center">
             <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-surface px-2 py-1.5 shadow-lg shadow-black/40">
               <span className="pl-2 text-[12px] text-text">
@@ -427,12 +427,23 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
               </Button>
               <Button
                 size="sm"
-                className="h-7 gap-1 rounded-full bg-red-500/90 px-2.5 text-white hover:bg-red-500"
-                onClick={bulkDeleteConfirm.open}
+                variant="ghost"
+                className="h-7 gap-1 rounded-full px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+                onClick={handleExport}
               >
-                <IconTrash size={12} />
-                Delete {selectedCount}
+                <IconDownload size={12} />
+                Export {selectedCount}
               </Button>
+              {canMutate && (
+                <Button
+                  size="sm"
+                  className="h-7 gap-1 rounded-full bg-red-500/90 px-2.5 text-white hover:bg-red-500"
+                  onClick={bulkDeleteConfirm.open}
+                >
+                  <IconTrash size={12} />
+                  Delete {selectedCount}
+                </Button>
+              )}
             </div>
           </div>
         )}
