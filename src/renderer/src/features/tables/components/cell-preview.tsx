@@ -1,7 +1,9 @@
 import * as React from 'react'
 import * as HoverCardPrimitive from '@radix-ui/react-hover-card'
-import { IconCheck, IconCopy } from '@tabler/icons-react'
+import { IconArrowsMaximize, IconCheck, IconCopy } from '@tabler/icons-react'
 import { formatDistanceToNow } from 'date-fns'
+import { Chip } from '@renderer/components/ui/chip'
+import { CellValueModal } from './cell-value-modal'
 
 interface CellPreviewProps {
   value: unknown
@@ -67,7 +69,8 @@ function useClipboardCopy(): {
 }
 
 const SHORT_THRESHOLD = 50
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/
+const ISO_DATE_PATTERN =
+  /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/
 
 // Roughly year-2001 → year-2096 in milliseconds. Tight enough that random
 // integer IDs typically fall outside this window.
@@ -159,6 +162,8 @@ function prettyValue(value: unknown, display: string): string {
 }
 
 export function CellPreview({ value, display, columnName, children }: CellPreviewProps) {
+  const [isModalOpen, setIsModalOpen] = React.useState(false)
+
   if (!isPreviewWorthy(value, display, columnName)) {
     return <>{children}</>
   }
@@ -166,26 +171,41 @@ export function CellPreview({ value, display, columnName, children }: CellPrevie
   const dateValue = parseAsDate(value, columnName)
 
   return (
-    <HoverCardPrimitive.Root openDelay={300} closeDelay={80}>
-      <HoverCardPrimitive.Trigger asChild>
-        <span className="inline-block max-w-full truncate align-middle">{children}</span>
-      </HoverCardPrimitive.Trigger>
-      <HoverCardPrimitive.Portal>
-        <HoverCardPrimitive.Content
-          side="bottom"
-          align="start"
-          sideOffset={6}
-          collisionPadding={12}
-          className="animate-fade-in z-50 max-h-[60vh] max-w-xl overflow-auto rounded-lg border border-border bg-surface p-2 shadow-2xl shadow-black/50"
-        >
-          {dateValue ? (
-            <DatePreviewBody date={dateValue} />
-          ) : (
-            <TextPreviewBody text={prettyValue(value, display)} />
-          )}
-        </HoverCardPrimitive.Content>
-      </HoverCardPrimitive.Portal>
-    </HoverCardPrimitive.Root>
+    <>
+      <HoverCardPrimitive.Root openDelay={300} closeDelay={80}>
+        <HoverCardPrimitive.Trigger asChild>
+          <span className="inline-block max-w-full truncate align-middle">{children}</span>
+        </HoverCardPrimitive.Trigger>
+        <HoverCardPrimitive.Portal>
+          <HoverCardPrimitive.Content
+            side="bottom"
+            align="start"
+            sideOffset={6}
+            collisionPadding={12}
+            className="animate-fade-in z-50 max-h-[60vh] max-w-xl overflow-auto rounded-lg border border-border bg-surface p-2 shadow-2xl shadow-black/50"
+          >
+            {dateValue ? (
+              <DatePreviewBody date={dateValue} />
+            ) : (
+              <TextPreviewBody
+                text={prettyValue(value, display)}
+                onExpand={() => setIsModalOpen(true)}
+              />
+            )}
+          </HoverCardPrimitive.Content>
+        </HoverCardPrimitive.Portal>
+      </HoverCardPrimitive.Root>
+
+      {!dateValue && (
+        <CellValueModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          value={value}
+          display={display}
+          columnName={columnName}
+        />
+      )}
+    </>
   )
 }
 
@@ -290,30 +310,64 @@ function CopyableRow({
   )
 }
 
-function TextPreviewBody({ text }: { text: string }) {
-  const { copied, copy } = useClipboardCopy()
-  const isCopied = copied === 'text'
-
+function PreviewIconButton({
+  label,
+  onClick,
+  children
+}: {
+  label: string
+  onClick: () => void
+  children: React.ReactNode
+}) {
   return (
     <button
       type="button"
-      onClick={() => void copy('text', text)}
-      title="Click to copy"
-      className="group/copy flex w-full cursor-pointer items-start gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-surface-elevated"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-subtle transition-colors hover:bg-surface-elevated hover:text-text"
     >
-      <pre className="min-w-0 flex-1 whitespace-pre-wrap wrap-anywhere font-mono text-[11px] leading-snug text-text-muted">
+      {children}
+    </button>
+  )
+}
+
+function TextPreviewBody({ text, onExpand }: { text: string; onExpand: () => void }) {
+  const { copied, copy } = useClipboardCopy()
+  const isCopied = copied === 'text'
+  const trimmed = text.trimStart()
+  const isJson = trimmed.startsWith('{') || trimmed.startsWith('[')
+  const lineCount = text.split('\n').length
+
+  return (
+    <div className="flex w-full min-w-[18rem] flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2 pl-0.5">
+        <div className="flex items-center gap-2">
+          <Chip tone={isJson ? 'sky' : 'neutral'}>{isJson ? 'JSON' : 'Text'}</Chip>
+          <span className="text-[10.5px] tabular-nums text-text-subtle">
+            {text.length.toLocaleString()} chars
+            {lineCount > 1 ? ` · ${lineCount.toLocaleString()} lines` : ''}
+          </span>
+        </div>
+        <div className="flex items-center gap-0.5">
+          <PreviewIconButton
+            label={isCopied ? 'Copied' : 'Copy'}
+            onClick={() => void copy('text', text)}
+          >
+            {isCopied ? (
+              <IconCheck size={12} className="text-emerald-400" />
+            ) : (
+              <IconCopy size={12} />
+            )}
+          </PreviewIconButton>
+          <PreviewIconButton label="Open full view" onClick={onExpand}>
+            <IconArrowsMaximize size={12} />
+          </PreviewIconButton>
+        </div>
+      </div>
+      <pre className="max-h-[44vh] min-w-0 overflow-auto rounded-md border border-border bg-surface-elevated/40 px-2.5 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap wrap-anywhere text-text-muted">
         {text}
       </pre>
-      <span className="mt-0.5 shrink-0">
-        {isCopied ? (
-          <IconCheck size={11} className="text-emerald-400" />
-        ) : (
-          <IconCopy
-            size={11}
-            className="text-text-subtle opacity-0 transition-opacity group-hover/copy:opacity-100"
-          />
-        )}
-      </span>
-    </button>
+    </div>
   )
 }
