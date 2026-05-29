@@ -1,5 +1,6 @@
 import type {
   ConnectionInput,
+  DdlRequest,
   DistinctValuesOptions,
   GetRowsOptions,
   QueryResult,
@@ -37,6 +38,9 @@ export interface DatabaseDriver {
   insertRow(opts: RowMutation): Promise<Record<string, unknown>>
   updateRow(opts: RowUpdate): Promise<Record<string, unknown>>
   deleteRow(opts: RowDelete): Promise<{ deleted: number }>
+
+  generateDdl(opts: DdlRequest): Promise<string>
+  executeDdl(opts: DdlRequest): Promise<void>
 
   runQuery(opts: RunQueryOptions): Promise<QueryResult>
   cancelQuery(connectionId: string, queryId: string): Promise<void>

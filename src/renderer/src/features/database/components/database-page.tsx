@@ -6,15 +6,17 @@ import { ErrorState } from '@renderer/components/common/error-state'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { Button } from '@renderer/components/ui/button'
 import { useAsync } from '@renderer/hooks/use-async'
+import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { TableDataView } from '@renderer/features/tables/components/table-data-view'
 import { ROUTES, tableRoute } from '@renderer/config/routes'
 import { pushRecent } from '@renderer/features/database/lib/table-prefs'
-import type { TableDetails } from '@renderer/types'
+import type { DdlOperation, DdlOperationKind, TableDetails } from '@renderer/types'
 import { SchemaTree } from './schema-tree'
 import { TableHeader } from './table-header'
 import { TableStructure } from './table-structure'
+import { DdlDialog } from './ddl-dialog'
 
 export function DatabasePage() {
   const navigate = useNavigate()
@@ -150,10 +152,30 @@ function TableViewContainer({
   activeTab,
   onChangeTab
 }: TableViewContainerProps) {
+  const navigate = useNavigate()
   const { data, error, isLoading, refresh } = useAsync<TableDetails>(
     async () => unwrap(window.api.db.tableDetails(connectionId, schema, table)),
     [connectionId, schema, table]
   )
+
+  const ddlDialog = useDisclosure(false)
+  const [ddlState, setDdlState] = React.useState<{
+    kind: DdlOperationKind
+    target?: string
+  } | null>(null)
+
+  function openDdl(kind: DdlOperationKind, target?: string) {
+    setDdlState({ kind, target })
+    ddlDialog.open()
+  }
+
+  function handleDdlSuccess(operation: DdlOperation) {
+    if (operation.kind === 'rename-table' && data) {
+      navigate(tableRoute(data.schema, operation.to), { replace: true })
+      return
+    }
+    refresh()
+  }
 
   if (isLoading) {
     return (
@@ -170,13 +192,34 @@ function TableViewContainer({
     )
   }
 
+  const canEdit = data.type === 'table'
+
   return (
     <>
-      <TableHeader details={data} activeTab={activeTab} onChangeTab={onChangeTab} />
+      <TableHeader
+        details={data}
+        activeTab={activeTab}
+        onChangeTab={onChangeTab}
+        onRename={canEdit ? () => openDdl('rename-table') : undefined}
+      />
       {activeTab === 'data' ? (
         <TableDataView connectionId={connectionId} details={data} />
       ) : (
-        <TableStructure details={data} />
+        <TableStructure details={data} onEdit={canEdit ? openDdl : undefined} />
+      )}
+
+      {ddlState && (
+        <DdlDialog
+          isOpen={ddlDialog.isOpen}
+          onClose={ddlDialog.close}
+          connectionId={connectionId}
+          schema={data.schema}
+          table={data.name}
+          columns={data.columns}
+          kind={ddlState.kind}
+          target={ddlState.target}
+          onSuccess={handleDdlSuccess}
+        />
       )}
     </>
   )

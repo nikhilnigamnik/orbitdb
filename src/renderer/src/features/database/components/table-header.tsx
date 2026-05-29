@@ -1,4 +1,4 @@
-import { IconTable, IconEye } from '@tabler/icons-react'
+import { IconTable, IconEye, IconPencil } from '@tabler/icons-react'
 import { Chip } from '@renderer/components/ui/chip'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { cn } from '@renderer/lib/utils'
@@ -8,6 +8,8 @@ interface TableHeaderProps {
   details: TableDetails
   activeTab: 'data' | 'structure'
   onChangeTab: (tab: 'data' | 'structure') => void
+  /** When provided, shows a rename affordance next to the table name. */
+  onRename?: () => void
 }
 
 const TYPE_LABEL: Record<TableDetails['type'], string> = {
@@ -16,11 +18,11 @@ const TYPE_LABEL: Record<TableDetails['type'], string> = {
   materialized_view: 'Materialized view'
 }
 
-export function TableHeader({ details, activeTab, onChangeTab }: TableHeaderProps) {
+export function TableHeader({ details, activeTab, onChangeTab, onRename }: TableHeaderProps) {
   const Icon = details.type === 'table' ? IconTable : IconEye
   const isView = details.type !== 'table'
   return (
-    <div className="shrink-0 border-b border-border px-5 py-3">
+    <div className="group/header shrink-0 border-b border-border px-5 py-3">
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <div
@@ -37,6 +39,17 @@ export function TableHeader({ details, activeTab, onChangeTab }: TableHeaderProp
             {details.name}
           </h2>
           <Chip tone={isView ? 'amber' : 'accent'}>{TYPE_LABEL[details.type]}</Chip>
+          {onRename && (
+            <button
+              type="button"
+              onClick={onRename}
+              title="Rename table"
+              aria-label="Rename table"
+              className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-subtle opacity-0 transition-all group-hover/header:opacity-100 hover:bg-surface-elevated hover:text-text"
+            >
+              <IconPencil size={13} />
+            </button>
+          )}
         </div>
 
         <SlidingTabs

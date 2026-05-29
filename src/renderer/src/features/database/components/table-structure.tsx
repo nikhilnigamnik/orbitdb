@@ -1,161 +1,246 @@
-import { IconKey } from '@tabler/icons-react'
-import type { TableDetails } from '@renderer/types'
+import { IconKey, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
+import { Button } from '@renderer/components/ui/button'
+import type { DdlOperationKind, TableDetails } from '@renderer/types'
 
 interface TableStructureProps {
   details: TableDetails
+  /** Opens the DDL dialog. Absent for views / read-only tables. */
+  onEdit?: (kind: DdlOperationKind, target?: string) => void
 }
 
 function Section({
   title,
   count,
+  action,
   children
 }: {
   title: string
   count: number
+  action?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
-    <section>
-      <div className="mb-2 flex items-baseline gap-2">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-          {title}
-        </h3>
-        <span className="text-[11px] text-[var(--color-text-subtle)]">{count}</span>
+    <section className="overflow-hidden rounded-xl border border-border">
+      <div className="flex items-center justify-between gap-2 border-b border-border bg-surface-elevated/20 px-4 py-2.5">
+        <div className="flex items-baseline gap-2">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+            {title}
+          </h3>
+          <span className="text-[11px] tabular-nums text-text-subtle">{count}</span>
+        </div>
+        {action}
       </div>
       {children}
     </section>
   )
 }
 
-export function TableStructure({ details }: TableStructureProps) {
+function HeaderAction({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <div className="space-y-8 overflow-auto p-6">
-      <Section title="Columns" count={details.columns.length}>
-        <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
+    >
+      {children}
+    </button>
+  )
+}
+
+function RowAction({
+  label,
+  tone,
+  onClick,
+  children
+}: {
+  label: string
+  tone: 'neutral' | 'rose'
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <Button
+      size="icon-xs"
+      variant="ghost"
+      className={
+        tone === 'rose'
+          ? 'border-transparent bg-transparent text-text-subtle hover:bg-linear-to-b hover:from-rose-500/25 hover:to-rose-500/5 hover:text-rose-200 hover:ring-1 hover:ring-inset hover:ring-rose-500/25 hover:shadow-[inset_0_1px_0_rgba(253,164,175,0.35)]'
+          : 'border-transparent bg-transparent text-text-subtle hover:bg-linear-to-b hover:from-neutral-500/25 hover:to-neutral-500/5 hover:text-neutral-200 hover:ring-1 hover:ring-inset hover:ring-neutral-500/25 hover:shadow-[inset_0_1px_0_rgba(229,229,229,0.25)]'
+      }
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+    >
+      {children}
+    </Button>
+  )
+}
+
+const TH = 'px-4 py-2 text-left text-[10.5px] font-medium uppercase tracking-wider text-text-subtle'
+const TD = 'px-4 py-2 align-middle'
+
+export function TableStructure({ details, onEdit }: TableStructureProps) {
+  const canEdit = !!onEdit
+
+  return (
+    <div className="space-y-5 overflow-auto p-6">
+      <Section
+        title="Columns"
+        count={details.columns.length}
+        action={
+          canEdit && (
+            <HeaderAction onClick={() => onEdit?.('add-column')}>
+              <IconPlus size={12} />
+              Add column
+            </HeaderAction>
+          )
+        }
+      >
+        <table className="w-full text-[12.5px]">
+          <thead className="border-b border-border">
+            <tr>
+              <th className={TH}>Name</th>
+              <th className={TH}>Type</th>
+              <th className={TH}>Nullable</th>
+              <th className={TH}>Default</th>
+              {canEdit && <th className="w-20" />}
+            </tr>
+          </thead>
+          <tbody>
+            {details.columns.map((col, i) => (
+              <tr key={col.name} className={`group ${i > 0 ? 'border-t border-border/50' : ''}`}>
+                <td className={`${TD} font-medium text-text`}>
+                  <span className="flex items-center gap-1.5">
+                    {col.isPrimaryKey && (
+                      <IconKey size={11} className="shrink-0 text-amber-300/80" />
+                    )}
+                    {col.name}
+                  </span>
+                </td>
+                <td className={`${TD} font-mono text-[11px] text-text-muted`}>
+                  {col.dataType}
+                  {col.characterMaximumLength ? `(${col.characterMaximumLength})` : ''}
+                </td>
+                <td className={`${TD} text-text-subtle`}>{col.isNullable ? 'YES' : 'NO'}</td>
+                <td className={`${TD} font-mono text-[11px] text-text-subtle`}>
+                  {col.defaultValue ?? '—'}
+                </td>
+                {canEdit && (
+                  <td className="px-3 py-1">
+                    <div className="flex justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <RowAction
+                        label={`Rename ${col.name}`}
+                        tone="neutral"
+                        onClick={() => onEdit?.('rename-column', col.name)}
+                      >
+                        <IconPencil stroke={2} />
+                      </RowAction>
+                      <RowAction
+                        label={`Drop ${col.name}`}
+                        tone="rose"
+                        onClick={() => onEdit?.('drop-column', col.name)}
+                      >
+                        <IconTrash stroke={2} />
+                      </RowAction>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Section>
+
+      <Section
+        title="Indexes"
+        count={details.indexes.length}
+        action={
+          canEdit && (
+            <HeaderAction onClick={() => onEdit?.('create-index')}>
+              <IconPlus size={12} />
+              Create index
+            </HeaderAction>
+          )
+        }
+      >
+        {details.indexes.length === 0 ? (
+          <p className="px-4 py-3 text-[12px] text-text-subtle">No indexes.</p>
+        ) : (
           <table className="w-full text-[12.5px]">
-            <thead className="border-b border-[var(--color-border)] text-[10.5px] uppercase tracking-wider text-[var(--color-text-subtle)]">
+            <thead className="border-b border-border">
               <tr>
-                <th className="px-3 py-2 text-left font-medium">Name</th>
-                <th className="px-3 py-2 text-left font-medium">Type</th>
-                <th className="px-3 py-2 text-left font-medium">Nullable</th>
-                <th className="px-3 py-2 text-left font-medium">Default</th>
-                <th className="w-10 px-3 py-2 text-left font-medium" />
+                <th className={TH}>Name</th>
+                <th className={TH}>Columns</th>
+                <th className={TH}>Flags</th>
+                {canEdit && <th className="w-12" />}
               </tr>
             </thead>
             <tbody>
-              {details.columns.map((col, i) => (
-                <tr
-                  key={col.name}
-                  className={
-                    i > 0
-                      ? 'border-t border-[var(--color-border)]/60 text-[var(--color-text-muted)]'
-                      : 'text-[var(--color-text-muted)]'
-                  }
-                >
-                  <td className="px-3 py-1.5 font-medium text-[var(--color-text)]">{col.name}</td>
-                  <td className="px-3 py-1.5 font-mono text-[11px]">
-                    {col.dataType}
-                    {col.characterMaximumLength ? `(${col.characterMaximumLength})` : ''}
+              {details.indexes.map((idx, i) => (
+                <tr key={idx.name} className={`group ${i > 0 ? 'border-t border-border/50' : ''}`}>
+                  <td className={`${TD} font-medium text-text`}>{idx.name}</td>
+                  <td className={`${TD} font-mono text-[11px] text-text-muted`}>
+                    {Array.isArray(idx.columns) ? idx.columns.join(', ') : String(idx.columns)}
                   </td>
-                  <td className="px-3 py-1.5 text-[var(--color-text-subtle)]">
-                    {col.isNullable ? 'YES' : 'NO'}
+                  <td className={`${TD} text-[10.5px] uppercase tracking-wider text-text-subtle`}>
+                    {idx.isPrimary ? 'Primary' : idx.isUnique ? 'Unique' : ''}
                   </td>
-                  <td className="px-3 py-1.5 font-mono text-[11px] text-[var(--color-text-subtle)]">
-                    {col.defaultValue ?? '—'}
-                  </td>
-                  <td className="px-3 py-1.5">
-                    {col.isPrimaryKey && (
-                      <IconKey size={11} className="text-[var(--color-text-muted)]" />
-                    )}
-                  </td>
+                  {canEdit && (
+                    <td className="px-3 py-1">
+                      <div className="flex justify-end opacity-0 transition-opacity group-hover:opacity-100">
+                        {!idx.isPrimary && (
+                          <RowAction
+                            label={`Drop index ${idx.name}`}
+                            tone="rose"
+                            onClick={() => onEdit?.('drop-index', idx.name)}
+                          >
+                            <IconTrash stroke={2} />
+                          </RowAction>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      </Section>
-
-      <Section title="Indexes" count={details.indexes.length}>
-        {details.indexes.length === 0 ? (
-          <p className="text-[12px] text-[var(--color-text-subtle)]">No indexes.</p>
-        ) : (
-          <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
-            <table className="w-full text-[12.5px]">
-              <thead className="border-b border-[var(--color-border)] text-[10.5px] uppercase tracking-wider text-[var(--color-text-subtle)]">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">Name</th>
-                  <th className="px-3 py-2 text-left font-medium">Columns</th>
-                  <th className="px-3 py-2 text-left font-medium">Flags</th>
-                </tr>
-              </thead>
-              <tbody>
-                {details.indexes.map((idx, i) => (
-                  <tr
-                    key={idx.name}
-                    className={
-                      i > 0
-                        ? 'border-t border-[var(--color-border)]/60 text-[var(--color-text-muted)]'
-                        : 'text-[var(--color-text-muted)]'
-                    }
-                  >
-                    <td className="px-3 py-1.5 font-medium text-[var(--color-text)]">{idx.name}</td>
-                    <td className="px-3 py-1.5 font-mono text-[11px]">
-                      {Array.isArray(idx.columns) ? idx.columns.join(', ') : String(idx.columns)}
-                    </td>
-                    <td className="px-3 py-1.5 text-[10.5px] uppercase tracking-wider text-[var(--color-text-subtle)]">
-                      {idx.isPrimary ? 'Primary' : idx.isUnique ? 'Unique' : ''}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         )}
       </Section>
 
       <Section title="Foreign keys" count={details.foreignKeys.length}>
         {details.foreignKeys.length === 0 ? (
-          <p className="text-[12px] text-[var(--color-text-subtle)]">No foreign keys.</p>
+          <p className="px-4 py-3 text-[12px] text-text-subtle">No foreign keys.</p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
-            <table className="w-full text-[12.5px]">
-              <thead className="border-b border-[var(--color-border)] text-[10.5px] uppercase tracking-wider text-[var(--color-text-subtle)]">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">Name</th>
-                  <th className="px-3 py-2 text-left font-medium">Columns</th>
-                  <th className="px-3 py-2 text-left font-medium">References</th>
-                  <th className="px-3 py-2 text-left font-medium">On delete</th>
-                  <th className="px-3 py-2 text-left font-medium">On update</th>
+          <table className="w-full text-[12.5px]">
+            <thead className="border-b border-border">
+              <tr>
+                <th className={TH}>Name</th>
+                <th className={TH}>Columns</th>
+                <th className={TH}>References</th>
+                <th className={TH}>On delete</th>
+                <th className={TH}>On update</th>
+              </tr>
+            </thead>
+            <tbody>
+              {details.foreignKeys.map((fk, i) => (
+                <tr key={fk.name} className={i > 0 ? 'border-t border-border/50' : ''}>
+                  <td className={`${TD} font-medium text-text`}>{fk.name}</td>
+                  <td className={`${TD} font-mono text-[11px] text-text-muted`}>
+                    {Array.isArray(fk.columns) ? fk.columns.join(', ') : String(fk.columns)}
+                  </td>
+                  <td className={`${TD} font-mono text-[11px] text-text-muted`}>
+                    {fk.referencedSchema}.{fk.referencedTable}(
+                    {Array.isArray(fk.referencedColumns)
+                      ? fk.referencedColumns.join(', ')
+                      : String(fk.referencedColumns)}
+                    )
+                  </td>
+                  <td className={`${TD} text-[11px] text-text-subtle`}>{fk.onDelete}</td>
+                  <td className={`${TD} text-[11px] text-text-subtle`}>{fk.onUpdate}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {details.foreignKeys.map((fk, i) => (
-                  <tr
-                    key={fk.name}
-                    className={
-                      i > 0
-                        ? 'border-t border-[var(--color-border)]/60 text-[var(--color-text-muted)]'
-                        : 'text-[var(--color-text-muted)]'
-                    }
-                  >
-                    <td className="px-3 py-1.5 font-medium text-[var(--color-text)]">{fk.name}</td>
-                    <td className="px-3 py-1.5 font-mono text-[11px]">
-                      {Array.isArray(fk.columns) ? fk.columns.join(', ') : String(fk.columns)}
-                    </td>
-                    <td className="px-3 py-1.5 font-mono text-[11px]">
-                      {fk.referencedSchema}.{fk.referencedTable}(
-                      {Array.isArray(fk.referencedColumns)
-                        ? fk.referencedColumns.join(', ')
-                        : String(fk.referencedColumns)}
-                      )
-                    </td>
-                    <td className="px-3 py-1.5 text-[11px]">{fk.onDelete}</td>
-                    <td className="px-3 py-1.5 text-[11px]">{fk.onUpdate}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         )}
       </Section>
     </div>

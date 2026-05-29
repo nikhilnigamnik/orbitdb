@@ -2,6 +2,7 @@ import { ipcMain, app, shell } from 'electron'
 import { checkForUpdate } from '../app/update-check'
 import type {
   ConnectionInput,
+  DdlRequest,
   DistinctValuesOptions,
   GetRowsOptions,
   RowDelete,
@@ -21,6 +22,8 @@ import {
   describeActive,
   deleteRow,
   disconnectPool,
+  executeDdl,
+  generateDdl,
   getColumnDistinct,
   getRows,
   getSchemaGraph,
@@ -126,6 +129,17 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'db:row-delete',
     wrap(async (opts: RowDelete) => deleteRow(opts))
+  )
+
+  ipcMain.handle(
+    'db:ddl-preview',
+    wrap(async (opts: DdlRequest) => generateDdl(opts))
+  )
+  ipcMain.handle(
+    'db:ddl-execute',
+    wrap(async (opts: DdlRequest) => {
+      await executeDdl(opts)
+    })
   )
 
   ipcMain.handle(

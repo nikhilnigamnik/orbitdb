@@ -1,6 +1,7 @@
 import type {
   ConnectionInput,
   DatabaseEngine,
+  DdlRequest,
   DistinctValuesOptions,
   GetRowsOptions,
   QueryResult,
@@ -90,6 +91,14 @@ export function updateRow(opts: RowUpdate): Promise<Record<string, unknown>> {
 
 export function deleteRow(opts: RowDelete): Promise<{ deleted: number }> {
   return driverForConnection(opts.connectionId).deleteRow(opts)
+}
+
+export function generateDdl(opts: DdlRequest): Promise<string> {
+  return driverForConnection(opts.connectionId).generateDdl(opts)
+}
+
+export function executeDdl(opts: DdlRequest): Promise<void> {
+  return driverForConnection(opts.connectionId).executeDdl(opts)
 }
 
 export function runQuery(opts: RunQueryOptions): Promise<QueryResult> {

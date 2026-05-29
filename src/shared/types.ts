@@ -149,6 +149,29 @@ export interface RowDelete {
   pk: Record<string, unknown>
 }
 
+export type DdlOperation =
+  | {
+      kind: 'add-column'
+      name: string
+      dataType: string
+      isNullable: boolean
+      defaultValue?: string | null
+    }
+  | { kind: 'drop-column'; name: string }
+  | { kind: 'rename-column'; from: string; to: string }
+  | { kind: 'rename-table'; to: string }
+  | { kind: 'create-index'; name: string; columns: string[]; isUnique: boolean }
+  | { kind: 'drop-index'; name: string }
+
+export type DdlOperationKind = DdlOperation['kind']
+
+export interface DdlRequest {
+  connectionId: string
+  schema: string
+  table: string
+  operation: DdlOperation
+}
+
 export interface RunQueryOptions {
   connectionId: string
   sql: string

@@ -8,6 +8,7 @@ import {
   MAX_QUERY_RESULT_ROWS,
   type ColumnInfo,
   type ConnectionInput,
+  type DdlRequest,
   type DistinctValuesOptions,
   type ForeignKeyInfo,
   type GetRowsOptions,
@@ -28,6 +29,7 @@ import {
   type TestConnectionResult
 } from '../../../shared/types'
 import { getConnection } from '../../store/connections-store'
+import { buildDdl, type DdlDialect } from '../ddl'
 import { recordQuery } from '../query-log'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
@@ -514,6 +516,24 @@ async function deleteRow(opts: RowDelete): Promise<{ deleted: number }> {
   return { deleted: result.affectedRows ?? 0 }
 }
 
+const ddlDialect: DdlDialect = {
+  quoteIdent,
+  qualifiedTable,
+  dropIndex: (schema, table, name) =>
+    `DROP INDEX ${quoteIdent(name)} ON ${qualifiedTable(schema, table)}`
+}
+
+async function generateDdl(opts: DdlRequest): Promise<string> {
+  return buildDdl(opts.operation, opts.schema, opts.table, ddlDialect)
+}
+
+async function executeDdl(opts: DdlRequest): Promise<void> {
+  const sql = buildDdl(opts.operation, opts.schema, opts.table, ddlDialect)
+  const pool = getPool(opts.connectionId)
+  await pool.query(sql)
+  invalidateTableDetailsForConnection(opts.connectionId)
+}
+
 function detectCommand(sql: string): string | null {
   const trimmed = sql.trim().split(/\s+/)[0]
   return trimmed ? trimmed.toUpperCase() : null
@@ -711,6 +731,8 @@ export const mysqlDriver: DatabaseDriver = {
   insertRow,
   updateRow,
   deleteRow,
+  generateDdl,
+  executeDdl,
   runQuery,
   cancelQuery,
   getColumnDistinct

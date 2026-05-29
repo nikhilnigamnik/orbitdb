@@ -3,6 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import type {
   ActiveConnectionMeta,
   ConnectionInput,
+  DdlRequest,
   DistinctValuesOptions,
   GetRowsOptions,
   OperationResult,
@@ -50,6 +51,8 @@ const api = {
     insertRow: (opts: RowMutation) => invoke<Record<string, unknown>>('db:row-insert', opts),
     updateRow: (opts: RowUpdate) => invoke<Record<string, unknown>>('db:row-update', opts),
     deleteRow: (opts: RowDelete) => invoke<{ deleted: number }>('db:row-delete', opts),
+    ddlPreview: (opts: DdlRequest) => invoke<string>('db:ddl-preview', opts),
+    ddlExecute: (opts: DdlRequest) => invoke<void>('db:ddl-execute', opts),
     runQuery: (opts: RunQueryOptions) => invoke<QueryResult>('db:query-run', opts),
     cancelQuery: (connectionId: string, queryId: string) =>
       invoke<void>('db:query-cancel', connectionId, queryId),

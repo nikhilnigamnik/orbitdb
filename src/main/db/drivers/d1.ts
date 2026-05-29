@@ -2,6 +2,7 @@ import {
   MAX_QUERY_RESULT_ROWS,
   type ColumnInfo,
   type ConnectionInput,
+  type DdlRequest,
   type DistinctValuesOptions,
   type ForeignKeyInfo,
   type GetRowsOptions,
@@ -22,6 +23,7 @@ import {
   type TestConnectionResult
 } from '../../../shared/types'
 import { getConnection } from '../../store/connections-store'
+import { buildDdl, type DdlDialect } from '../ddl'
 import { recordQuery } from '../query-log'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
@@ -542,6 +544,24 @@ async function deleteRow(opts: RowDelete): Promise<{ deleted: number }> {
   return { deleted: entry.meta.changes ?? 0 }
 }
 
+// D1/SQLite has no schemas — identifiers are table-only and indexes are global.
+const ddlDialect: DdlDialect = {
+  quoteIdent,
+  qualifiedTable: (_schema, table) => quoteIdent(table),
+  dropIndex: (_schema, _table, name) => `DROP INDEX ${quoteIdent(name)}`
+}
+
+async function generateDdl(opts: DdlRequest): Promise<string> {
+  return buildDdl(opts.operation, opts.schema, opts.table, ddlDialect)
+}
+
+async function executeDdl(opts: DdlRequest): Promise<void> {
+  const saved = loadSaved(opts.connectionId)
+  const sql = buildDdl(opts.operation, opts.schema, opts.table, ddlDialect)
+  await callD1(saved, sql)
+  invalidateTableDetailsForConnection(opts.connectionId)
+}
+
 function detectCommand(sql: string): string | null {
   const trimmed = sql.trim().split(/\s+/)[0]
   return trimmed ? trimmed.toUpperCase() : null
@@ -693,6 +713,8 @@ export const d1Driver: DatabaseDriver = {
   insertRow,
   updateRow,
   deleteRow,
+  generateDdl,
+  executeDdl,
   runQuery,
   cancelQuery,
   getColumnDistinct
