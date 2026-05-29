@@ -7,9 +7,15 @@ import { Switch } from '@renderer/components/ui/switch'
 import { Select } from '@renderer/components/ui/select'
 import { FormField } from '@renderer/components/forms/form-field'
 import { SubmitButton } from '@renderer/components/forms/submit-button'
-import { Badge } from '@renderer/components/ui/badge'
 import type { ColumnInfo } from '@renderer/types'
 import { Chip } from '@renderer/components/ui/chip'
+import {
+  coerceCellValue,
+  isBoolType,
+  isJsonType,
+  isNumericType,
+  stringifyValue
+} from '../lib/cell-value'
 
 type Mode = 'insert' | 'edit'
 
@@ -28,30 +34,6 @@ interface FieldState {
   touched: boolean
 }
 
-function isJsonType(udt: string): boolean {
-  return udt === 'json' || udt === 'jsonb'
-}
-
-function isBoolType(udt: string): boolean {
-  return udt === 'bool'
-}
-
-function isNumericType(udt: string): boolean {
-  return ['int2', 'int4', 'int8', 'numeric', 'float4', 'float8', 'money'].includes(udt)
-}
-
-function stringifyInitial(value: unknown): string {
-  if (value === null || value === undefined) return ''
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value, null, 2)
-    } catch {
-      return String(value)
-    }
-  }
-  return String(value)
-}
-
 function buildInitialFields(
   columns: ColumnInfo[],
   values?: Record<string, unknown> | null
@@ -60,34 +42,12 @@ function buildInitialFields(
   for (const col of columns) {
     const current = values?.[col.name]
     out[col.name] = {
-      raw: current == null ? '' : stringifyInitial(current),
+      raw: current == null ? '' : stringifyValue(current),
       isNull: current === null && values != null,
       touched: false
     }
   }
   return out
-}
-
-function coerceValue(col: ColumnInfo, field: FieldState): unknown {
-  if (field.isNull) return null
-  const raw = field.raw
-  if (isBoolType(col.udtName)) {
-    if (raw === '' || raw == null) return null
-    return raw === 'true' || raw === 't' || raw === '1'
-  }
-  if (isJsonType(col.udtName) && raw.trim() !== '') {
-    try {
-      return JSON.parse(raw)
-    } catch {
-      throw new Error(`Column "${col.name}": invalid JSON`)
-    }
-  }
-  if (isNumericType(col.udtName) && raw.trim() !== '') {
-    const num = Number(raw)
-    if (Number.isNaN(num)) throw new Error(`Column "${col.name}": invalid number`)
-    return num
-  }
-  return raw
 }
 
 export function RowEditorSheet({
@@ -124,7 +84,7 @@ export function RowEditorSheet({
         const field = fields[col.name]
         if (mode === 'insert' && !field.touched && col.defaultValue != null) continue
         if (mode === 'insert' && !field.touched && field.raw === '' && !field.isNull) continue
-        const value = coerceValue(col, field)
+        const value = coerceCellValue(col, field.raw, field.isNull)
         values[col.name] = value
       }
       if (Object.keys(values).length === 0) {

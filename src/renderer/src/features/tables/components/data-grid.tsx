@@ -23,6 +23,7 @@ import { formatCellValue } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import { CellPreview } from './cell-preview'
+import { CellEditPopover } from './cell-edit-popover'
 import type { ColumnInfo, SortDirection } from '@renderer/types'
 
 type Row = Record<string, unknown>
@@ -41,6 +42,7 @@ interface DataGridProps {
   onSort: (column: string) => void
   onEditRow: (row: Row) => void
   onDeleteRow: (row: Row) => void
+  onEditCell?: (row: Row, column: string, value: unknown) => Promise<void>
   canMutate: boolean
   rowOffset?: number
   rowSelection?: RowSelectionState
@@ -63,6 +65,7 @@ export function DataGrid({
   onSort,
   onEditRow,
   onDeleteRow,
+  onEditCell,
   canMutate,
   rowOffset = 0,
   rowSelection: controlledRowSelection,
@@ -94,6 +97,15 @@ export function DataGrid({
     if (isControlled) return
     setInternalRowSelection({})
   }, [rows, isControlled])
+
+  const [editingCell, setEditingCell] = React.useState<{
+    rowIndex: number
+    columnId: string
+  } | null>(null)
+  const canEditCells = canMutate && !!onEditCell
+  React.useEffect(() => {
+    setEditingCell(null)
+  }, [rows])
 
   const sorting: SortingState = React.useMemo(
     () => (orderBy ? [{ id: orderBy, desc: orderDir === 'desc' }] : []),
@@ -363,6 +375,15 @@ export function DataGrid({
                     const isSelect = cell.column.id === SELECT_COLUMN_ID
                     const isIndex = cell.column.id === INDEX_COLUMN_ID
                     const isActions = cell.column.id === ACTIONS_COLUMN_ID
+                    const isData = !isSelect && !isIndex && !isActions
+                    const isEditingThis =
+                      isData &&
+                      editingCell?.rowIndex === row.index &&
+                      editingCell?.columnId === cell.column.id
+                    const editColumn = isEditingThis
+                      ? columns.find((c) => c.name === cell.column.id)
+                      : undefined
+                    const cellValue = row.original[cell.column.id]
                     return (
                       <td
                         key={cell.id}
@@ -371,18 +392,48 @@ export function DataGrid({
                           isSelect && 'px-2',
                           isIndex && 'text-[10.5px] text-text-subtle',
                           isActions && 'sticky right-0 bg-surface px-2 py-1 group-hover:bg-surface',
-                          !isSelect &&
-                            !isIndex &&
-                            !isActions &&
-                            'max-w-xs truncate font-mono text-[11.5px]'
+                          isData && 'max-w-xs truncate font-mono text-[11.5px]',
+                          isData && canEditCells && 'cursor-text',
+                          isEditingThis && 'bg-surface-elevated'
                         )}
-                        title={
-                          !isSelect && !isIndex && !isActions
-                            ? formatCellValue(row.original[cell.column.id])
+                        title={isData && !isEditingThis ? formatCellValue(cellValue) : undefined}
+                        onMouseDown={
+                          isData && canEditCells
+                            ? (e) => {
+                                // Stop the browser's double-click word-selection (the
+                                // highlight) while keeping single-click selection intact.
+                                if (e.detail > 1) e.preventDefault()
+                              }
+                            : undefined
+                        }
+                        onDoubleClick={
+                          isData && canEditCells
+                            ? () =>
+                                setEditingCell({ rowIndex: row.index, columnId: cell.column.id })
                             : undefined
                         }
                       >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {isEditingThis && editColumn && onEditCell ? (
+                          <CellEditPopover
+                            column={editColumn}
+                            value={cellValue}
+                            onSave={async (newValue) => {
+                              await onEditCell(row.original, cell.column.id, newValue)
+                              setEditingCell(null)
+                            }}
+                            onCancel={() => setEditingCell(null)}
+                          >
+                            <span className="block max-w-full truncate">
+                              {cellValue === null ? (
+                                <span className="italic text-text-subtle">NULL</span>
+                              ) : (
+                                formatCellValue(cellValue)
+                              )}
+                            </span>
+                          </CellEditPopover>
+                        ) : (
+                          flexRender(cell.column.columnDef.cell, cell.getContext())
+                        )}
                       </td>
                     )
                   })}

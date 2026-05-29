@@ -251,6 +251,21 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
     await load()
   }
 
+  async function handleEditCell(row: Record<string, unknown>, column: string, value: unknown) {
+    const pk: Record<string, unknown> = {}
+    for (const key of details.primaryKey) pk[key] = row[key]
+    await unwrap(
+      window.api.db.updateRow({
+        connectionId,
+        schema: details.schema,
+        table: details.name,
+        pk,
+        values: { [column]: value }
+      })
+    )
+    await load()
+  }
+
   async function handleDelete() {
     if (!pendingDelete) return
     setIsMutating(true)
@@ -396,6 +411,7 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
             setPendingDelete(row)
             deleteConfirm.open()
           }}
+          onEditCell={canMutate ? handleEditCell : undefined}
           canMutate={canMutate}
           rowOffset={offset}
           rowSelection={rowSelection}
