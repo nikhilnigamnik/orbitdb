@@ -46,7 +46,23 @@ export function LogsPage() {
   const [filter, setFilter] = React.useState('')
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'success' | 'error'>('all')
   const [selected, setSelected] = React.useState<QueryLogEntry | null>(null)
+  const [copied, setCopied] = React.useState(false)
+  const copyTimeout = React.useRef<number | null>(null)
   const clearConfirm = useDisclosure(false)
+
+  React.useEffect(() => {
+    return () => {
+      if (copyTimeout.current != null) window.clearTimeout(copyTimeout.current)
+    }
+  }, [])
+
+  function copySql() {
+    if (!selected) return
+    void navigator.clipboard.writeText(selected.sql)
+    setCopied(true)
+    if (copyTimeout.current != null) window.clearTimeout(copyTimeout.current)
+    copyTimeout.current = window.setTimeout(() => setCopied(false), 1200)
+  }
 
   const load = React.useCallback(async () => {
     setIsLoading(true)
@@ -189,7 +205,7 @@ export function LogsPage() {
             </p>
             {logs.length === 0 && (
               <p className="text-[10.5px] text-text-subtle/70">
-                Run a query and it'll show up here.
+                {"Run a query and it'll show up here."}
               </p>
             )}
           </div>
@@ -253,78 +269,87 @@ export function LogsPage() {
         content={
           selected ? (
             <div className="flex h-full min-h-0 flex-col">
-              <div className="flex shrink-0 flex-col gap-1 border-b border-border px-4 py-3 pr-12">
-                <h2 className="text-[13px] font-semibold text-text">Query detail</h2>
-                <div className="flex flex-wrap items-center gap-2 text-[10.5px]">
+              <div className="flex shrink-0 items-start gap-3 border-b border-border px-4 py-3.5 pr-12">
+                <div
+                  className={cn(
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-b ring-1 ring-inset',
+                    selected.success
+                      ? 'from-emerald-500/20 to-emerald-500/5 text-emerald-200 ring-emerald-500/25 shadow-[inset_0_1px_0_rgba(110,231,183,0.35)]'
+                      : 'from-rose-500/20 to-rose-500/5 text-rose-200 ring-rose-500/25 shadow-[inset_0_1px_0_rgba(253,164,175,0.35)]'
+                  )}
+                >
                   {selected.success ? (
-                    <Chip tone="emerald">
-                      <IconCheck size={9} />
-                      OK
-                    </Chip>
+                    <IconCheck size={16} stroke={2} />
                   ) : (
-                    <Chip tone="rose">
-                      <IconAlertTriangle size={9} />
-                      Error
-                    </Chip>
+                    <IconAlertTriangle size={16} stroke={2} />
                   )}
-                  <Chip tone={ENGINE_TONE[selected.engine]}>{ENGINE_LABEL[selected.engine]}</Chip>
-                  <span className="text-text-muted">{connectionName(selected.connectionId)}</span>
-                  <span className="font-mono text-text-subtle">{selected.durationMs} ms</span>
-                  {selected.rowCount != null && (
-                    <span className="text-text-subtle">
-                      <span className="font-mono text-text-muted">
-                        {formatNumber(selected.rowCount)}
-                      </span>{' '}
-                      row{selected.rowCount === 1 ? '' : 's'}
-                    </span>
-                  )}
-                  <span className="text-text-subtle">
+                </div>
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-[14px] font-semibold tracking-tight text-text">
+                      Query detail
+                    </h2>
+                    <Chip tone={ENGINE_TONE[selected.engine]}>{ENGINE_LABEL[selected.engine]}</Chip>
+                  </div>
+                  <p className="truncate text-[11px] text-text-subtle">
+                    {connectionName(selected.connectionId)} ·{' '}
                     {new Date(selected.ranAt).toLocaleString()}
-                  </span>
+                  </p>
                 </div>
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-3">
-                <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="text-[10.5px] font-medium uppercase tracking-wide text-text-subtle">
-                      SQL
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 gap-1 px-1.5 text-text-subtle hover:bg-surface-elevated hover:text-text"
-                      onClick={() => void navigator.clipboard.writeText(selected.sql)}
-                    >
-                      <IconCopy size={11} />
-                      Copy
-                    </Button>
-                  </div>
-                  <pre className="whitespace-pre-wrap break-words rounded-md border border-border bg-surface-elevated/40 p-3 font-mono text-[12px] text-text">
-                    {selected.sql}
-                  </pre>
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 py-4">
+                <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-border bg-surface-elevated/20">
+                  <Stat label="Duration" value={`${selected.durationMs} ms`} />
+                  <Stat
+                    label="Rows"
+                    value={selected.rowCount != null ? formatNumber(selected.rowCount) : '—'}
+                    border
+                  />
+                  <Stat
+                    label="Status"
+                    value={selected.success ? 'Success' : 'Failed'}
+                    valueClassName={selected.success ? 'text-emerald-300' : 'text-rose-300'}
+                    border
+                  />
                 </div>
 
-                {selected.params.length > 0 && (
-                  <div>
-                    <span className="text-[10.5px] font-medium uppercase tracking-wide text-text-subtle">
-                      Params
-                    </span>
-                    <pre className="mt-1 whitespace-pre-wrap break-words rounded-md border border-border bg-surface-elevated/40 p-3 font-mono text-[11.5px] text-text-muted">
-                      {JSON.stringify(selected.params, null, 2)}
+                <DetailSection label="SQL">
+                  <div className="group/sql relative">
+                    <button
+                      type="button"
+                      onClick={copySql}
+                      title="Copy SQL"
+                      aria-label="Copy SQL"
+                      className="absolute right-2 top-2 z-10 flex h-6 cursor-pointer items-center gap-1 rounded-md border border-border bg-surface px-2 text-[10.5px] text-text-subtle opacity-0 transition-all group-hover/sql:opacity-100 hover:bg-surface-elevated hover:text-text"
+                    >
+                      {copied ? (
+                        <IconCheck size={11} className="text-emerald-400" />
+                      ) : (
+                        <IconCopy size={11} />
+                      )}
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                    <pre className="overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3.5 py-3 pr-14 font-mono text-[12px] leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
+                      {selected.sql.trim() || '—'}
                     </pre>
                   </div>
+                </DetailSection>
+
+                {selected.params.length > 0 && (
+                  <DetailSection label="Params">
+                    <pre className="overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3.5 py-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap wrap-anywhere text-text-muted">
+                      {JSON.stringify(selected.params, null, 2)}
+                    </pre>
+                  </DetailSection>
                 )}
 
                 {selected.error && (
-                  <div>
-                    <span className="text-[10.5px] font-medium uppercase tracking-wide text-red-400/80">
-                      Error
-                    </span>
-                    <pre className="mt-1 whitespace-pre-wrap break-words rounded-md border border-red-500/20 bg-red-500/5 p-3 font-mono text-[12px] text-red-300/90">
+                  <DetailSection label="Error" tone="error">
+                    <pre className="overflow-auto rounded-lg border border-rose-500/20 bg-rose-500/5 px-3.5 py-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap wrap-anywhere text-rose-200">
                       {selected.error}
                     </pre>
-                  </div>
+                  </DetailSection>
                 )}
               </div>
             </div>
@@ -343,6 +368,56 @@ export function LogsPage() {
         confirmLabel="Clear log"
         variant="danger"
       />
+    </div>
+  )
+}
+
+function Stat({
+  label,
+  value,
+  border,
+  valueClassName
+}: {
+  label: string
+  value: React.ReactNode
+  border?: boolean
+  valueClassName?: string
+}) {
+  return (
+    <div className={cn('flex flex-col gap-0.5 px-3 py-2', border && 'border-l border-border')}>
+      <span className="text-[10px] font-medium uppercase tracking-wider text-text-subtle">
+        {label}
+      </span>
+      <span className={cn('font-mono text-[12px] text-text', valueClassName)}>{value}</span>
+    </div>
+  )
+}
+
+function DetailSection({
+  label,
+  action,
+  tone = 'default',
+  children
+}: {
+  label: string
+  action?: React.ReactNode
+  tone?: 'default' | 'error'
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex h-6 items-center justify-between">
+        <span
+          className={cn(
+            'text-[10.5px] font-semibold uppercase tracking-wider',
+            tone === 'error' ? 'text-rose-400/80' : 'text-text-subtle'
+          )}
+        >
+          {label}
+        </span>
+        {action}
+      </div>
+      {children}
     </div>
   )
 }
