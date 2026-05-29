@@ -51,9 +51,9 @@ export function Select<T extends string = string>({
         className={cn(
           'flex w-fit cursor-pointer items-center justify-between gap-1.5 rounded-md border border-border bg-surface-elevated/30 px-2 text-text outline-none transition-colors',
           'hover:bg-surface-elevated hover:text-text',
-          'focus-visible:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/20',
+          'focus-visible:border-[var(--color-border-strong)]',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          'data-[state=open]:border-accent/50 data-[state=open]:bg-surface-elevated',
+          'data-[state=open]:border-[var(--color-border-strong)] data-[state=open]:bg-surface-elevated',
           'data-placeholder:text-text-subtle',
           'data-[size=default]:h-8 data-[size=default]:text-[12.5px]',
           'data-[size=sm]:h-7 data-[size=sm]:text-[11.5px]',
@@ -95,7 +95,7 @@ export function Select<T extends string = string>({
               >
                 <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
                 <SelectPrimitive.ItemIndicator className="absolute right-2 flex items-center">
-                  <IconCheck size={12} className="text-accent" />
+                  <IconCheck size={12} className="text-text" />
                 </SelectPrimitive.ItemIndicator>
               </SelectPrimitive.Item>
             ))}
