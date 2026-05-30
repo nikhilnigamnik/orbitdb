@@ -16,6 +16,10 @@ export function tableRoute(schema: string, name: string): string {
   return `${ROUTES.table}?schema=${encodeURIComponent(schema)}&table=${encodeURIComponent(name)}`
 }
 
+export function tableStructureRoute(schema: string, name: string): string {
+  return `${tableRoute(schema, name)}&view=structure`
+}
+
 export function tableRouteWithFk(
   schema: string,
   name: string,

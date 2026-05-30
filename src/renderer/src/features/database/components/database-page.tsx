@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { IconDatabase, IconPlug } from '@tabler/icons-react'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { ErrorState } from '@renderer/components/common/error-state'
-import { Spinner } from '@renderer/components/ui/spinner'
+import { LoadingState } from '@renderer/components/common/loading-state'
 import { Button } from '@renderer/components/ui/button'
 import { useAsync } from '@renderer/hooks/use-async'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
@@ -24,11 +24,14 @@ export function DatabasePage() {
   const { active } = useConnection()
   const schema = searchParams.get('schema') ?? ''
   const table = searchParams.get('table') ?? ''
-  const [activeTab, setActiveTab] = React.useState<'data' | 'structure'>('data')
+  const view = searchParams.get('view')
+  const [activeTab, setActiveTab] = React.useState<'data' | 'structure'>(
+    view === 'structure' ? 'structure' : 'data'
+  )
 
   React.useEffect(() => {
-    setActiveTab('data')
-  }, [schema, table])
+    setActiveTab(view === 'structure' ? 'structure' : 'data')
+  }, [schema, table, view])
 
   const lastConnectionId = React.useRef<string | null>(null)
   React.useEffect(() => {
@@ -163,6 +166,13 @@ function TableViewContainer({
     kind: DdlOperationKind
     target?: string
   } | null>(null)
+  // Hold the header until the first page of rows lands so the whole view reveals
+  // at once (one loader). Sticky once shown — and the structure tab, which has no
+  // async load, reveals it immediately. Resets per table via the container key.
+  const [headerShown, setHeaderShown] = React.useState(activeTab !== 'data')
+  React.useEffect(() => {
+    if (activeTab !== 'data') setHeaderShown(true)
+  }, [activeTab])
 
   function openDdl(kind: DdlOperationKind, target?: string) {
     setDdlState({ kind, target })
@@ -178,11 +188,7 @@ function TableViewContainer({
   }
 
   if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner size={20} />
-      </div>
-    )
+    return <LoadingState />
   }
   if (error || !data) {
     return (
@@ -196,14 +202,16 @@ function TableViewContainer({
 
   return (
     <>
-      <TableHeader
-        details={data}
-        activeTab={activeTab}
-        onChangeTab={onChangeTab}
-        onRename={canEdit ? () => openDdl('rename-table') : undefined}
-      />
+      {headerShown && (
+        <TableHeader details={data} activeTab={activeTab} onChangeTab={onChangeTab} />
+      )}
       {activeTab === 'data' ? (
-        <TableDataView connectionId={connectionId} details={data} />
+        <TableDataView
+          connectionId={connectionId}
+          details={data}
+          onRenameTable={canEdit ? () => openDdl('rename-table') : undefined}
+          onReady={() => setHeaderShown(true)}
+        />
       ) : (
         <TableStructure details={data} onEdit={canEdit ? openDdl : undefined} />
       )}

@@ -4,14 +4,13 @@ import {
   IconChevronRight,
   IconTable,
   IconEye,
-  IconLoader,
   IconRefresh,
   IconSearch,
   IconDatabase,
-  IconPin,
   IconPinFilled
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { useCommandPalette } from '@renderer/features/command-palette/store'
 import {
   loadPinned,
@@ -31,6 +30,8 @@ import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { formatNumber } from '@renderer/lib/format'
 import { tableRoute } from '@renderer/config/routes'
+import { onSchemaTablesChanged } from '@renderer/features/database/lib/schema-events'
+import { TableActionsMenu } from './table-actions-menu'
 import type { TableInfo } from '@renderer/types'
 
 interface SchemaTreeProps {
@@ -103,6 +104,20 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
       }
     }
   }, [expanded, fetchTables, tablesBySchema])
+
+  // Re-fetch a schema's tables when a truncate/drop happens anywhere (the tree
+  // row menu or the table header overflow menu) for a schema we've loaded.
+  const loadedSchemasRef = React.useRef<Set<string>>(new Set())
+  React.useEffect(() => {
+    loadedSchemasRef.current = new Set(Object.keys(tablesBySchema))
+  }, [tablesBySchema])
+  React.useEffect(() => {
+    return onSchemaTablesChanged((connId, changedSchema) => {
+      if (connId === connectionId && loadedSchemasRef.current.has(changedSchema)) {
+        void fetchTables(changedSchema)
+      }
+    })
+  }, [connectionId, fetchTables])
 
   React.useEffect(() => {
     if (!activeSchema) return
@@ -276,7 +291,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                   <div className="ml-3 mt-0.5 pl-2">
                     {state?.isLoading ? (
                       <div className="flex items-center justify-center px-3 py-3 text-text-subtle">
-                        <IconLoader stroke={2} size={14} className="animate-spin" />
+                        <Spinner size={14} />
                       </div>
                     ) : state?.error ? (
                       <p className="px-3 py-1.5 text-[11px] text-red-400/80">{state.error}</p>
@@ -328,27 +343,27 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                                     </span>
                                   )}
                               </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleTogglePin({ schema, table: table.name })
-                                }}
-                                className={cn(
-                                  'mr-1 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-text-subtle transition-opacity hover:bg-surface hover:text-text',
-                                  tableIsPinned
-                                    ? 'opacity-100 text-amber-300/80'
-                                    : 'opacity-0 group-hover/row:opacity-100'
-                                )}
-                                aria-label={tableIsPinned ? 'Unpin table' : 'Pin table'}
-                                title={tableIsPinned ? 'Unpin table' : 'Pin table'}
-                              >
-                                {tableIsPinned ? (
+                              {tableIsPinned && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleTogglePin({ schema, table: table.name })
+                                  }}
+                                  className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-amber-300/80 transition-colors hover:bg-surface hover:text-text"
+                                  aria-label="Unpin table"
+                                  title="Unpin table"
+                                >
                                   <IconPinFilled size={11} />
-                                ) : (
-                                  <IconPin size={11} />
-                                )}
-                              </button>
+                                </button>
+                              )}
+                              <TableActionsMenu
+                                connectionId={connectionId}
+                                schema={schema}
+                                table={table}
+                                isPinned={tableIsPinned}
+                                onTogglePin={() => handleTogglePin({ schema, table: table.name })}
+                              />
                             </SlidingHoverList.Item>
                           )
                         })}

@@ -5,6 +5,7 @@ import {
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
+  type RowData,
   type RowSelectionState,
   type SortingState
 } from '@tanstack/react-table'
@@ -12,7 +13,6 @@ import {
   IconArrowDown,
   IconArrowUp,
   IconArrowsSort,
-  IconLoader,
   IconPencil,
   IconTrash,
   IconKey,
@@ -22,7 +22,7 @@ import { cn } from '@renderer/lib/utils'
 import { formatCellValue } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
-import { CellPreview } from './cell-preview'
+import { LoadingState } from '@renderer/components/common/loading-state'
 import { CellEditPopover } from './cell-edit-popover'
 import type { ColumnInfo, SortDirection } from '@renderer/types'
 
@@ -233,11 +233,7 @@ export function DataGrid({
               </button>
             )
           }
-          return (
-            <CellPreview value={value} display={display} columnName={col.name}>
-              <span className="text-text">{display}</span>
-            </CellPreview>
-          )
+          return <span className="text-text">{display}</span>
         },
         meta: { dataType: col.dataType }
       })
@@ -307,11 +303,7 @@ export function DataGrid({
   const visibleColCount = tableColumns.length
 
   if (isInitialLoad) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center text-text-subtle">
-        <IconLoader stroke={2} size={22} className="animate-spin" />
-      </div>
-    )
+    return <LoadingState />
   }
 
   return (
@@ -448,7 +440,10 @@ export function DataGrid({
 }
 
 declare module '@tanstack/react-table' {
-  interface ColumnMeta<TData extends unknown, TValue> {
+  // TData/TValue must mirror TanStack's ColumnMeta signature for declaration
+  // merging, even though this augmentation only adds `dataType`.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
     dataType?: string
   }
 }

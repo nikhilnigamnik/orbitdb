@@ -1,12 +1,12 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { RowSelectionState } from '@tanstack/react-table'
-import { IconDownload, IconRefresh, IconTrash, IconX } from '@tabler/icons-react'
+import { IconDownload, IconTrash, IconX } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
+import { LoadingState } from '@renderer/components/common/loading-state'
 import { unwrap } from '@renderer/lib/ipc'
-import { buildExportFilename, downloadJson } from '@renderer/lib/export'
 import { DEFAULT_PAGE_SIZE } from '@renderer/config/site'
 import { tableRouteWithFk } from '@renderer/config/routes'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
@@ -18,6 +18,8 @@ import type {
   TableDetails
 } from '@renderer/types'
 import { DataGrid } from './data-grid'
+import { ExportMenu } from './export-menu'
+import { TableOverflowMenu } from './table-overflow-menu'
 import { FiltersBar } from './filters-bar'
 import { PaginationBar } from './pagination-bar'
 import { RowEditorSheet } from './row-editor-sheet'
@@ -25,9 +27,18 @@ import { RowEditorSheet } from './row-editor-sheet'
 interface TableDataViewProps {
   connectionId: string
   details: TableDetails
+  /** Opens the DDL rename dialog (table-only); surfaced in the overflow menu. */
+  onRenameTable?: () => void
+  /** Fires once the first page of rows has loaded, so the container can reveal chrome. */
+  onReady?: () => void
 }
 
-export function TableDataView({ connectionId, details }: TableDataViewProps) {
+export function TableDataView({
+  connectionId,
+  details,
+  onRenameTable,
+  onReady
+}: TableDataViewProps) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const fkColumn = searchParams.get('fkColumn')
@@ -208,6 +219,14 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
     void load()
   }, [load])
 
+  // Signal the container once the first page lands, so it can reveal the header
+  // and grid together — a single loader instead of loader-then-loader.
+  const onReadyRef = React.useRef(onReady)
+  onReadyRef.current = onReady
+  React.useEffect(() => {
+    if (hasLoadedOnce) onReadyRef.current?.()
+  }, [hasLoadedOnce])
+
   function handleSort(column: string) {
     if (orderBy !== column) {
       setOrderBy(column)
@@ -291,12 +310,6 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
     }
   }
 
-  function handleExport() {
-    const data = selectedRows.length > 0 ? selectedRows : rows
-    if (data.length === 0) return
-    downloadJson(buildExportFilename([details.schema, details.name], 'json'), data)
-  }
-
   async function handleBulkDelete() {
     if (selectedRows.length === 0) return
     setIsMutating(true)
@@ -326,6 +339,19 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
     }
   }
 
+  // Hold the whole view behind one full-area loader until the first page is in,
+  // so the header/filters/grid all appear at once.
+  if (!hasLoadedOnce) {
+    if (error) {
+      return (
+        <div className="p-4">
+          <ErrorState message={error} onRetry={load} />
+        </div>
+      )
+    }
+    return <LoadingState />
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-2">
@@ -341,31 +367,6 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
           }}
         />
         <div className="flex items-center gap-1.5">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-text-muted hover:bg-surface-elevated hover:text-text"
-            onClick={handleExport}
-            disabled={rows.length === 0}
-          >
-            <IconDownload size={12} />
-            Export
-            {selectedCount > 0 && (
-              <span className="ml-0.5 rounded bg-surface px-1 py-0 font-mono text-[10px] text-text-subtle">
-                {selectedCount}
-              </span>
-            )}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-text-muted hover:bg-surface-elevated hover:text-text"
-            onClick={load}
-            disabled={isLoading}
-          >
-            <IconRefresh size={12} className={isLoading ? 'animate-spin' : ''} />
-            Refresh
-          </Button>
           {canMutate && (
             <Button
               size="sm"
@@ -375,6 +376,14 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
               Insert row
             </Button>
           )}
+          <TableOverflowMenu
+            connectionId={connectionId}
+            details={details}
+            exportRows={selectedRows.length > 0 ? selectedRows : rows}
+            exportColumns={columns.map((c) => c.name)}
+            onRefresh={load}
+            onRenameTable={onRenameTable}
+          />
         </div>
       </div>
 
@@ -441,15 +450,22 @@ export function TableDataView({ connectionId, details }: TableDataViewProps) {
                 <IconX size={12} />
                 Clear
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 gap-1 rounded-full px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
-                onClick={handleExport}
+              <ExportMenu
+                rows={selectedRows}
+                columns={columns.map((c) => c.name)}
+                filenameParts={[details.schema, details.name]}
+                side="top"
+                align="center"
               >
-                <IconDownload size={12} />
-                Export {selectedCount}
-              </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1 rounded-full px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+                >
+                  <IconDownload size={12} />
+                  Export {selectedCount}
+                </Button>
+              </ExportMenu>
               {canMutate && (
                 <Button
                   size="sm"
