@@ -9,6 +9,8 @@ export interface DdlDialect {
   quoteIdent(name: string): string
   qualifiedTable(schema: string, table: string): string
   dropIndex(schema: string, table: string, name: string): string
+  /** TRUNCATE has no portable grammar — SQLite/D1 has no TRUNCATE statement. */
+  truncate(schema: string, table: string): string
 }
 
 function requireValue(value: string | undefined | null, label: string): string {
@@ -66,6 +68,12 @@ export function buildDdl(
     case 'drop-index': {
       const name = requireValue(operation.name, 'Index name')
       return dialect.dropIndex(schema, table, name)
+    }
+    case 'truncate-table': {
+      return dialect.truncate(schema, table)
+    }
+    case 'drop-table': {
+      return `DROP TABLE ${tbl}`
     }
     default: {
       const exhaustive: never = operation

@@ -548,7 +548,9 @@ async function deleteRow(opts: RowDelete): Promise<{ deleted: number }> {
 const ddlDialect: DdlDialect = {
   quoteIdent,
   qualifiedTable: (_schema, table) => quoteIdent(table),
-  dropIndex: (_schema, _table, name) => `DROP INDEX ${quoteIdent(name)}`
+  dropIndex: (_schema, _table, name) => `DROP INDEX ${quoteIdent(name)}`,
+  // SQLite/D1 has no TRUNCATE — DELETE FROM clears every row.
+  truncate: (_schema, table) => `DELETE FROM ${quoteIdent(table)}`
 }
 
 async function generateDdl(opts: DdlRequest): Promise<string> {

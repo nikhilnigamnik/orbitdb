@@ -27,10 +27,17 @@ const TITLES: Record<DdlOperationKind, string> = {
   'rename-column': 'Rename column',
   'rename-table': 'Rename table',
   'create-index': 'Create index',
-  'drop-index': 'Drop index'
+  'drop-index': 'Drop index',
+  'truncate-table': 'Truncate table',
+  'drop-table': 'Drop table'
 }
 
-const DESTRUCTIVE = new Set<DdlOperationKind>(['drop-column', 'drop-index'])
+const DESTRUCTIVE = new Set<DdlOperationKind>([
+  'drop-column',
+  'drop-index',
+  'truncate-table',
+  'drop-table'
+])
 
 export function DdlDialog({
   isOpen,

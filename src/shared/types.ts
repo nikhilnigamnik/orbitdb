@@ -162,6 +162,8 @@ export type DdlOperation =
   | { kind: 'rename-table'; to: string }
   | { kind: 'create-index'; name: string; columns: string[]; isUnique: boolean }
   | { kind: 'drop-index'; name: string }
+  | { kind: 'truncate-table' }
+  | { kind: 'drop-table' }
 
 export type DdlOperationKind = DdlOperation['kind']
 

@@ -520,7 +520,8 @@ const ddlDialect: DdlDialect = {
   quoteIdent,
   qualifiedTable,
   dropIndex: (schema, table, name) =>
-    `DROP INDEX ${quoteIdent(name)} ON ${qualifiedTable(schema, table)}`
+    `DROP INDEX ${quoteIdent(name)} ON ${qualifiedTable(schema, table)}`,
+  truncate: (schema, table) => `TRUNCATE TABLE ${qualifiedTable(schema, table)}`
 }
 
 async function generateDdl(opts: DdlRequest): Promise<string> {
