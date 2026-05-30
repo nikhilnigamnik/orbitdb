@@ -1,13 +1,8 @@
 import * as React from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import {
-  IconAlertTriangle,
-  IconCheck,
-  IconDownload,
-  IconLoader,
-  IconTable
-} from '@tabler/icons-react'
+import { IconAlertTriangle, IconCheck, IconDownload, IconTable } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { LoadingState } from '@renderer/components/common/loading-state'
 import { formatCellValue, formatNumber } from '@renderer/lib/format'
 import { buildExportFilename, downloadJson } from '@renderer/lib/export'
 import type { QueryResult } from '@renderer/types'
@@ -19,11 +14,7 @@ interface QueryResultsProps {
 
 export function QueryResults({ result, isRunning }: QueryResultsProps) {
   if (isRunning) {
-    return (
-      <div className="flex h-full items-center justify-center text-text-subtle">
-        <IconLoader stroke={2} size={20} className="animate-spin" />
-      </div>
-    )
+    return <LoadingState />
   }
   if (!result) {
     return (

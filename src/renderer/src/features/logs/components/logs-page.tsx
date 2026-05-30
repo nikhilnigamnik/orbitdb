@@ -5,7 +5,6 @@ import {
   IconCheck,
   IconCopy,
   IconDownload,
-  IconLoader,
   IconRefresh,
   IconSearch,
   IconTrash
@@ -16,6 +15,7 @@ import { Input } from '@renderer/components/ui/input'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
+import { LoadingState } from '@renderer/components/common/loading-state'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { unwrap } from '@renderer/lib/ipc'
 import { buildExportFilename, downloadJson } from '@renderer/lib/export'
@@ -195,9 +195,7 @@ export function LogsPage() {
 
       <div className="min-h-0 flex-1 overflow-auto">
         {isLoading && logs.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-text-subtle">
-            <IconLoader stroke={2} size={20} className="animate-spin" />
-          </div>
+          <LoadingState />
         ) : filtered.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-text-subtle">
             <p className="text-[12px]">

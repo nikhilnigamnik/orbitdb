@@ -4,7 +4,7 @@ import { IconPlug, IconSchema } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { ErrorState } from '@renderer/components/common/error-state'
-import { Spinner } from '@renderer/components/ui/spinner'
+import { LoadingState } from '@renderer/components/common/loading-state'
 import { Popover } from '@renderer/components/ui/popover'
 import { useAsync } from '@renderer/hooks/use-async'
 import { unwrap } from '@renderer/lib/ipc'
@@ -83,24 +83,16 @@ function DiagramContent({ connectionId, schema, onPickSchema }: DiagramContentPr
   }
 
   if (!schemasState.data || !schema) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner size={20} />
-      </div>
-    )
+    return <LoadingState />
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <DiagramToolbar
-        schemas={schemasState.data.map((s) => s.name)}
-        activeSchema={schema}
-        onPickSchema={onPickSchema}
-      />
-      <div className="min-h-0 flex-1">
-        <GraphContainer connectionId={connectionId} schema={schema} />
-      </div>
-    </div>
+    <DiagramView
+      connectionId={connectionId}
+      schemas={schemasState.data.map((s) => s.name)}
+      schema={schema}
+      onPickSchema={onPickSchema}
+    />
   )
 }
 
@@ -150,44 +142,60 @@ function DiagramToolbar({ schemas, activeSchema, onPickSchema }: DiagramToolbarP
   )
 }
 
-interface GraphContainerProps {
+interface DiagramViewProps {
   connectionId: string
+  schemas: string[]
   schema: string
+  onPickSchema: (name: string) => void
 }
 
-function GraphContainer({ connectionId, schema }: GraphContainerProps) {
+function DiagramView({ connectionId, schemas, schema, onPickSchema }: DiagramViewProps) {
   const { data, error, isLoading, refresh } = useAsync<SchemaGraph>(
     async () => unwrap(window.api.db.schemaGraph(connectionId, schema)),
     [connectionId, schema]
   )
 
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Spinner size={20} />
-      </div>
-    )
+  // Until the graph loads the first time, hold the toolbar back and show one
+  // bare full-area loader — same spot as the schema-list loader — so navigating
+  // to the diagram is a single continuous spinner, not loader-then-loader.
+  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false)
+  React.useEffect(() => {
+    if (data) setHasLoadedOnce(true)
+  }, [data])
+
+  if (!hasLoadedOnce) {
+    if (isLoading) return <LoadingState />
+    if (error) {
+      return (
+        <div className="p-4">
+          <ErrorState title="Failed to load schema graph" message={error} onRetry={refresh} />
+        </div>
+      )
+    }
   }
 
-  if (error) {
-    return (
-      <div className="p-4">
-        <ErrorState title="Failed to load schema graph" message={error} onRetry={refresh} />
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <DiagramToolbar schemas={schemas} activeSchema={schema} onPickSchema={onPickSchema} />
+      <div className="min-h-0 flex-1">
+        {isLoading ? (
+          <LoadingState />
+        ) : error ? (
+          <div className="p-4">
+            <ErrorState title="Failed to load schema graph" message={error} onRetry={refresh} />
+          </div>
+        ) : !data || data.tables.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <EmptyState
+              icon={<IconSchema size={20} />}
+              title="No tables in this schema"
+              description="Pick a different schema from the toolbar."
+            />
+          </div>
+        ) : (
+          <SchemaGraphCanvas graph={data} />
+        )}
       </div>
-    )
-  }
-
-  if (!data || data.tables.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <EmptyState
-          icon={<IconSchema size={20} />}
-          title="No tables in this schema"
-          description="Pick a different schema from the toolbar."
-        />
-      </div>
-    )
-  }
-
-  return <SchemaGraphCanvas graph={data} />
+    </div>
+  )
 }

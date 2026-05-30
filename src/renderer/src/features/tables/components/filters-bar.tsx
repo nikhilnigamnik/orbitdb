@@ -3,12 +3,12 @@ import {
   IconArrowLeft,
   IconDatabase,
   IconFilter2,
-  IconLoader,
   IconPlus,
   IconSearch,
   IconX
 } from '@tabler/icons-react'
 import { Popover } from '@renderer/components/ui/popover'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { SlidingHoverList } from '@renderer/components/ui/sliding-hover-list'
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
@@ -263,7 +263,7 @@ export function FiltersBar({
 
                         {valuesLoading ? (
                           <div className="flex items-center justify-center py-1 text-text-subtle">
-                            <IconLoader stroke={2} size={14} className="animate-spin" />
+                            <Spinner size={14} />
                           </div>
                         ) : valuesError ? (
                           <p className="text-[10.5px] text-red-300/80">{valuesError}</p>

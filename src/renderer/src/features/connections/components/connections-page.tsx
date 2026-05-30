@@ -7,6 +7,7 @@ import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
+import { LoadingState } from '@renderer/components/common/loading-state'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { unwrap } from '@renderer/lib/ipc'
@@ -210,9 +211,7 @@ export function ConnectionsPage() {
             )}
 
             {isLoading ? (
-              <div className="flex flex-1 items-center justify-center py-16">
-                <Spinner size={20} />
-              </div>
+              <LoadingState className="py-16" />
             ) : sorted.length === 0 ? (
               <EmptyState
                 icon={<IconPlug size={20} />}
