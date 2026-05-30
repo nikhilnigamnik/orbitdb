@@ -308,7 +308,7 @@ function PaletteItem({
           <span className="truncate font-mono text-[10.5px] text-text-subtle">{secondary}</span>
         )}
       </span>
-      {tag && <Chip tone="emerald">{tag}</Chip>}
+      {tag && <Chip tone={tagTone === 'success' ? 'emerald' : 'neutral'}>{tag}</Chip>}
       {shortcut && (
         <span className="kbd-shortcut flex shrink-0 items-center gap-1 opacity-0 transition-opacity">
           <Kbd>⌘</Kbd>
