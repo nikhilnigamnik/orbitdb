@@ -5,14 +5,20 @@ export const NODE_WIDTH = 280
 export const NODE_HEADER_HEIGHT = 36
 export const NODE_ROW_HEIGHT = 22
 
+export type LayoutDirection = 'LR' | 'TB'
+
 export function estimateNodeHeight(columnCount: number): number {
   return NODE_HEADER_HEIGHT + Math.max(1, columnCount) * NODE_ROW_HEIGHT + 8
 }
 
-export function layoutNodes<T extends Node>(nodes: T[], edges: Edge[]): T[] {
+export function layoutNodes<T extends Node>(
+  nodes: T[],
+  edges: Edge[],
+  direction: LayoutDirection = 'LR'
+): T[] {
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: 'LR', nodesep: 40, ranksep: 80 })
+  g.setGraph({ rankdir: direction, nodesep: 40, ranksep: 80 })
 
   for (const node of nodes) {
     g.setNode(node.id, {

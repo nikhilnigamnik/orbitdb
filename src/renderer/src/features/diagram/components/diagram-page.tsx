@@ -193,7 +193,7 @@ function DiagramView({ connectionId, schemas, schema, onPickSchema }: DiagramVie
             />
           </div>
         ) : (
-          <SchemaGraphCanvas graph={data} />
+          <SchemaGraphCanvas graph={data} schema={schema} />
         )}
       </div>
     </div>
