@@ -208,6 +208,70 @@ export interface QueryResult {
   truncated: boolean
 }
 
+export interface GenerateSqlOptions {
+  connectionId: string
+  prompt: string
+}
+
+export interface GenerateSqlResult {
+  sql: string
+  explanation: string
+}
+
+export interface FilterTableOptions {
+  connectionId: string
+  schema: string
+  table: string
+  prompt: string
+}
+
+export interface FilterTableResult {
+  filters: RowFilter[]
+  orderBy?: string
+  orderDir?: SortDirection
+}
+
+export interface ExplainTableOptions {
+  connectionId: string
+  schema: string
+  table: string
+}
+
+export interface ExplainTableResult {
+  explanation: string
+}
+
+export interface IndexSuggestion {
+  name: string
+  columns: string[]
+  isUnique: boolean
+  rationale: string
+}
+
+export interface SuggestIndexesOptions {
+  connectionId: string
+  schema: string
+  table: string
+}
+
+export interface SuggestIndexesResult {
+  suggestions: IndexSuggestion[]
+}
+
+export interface GenerateSeedOptions {
+  connectionId: string
+  schema: string
+  table: string
+  rowCount: number
+}
+
+export interface GenerateSeedResult {
+  inserted: number
+  attempted: number
+  failed: number
+  firstError?: string
+}
+
 export interface OperationResult<T = void> {
   success: boolean
   error?: string

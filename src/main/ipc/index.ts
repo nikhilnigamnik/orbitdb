@@ -4,12 +4,22 @@ import type {
   ConnectionInput,
   DdlRequest,
   DistinctValuesOptions,
+  ExplainTableOptions,
+  FilterTableOptions,
+  GenerateSeedOptions,
+  GenerateSqlOptions,
   GetRowsOptions,
   RowDelete,
   RowMutation,
   RowUpdate,
-  RunQueryOptions
+  RunQueryOptions,
+  SuggestIndexesOptions
 } from '../../shared/types'
+import { generateSql } from '../ai/generate-sql'
+import { explainTable } from '../ai/explain-table'
+import { filterTable } from '../ai/filter-table'
+import { suggestIndexes } from '../ai/suggest-indexes'
+import { seedTable } from '../ai/generate-seed'
 import {
   createConnection,
   deleteConnection,
@@ -148,9 +158,7 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle(
     'db:query-cancel',
-    wrap(async (connectionId: string, queryId: string) =>
-      cancelQuery(connectionId, queryId)
-    )
+    wrap(async (connectionId: string, queryId: string) => cancelQuery(connectionId, queryId))
   )
 
   ipcMain.handle(
@@ -167,6 +175,27 @@ export function registerIpcHandlers(): void {
     wrap(async () => {
       clearQueryLogs()
     })
+  )
+
+  ipcMain.handle(
+    'ai:generate-sql',
+    wrap(async (opts: GenerateSqlOptions) => generateSql(opts))
+  )
+  ipcMain.handle(
+    'ai:filter-table',
+    wrap(async (opts: FilterTableOptions) => filterTable(opts))
+  )
+  ipcMain.handle(
+    'ai:explain-table',
+    wrap(async (opts: ExplainTableOptions) => explainTable(opts))
+  )
+  ipcMain.handle(
+    'ai:suggest-indexes',
+    wrap(async (opts: SuggestIndexesOptions) => suggestIndexes(opts))
+  )
+  ipcMain.handle(
+    'ai:generate-seed',
+    wrap(async (opts: GenerateSeedOptions) => seedTable(opts))
   )
 
   ipcMain.handle(

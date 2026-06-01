@@ -6,6 +6,8 @@ interface TableStructureProps {
   details: TableDetails
   /** Opens the DDL dialog. Absent for views / read-only tables. */
   onEdit?: (kind: DdlOperationKind, target?: string) => void
+  /** Optional content rendered above the sections (e.g. the AI actions bar). */
+  header?: React.ReactNode
 }
 
 function Section({
@@ -79,11 +81,12 @@ function RowAction({
 const TH = 'px-4 py-2 text-left text-[10.5px] font-medium uppercase tracking-wider text-text-subtle'
 const TD = 'px-4 py-2 align-middle'
 
-export function TableStructure({ details, onEdit }: TableStructureProps) {
+export function TableStructure({ details, onEdit, header }: TableStructureProps) {
   const canEdit = !!onEdit
 
   return (
     <div className="space-y-5 overflow-auto p-6">
+      {header}
       <Section
         title="Columns"
         count={details.columns.length}
