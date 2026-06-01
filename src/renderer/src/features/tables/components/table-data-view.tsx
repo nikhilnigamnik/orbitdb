@@ -1,8 +1,11 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { RowSelectionState } from '@tanstack/react-table'
-import { IconDownload, IconTrash, IconX } from '@tabler/icons-react'
+import { IconDownload, IconSeeding, IconTrash, IconX } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Kbd } from '@renderer/components/ui/kbd'
+import { AiPrompt } from '@renderer/features/query/components/ai-prompt'
+import { SeedDataDialog } from '@renderer/features/database/components/seed-data-dialog'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { LoadingState } from '@renderer/components/common/loading-state'
@@ -32,6 +35,8 @@ interface TableDataViewProps {
   /** Fires once the first page of rows has loaded, so the container can reveal chrome. */
   onReady?: () => void
 }
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
 export function TableDataView({
   connectionId,
@@ -83,6 +88,22 @@ export function TableDataView({
     [fkByColumn, navigate]
   )
 
+  const aiPrompt = useDisclosure(false)
+  const seedDialog = useDisclosure(false)
+  const [isAiFiltering, setIsAiFiltering] = React.useState(false)
+  const [aiError, setAiError] = React.useState<string | null>(null)
+
+  const openAiPrompt = aiPrompt.open
+  React.useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'i') {
+        e.preventDefault()
+        openAiPrompt()
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [openAiPrompt])
   const insertModal = useDisclosure(false)
   const editModal = useDisclosure(false)
   const deleteConfirm = useDisclosure(false)
@@ -240,6 +261,30 @@ export function TableDataView({
     setOffset(0)
   }
 
+  async function handleAiFilter(prompt: string) {
+    setIsAiFiltering(true)
+    setAiError(null)
+    try {
+      const result = await unwrap(
+        window.api.ai.filterTable({
+          connectionId,
+          schema: details.schema,
+          table: details.name,
+          prompt
+        })
+      )
+      setFilters(result.filters)
+      setOrderBy(result.orderBy ?? null)
+      setOrderDir(result.orderDir ?? 'asc')
+      setOffset(0)
+      aiPrompt.close()
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setIsAiFiltering(false)
+    }
+  }
+
   async function handleInsert(values: Record<string, unknown>) {
     setMutationError(null)
     await unwrap(
@@ -367,6 +412,32 @@ export function TableDataView({
           }}
         />
         <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={aiPrompt.open}
+            aria-label="Filter this table with natural language"
+            className="group flex h-8 w-72 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-elevated focus-visible:border-accent focus-visible:outline-none"
+          >
+            <span className="flex-1 truncate text-[12px] text-text-subtle transition-colors group-hover:text-text-muted">
+              Describe the rows you want…
+            </span>
+            <span className="flex shrink-0 items-center gap-0.5">
+              <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
+              <Kbd>I</Kbd>
+            </span>
+          </button>
+          {details.type === 'table' && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-text-muted hover:bg-surface-elevated hover:text-text"
+              onClick={seedDialog.open}
+              title="Generate sample rows with AI"
+            >
+              <IconSeeding size={12} />
+              Seed data
+            </Button>
+          )}
           {canMutate && (
             <Button
               size="sm"
@@ -396,6 +467,12 @@ export function TableDataView({
       {mutationError && (
         <div className="p-3">
           <ErrorState title="Mutation failed" message={mutationError} />
+        </div>
+      )}
+
+      {aiError && (
+        <div className="p-3">
+          <ErrorState title="AI filter failed" message={aiError} />
         </div>
       )}
 
@@ -498,6 +575,28 @@ export function TableDataView({
           setPageSize(size)
           setOffset(0)
         }}
+      />
+
+      <AiPrompt
+        open={aiPrompt.isOpen}
+        onOpenChange={(open) => (open ? aiPrompt.open() : aiPrompt.close())}
+        onSubmit={handleAiFilter}
+        isGenerating={isAiFiltering}
+        placeholder={`Filter ${details.name}…`}
+        suggestions={[
+          'rows created in the last 7 days',
+          'where status is active',
+          'most recent 100 rows'
+        ]}
+      />
+
+      <SeedDataDialog
+        open={seedDialog.isOpen}
+        onClose={seedDialog.close}
+        connectionId={connectionId}
+        schema={details.schema}
+        table={details.name}
+        onApplied={load}
       />
 
       <RowEditorSheet

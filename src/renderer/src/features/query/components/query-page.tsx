@@ -11,7 +11,6 @@ import {
   IconSparkles
 } from '@tabler/icons-react'
 import { formatDistanceToNow } from 'date-fns'
-import { format as formatSql } from 'sql-formatter'
 import { Button } from '@renderer/components/ui/button'
 import { Kbd } from '@renderer/components/ui/kbd'
 import { Sheet } from '@renderer/components/ui/sheet'
@@ -24,6 +23,7 @@ import { CmdKHint } from '@renderer/features/command-palette/components/cmdk-hin
 import type { QueryResult } from '@renderer/types'
 import { SqlEditor } from './sql-editor'
 import { QueryResults } from './query-results'
+import { AiPrompt } from './ai-prompt'
 
 interface HistoryEntry {
   id: string
@@ -38,13 +38,15 @@ const MAX_PANEL_PCT = 85
 
 export function QueryPage() {
   const navigate = useNavigate()
-  const { active, current } = useConnection()
+  const { active } = useConnection()
   const [sql, setSql] = React.useState('select now();')
   const [result, setResult] = React.useState<QueryResult | null>(null)
   const [isRunning, setIsRunning] = React.useState(false)
   const runningQueryIdRef = React.useRef<string | null>(null)
   const [history, setHistory] = React.useState<HistoryEntry[]>([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
+  const [isAiOpen, setIsAiOpen] = React.useState(false)
+  const [isAiGenerating, setIsAiGenerating] = React.useState(false)
   const [editorPct, setEditorPct] = React.useState(50)
   const [isDragging, setIsDragging] = React.useState(false)
   const splitRef = React.useRef<HTMLDivElement>(null)
@@ -90,20 +92,8 @@ export function QueryPage() {
     )
   }
 
-  function handleFormat() {
-    const trimmed = sql.trim()
-    if (!trimmed) return
-    const language =
-      current?.engine === 'mysql' ? 'mysql' : current?.engine === 'd1' ? 'sqlite' : 'postgresql'
-    try {
-      setSql(formatSql(trimmed, { language, keywordCase: 'lower' }))
-    } catch {
-      // sql-formatter throws on syntax it can't parse; leave the SQL alone
-    }
-  }
-
-  async function runQuery() {
-    const trimmed = sql.trim()
+  async function executeSql(text: string) {
+    const trimmed = text.trim()
     if (!trimmed) return
     const queryId = crypto.randomUUID()
     runningQueryIdRef.current = queryId
@@ -142,6 +132,10 @@ export function QueryPage() {
     }
   }
 
+  function runQuery() {
+    void executeSql(sql)
+  }
+
   async function cancelRunningQuery() {
     const queryId = runningQueryIdRef.current
     if (!queryId || !active) return
@@ -149,6 +143,33 @@ export function QueryPage() {
       await unwrap(window.api.db.cancelQuery(active.connectionId, queryId))
     } catch {
       // best effort; the run() promise will surface the cancellation error
+    }
+  }
+
+  async function handleAiGenerate(prompt: string) {
+    if (!active || isAiGenerating) return
+    setIsAiGenerating(true)
+    try {
+      const { sql: generated } = await unwrap(
+        window.api.ai.generateSql({ connectionId: active.connectionId, prompt })
+      )
+      setSql(generated)
+      setIsAiOpen(false)
+      await executeSql(generated)
+    } catch (err) {
+      setIsAiOpen(false)
+      setResult({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+        rows: [],
+        fields: [],
+        rowCount: null,
+        command: null,
+        durationMs: 0,
+        truncated: false
+      })
+    } finally {
+      setIsAiGenerating(false)
     }
   }
 
@@ -164,7 +185,19 @@ export function QueryPage() {
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <CmdKHint label="Search tables, connections, actions" />
+          <CmdKHint variant="input" label="Search tables, connections, actions" />
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn(
+              'text-text-muted hover:bg-surface-elevated hover:text-text',
+              isAiOpen && 'bg-surface-elevated text-text'
+            )}
+            onClick={() => setIsAiOpen((open) => !open)}
+          >
+            <IconSparkles size={12} className="text-accent" />
+            Ask AI
+          </Button>
           <Sheet
             openSheet={historyOpen}
             setOpenSheet={setHistoryOpen}
@@ -254,17 +287,6 @@ export function QueryPage() {
             size="sm"
             variant="ghost"
             className="text-text-muted hover:bg-surface-elevated hover:text-text"
-            onClick={handleFormat}
-            disabled={!sql.trim()}
-            title="Format SQL"
-          >
-            <IconSparkles size={12} />
-            Format
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-text-muted hover:bg-surface-elevated hover:text-text"
             onClick={() => setSql('')}
             disabled={!sql}
           >
@@ -334,6 +356,13 @@ export function QueryPage() {
           </div>
         </div>
       </div>
+
+      <AiPrompt
+        open={isAiOpen}
+        onOpenChange={setIsAiOpen}
+        onSubmit={handleAiGenerate}
+        isGenerating={isAiGenerating}
+      />
     </div>
   )
 }

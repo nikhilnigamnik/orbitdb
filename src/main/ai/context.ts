@@ -1,0 +1,109 @@
+import type { DatabaseEngine, TableDetails } from '../../shared/types'
+import { getSchemaGraph, listSchemas } from '../db/manager'
+import { MAX_SCHEMA_TABLES } from './config'
+
+const SYSTEM_SCHEMAS: Record<DatabaseEngine, string[]> = {
+  postgres: ['information_schema', 'pg_catalog', 'pg_toast'],
+  mysql: ['information_schema', 'performance_schema', 'mysql', 'sys'],
+  d1: []
+}
+
+export const ENGINE_DIALECT: Record<DatabaseEngine, string> = {
+  postgres: 'PostgreSQL',
+  mysql: 'MySQL',
+  d1: 'SQLite (Cloudflare D1)'
+}
+
+// Mixed-case identifiers (e.g. "createdAt") must be quoted or the engine folds
+// their case and the column/table won't be found. Shared by all AI SQL generation.
+export const QUOTE_HINT: Record<DatabaseEngine, string> = {
+  postgres:
+    'ALWAYS wrap every table and column identifier in double quotes (e.g. "createdAt") so mixed-case names are preserved.',
+  mysql:
+    'ALWAYS wrap every table and column identifier in backticks (e.g. `createdAt`) so mixed-case names are preserved.',
+  d1: 'ALWAYS wrap every table and column identifier in double quotes (e.g. "createdAt") so mixed-case names are preserved.'
+}
+
+/** Compact, whole-database schema map for grounding free-form SQL generation. */
+export async function buildSchemaContext(
+  connectionId: string,
+  engine: DatabaseEngine
+): Promise<string> {
+  const ignored = SYSTEM_SCHEMAS[engine]
+  const schemas = (await listSchemas(connectionId)).filter((s) => !ignored.includes(s.name))
+
+  const lines: string[] = []
+  let tableCount = 0
+
+  for (const schema of schemas) {
+    if (tableCount >= MAX_SCHEMA_TABLES) break
+    const graph = await getSchemaGraph(connectionId, schema.name)
+
+    for (const table of graph.tables) {
+      if (tableCount >= MAX_SCHEMA_TABLES) break
+      const cols = table.columns
+        .map((c) => {
+          const flags = [c.isPrimaryKey ? 'PK' : '', c.isNullable ? '' : 'NOT NULL']
+            .filter(Boolean)
+            .join(' ')
+          return `${c.name} ${c.dataType}${flags ? ' ' + flags : ''}`
+        })
+        .join(', ')
+      lines.push(`${table.schema}.${table.name}(${cols})`)
+      tableCount += 1
+    }
+
+    for (const edge of graph.edges) {
+      lines.push(
+        `FK: ${edge.from.table}(${edge.from.columns.join(', ')}) -> ` +
+          `${edge.to.table}(${edge.to.columns.join(', ')})`
+      )
+    }
+  }
+
+  return lines.join('\n')
+}
+
+/** Detailed single-table description for table-scoped features. */
+export function buildTableContext(details: TableDetails): string {
+  const lines: string[] = [`Table: ${details.schema}.${details.name} (${details.type})`]
+
+  lines.push('Columns:')
+  for (const c of details.columns) {
+    const flags = [
+      c.isPrimaryKey ? 'PK' : '',
+      c.isNullable ? 'nullable' : 'NOT NULL',
+      c.defaultValue ? `default ${c.defaultValue}` : ''
+    ]
+      .filter(Boolean)
+      .join(', ')
+    lines.push(`  - ${c.name} ${c.dataType}${flags ? ` (${flags})` : ''}`)
+  }
+
+  if (details.primaryKey.length) {
+    lines.push(`Primary key: ${details.primaryKey.join(', ')}`)
+  }
+
+  if (details.indexes.length) {
+    lines.push('Indexes:')
+    for (const idx of details.indexes) {
+      const kind = idx.isPrimary ? 'primary' : idx.isUnique ? 'unique' : 'index'
+      lines.push(`  - ${idx.name} (${kind}) on (${idx.columns.join(', ')})`)
+    }
+  }
+
+  if (details.foreignKeys.length) {
+    lines.push('Foreign keys:')
+    for (const fk of details.foreignKeys) {
+      lines.push(
+        `  - ${fk.columns.join(', ')} -> ${fk.referencedSchema}.${fk.referencedTable}(${fk.referencedColumns.join(', ')})`
+      )
+    }
+  }
+
+  if (details.estimatedRows != null) {
+    lines.push(`Estimated rows: ${details.estimatedRows}`)
+  }
+
+  return lines.join('\n')
+}

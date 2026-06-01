@@ -16,6 +16,7 @@ import type { DdlOperation, DdlOperationKind, TableDetails } from '@renderer/typ
 import { SchemaTree } from './schema-tree'
 import { TableHeader } from './table-header'
 import { TableStructure } from './table-structure'
+import { StructureAi } from './structure-ai'
 import { DdlDialog } from './ddl-dialog'
 
 export function DatabasePage() {
@@ -213,7 +214,19 @@ function TableViewContainer({
           onReady={() => setHeaderShown(true)}
         />
       ) : (
-        <TableStructure details={data} onEdit={canEdit ? openDdl : undefined} />
+        <TableStructure
+          details={data}
+          onEdit={canEdit ? openDdl : undefined}
+          header={
+            <StructureAi
+              connectionId={connectionId}
+              schema={data.schema}
+              table={data.name}
+              canEdit={canEdit}
+              onApplied={refresh}
+            />
+          }
+        />
       )}
 
       {ddlState && (

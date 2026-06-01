@@ -5,6 +5,14 @@ import type {
   ConnectionInput,
   DdlRequest,
   DistinctValuesOptions,
+  ExplainTableOptions,
+  ExplainTableResult,
+  FilterTableOptions,
+  FilterTableResult,
+  GenerateSeedOptions,
+  GenerateSeedResult,
+  GenerateSqlOptions,
+  GenerateSqlResult,
   GetRowsOptions,
   OperationResult,
   QueryLogEntry,
@@ -17,6 +25,8 @@ import type {
   SavedConnection,
   SchemaGraph,
   SchemaInfo,
+  SuggestIndexesOptions,
+  SuggestIndexesResult,
   TableDetails,
   TableInfo,
   TestConnectionResult,
@@ -56,10 +66,19 @@ const api = {
     runQuery: (opts: RunQueryOptions) => invoke<QueryResult>('db:query-run', opts),
     cancelQuery: (connectionId: string, queryId: string) =>
       invoke<void>('db:query-cancel', connectionId, queryId),
-    columnDistinct: (opts: DistinctValuesOptions) =>
-      invoke<unknown[]>('db:column-distinct', opts),
+    columnDistinct: (opts: DistinctValuesOptions) => invoke<unknown[]>('db:column-distinct', opts),
     listLogs: () => invoke<QueryLogEntry[]>('db:logs-list'),
     clearLogs: () => invoke<void>('db:logs-clear')
+  },
+  ai: {
+    generateSql: (opts: GenerateSqlOptions) => invoke<GenerateSqlResult>('ai:generate-sql', opts),
+    filterTable: (opts: FilterTableOptions) => invoke<FilterTableResult>('ai:filter-table', opts),
+    explainTable: (opts: ExplainTableOptions) =>
+      invoke<ExplainTableResult>('ai:explain-table', opts),
+    suggestIndexes: (opts: SuggestIndexesOptions) =>
+      invoke<SuggestIndexesResult>('ai:suggest-indexes', opts),
+    generateSeed: (opts: GenerateSeedOptions) =>
+      invoke<GenerateSeedResult>('ai:generate-seed', opts)
   },
   app: {
     getVersion: () => invoke<string>('app:get-version'),
