@@ -4,6 +4,8 @@ export const APP_NAME = 'OrbitDB'
 export const APP_TAGLINE = 'Postgres + MySQL, made friendly'
 export const APP_VERSION = '0.1.0'
 
+export const GITHUB_REPO_URL = 'https://github.com/nikhilnigamnik/orbitdb'
+
 export const DEFAULT_PAGE_SIZE = 50
 export const PAGE_SIZE_OPTIONS = [25, 50, 100, 250] as const
 export const MAX_PAGE_SIZE = 1000

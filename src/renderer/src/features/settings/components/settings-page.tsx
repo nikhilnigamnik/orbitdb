@@ -2,13 +2,14 @@ import * as React from 'react'
 import {
   IconRefresh,
   IconCircleCheck,
-  IconArrowUpRight,
-  IconExternalLink
+  IconExternalLink,
+  IconBrandGithub,
+  IconAlertTriangle
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { unwrap } from '@renderer/lib/ipc'
 import { useUpdateCheck } from '@renderer/features/settings/store'
-import { Chip } from '@renderer/components/ui/chip'
+import { APP_NAME, APP_TAGLINE, GITHUB_REPO_URL } from '@renderer/config/site'
 
 function formatRelative(date: Date | null): string {
   if (!date) return 'never'
@@ -55,89 +56,105 @@ export function SettingsPage() {
         <div className="mb-8">
           <h1 className="text-xl font-semibold text-text">Settings</h1>
           <p className="mt-1 text-[12.5px] text-text-subtle">
-            Configure how OrbitDB runs on this machine.
+            Configure how {APP_NAME} runs on this machine.
           </p>
         </div>
 
         <Section title="About">
-          <Row label="Version">
-            <Chip tone="neutral">v{currentVersion}</Chip>
-          </Row>
+          <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface-elevated/20 p-4">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[14px] font-semibold tracking-tight text-text">
+                  {APP_NAME}
+                </span>
+                <span className="font-mono text-[11px] text-text-subtle">v{currentVersion}</span>
+              </div>
+              <p className="text-[12px] text-text-subtle">{APP_TAGLINE}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void openExternal(GITHUB_REPO_URL)}
+              className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-subtle transition-colors hover:bg-surface-elevated hover:text-text"
+              aria-label="Open GitHub repository"
+            >
+              <IconBrandGithub size={16} />
+            </button>
+          </div>
         </Section>
 
         <Section title="Updates">
-          <Row label="Update channel">
-            <Chip tone="neutral">GitHub Releases</Chip>
-          </Row>
-
-          <div className="rounded-lg border border-border bg-surface-elevated/30 p-4">
-            {isChecking ? (
-              <div className="flex items-center gap-2 text-[12.5px] text-text-muted">
-                <IconRefresh size={14} className="animate-spin" />
-                Checking for updates…
-              </div>
-            ) : error ? (
-              <div className="flex flex-col gap-2">
-                <p className="text-[12.5px] text-red-400">
-                  Couldn&rsquo;t check for updates: {error}
-                </p>
-              </div>
-            ) : hasUpdate && result ? (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-300">
-                    <IconArrowUpRight size={14} />
-                  </div>
+          <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated/20">
+            <div className="p-4">
+              {isChecking ? (
+                <div className="flex items-center gap-2.5 text-[13px] text-text-muted">
+                  <IconRefresh size={15} className="animate-spin text-text-subtle" />
+                  Checking for updates…
+                </div>
+              ) : error ? (
+                <div className="flex items-start gap-2.5">
+                  <IconAlertTriangle size={15} className="mt-0.5 shrink-0 text-text-subtle" />
                   <div className="flex flex-col gap-0.5">
                     <p className="text-[13px] font-medium text-text">
-                      Version {result.latestVersion} is available
+                      Couldn&rsquo;t check for updates
                     </p>
+                    <p className="text-[11.5px] text-text-subtle">{error}</p>
+                  </div>
+                </div>
+              ) : hasUpdate && result ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <p className="text-[13px] font-medium text-text">
+                        Version {result.latestVersion} is available
+                      </p>
+                      <p className="text-[11.5px] text-text-subtle">
+                        You&rsquo;re on v{result.currentVersion}
+                        {result.publishedAt &&
+                          ` · Released ${formatPublishedAt(result.publishedAt)}`}
+                      </p>
+                    </div>
+                  </div>
+                  {result.releaseUrl && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="self-start border border-border bg-surface text-text-muted hover:bg-surface-elevated hover:text-text"
+                      onClick={() => void openExternal(result.releaseUrl!)}
+                    >
+                      <IconExternalLink size={12} />
+                      Open release page
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-start gap-2.5">
+                  <IconCircleCheck size={15} className="mt-0.5 shrink-0 text-text-subtle" />
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-[13px] font-medium text-text">You&rsquo;re up to date</p>
                     <p className="text-[11.5px] text-text-subtle">
-                      You&rsquo;re on v{result.currentVersion}
-                      {result.publishedAt && ` · Released ${formatPublishedAt(result.publishedAt)}`}
+                      Running the latest version (v{currentVersion}).
                     </p>
                   </div>
                 </div>
-                {result.releaseUrl && (
-                  <Button
-                    size="sm"
-                    className="self-start bg-accent text-white hover:bg-accent/90"
-                    onClick={() => void openExternal(result.releaseUrl!)}
-                  >
-                    <IconExternalLink size={12} />
-                    Open release page
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-start gap-3">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-elevated text-text-subtle">
-                  <IconCircleCheck size={14} />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <p className="text-[13px] font-medium text-text">You&rsquo;re up to date</p>
-                  <p className="text-[11.5px] text-text-subtle">
-                    Running the latest version (v{currentVersion}).
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <div className="flex items-center justify-between gap-3 pt-1">
-            <span className="text-[11px] text-text-subtle">
-              Last checked {formatRelative(lastCheckedAt)}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-text-muted hover:bg-surface-elevated hover:text-text"
-              onClick={() => void check()}
-              disabled={isChecking}
-            >
-              <IconRefresh size={12} className={isChecking ? 'animate-spin' : ''} />
-              Check now
-            </Button>
+            <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5">
+              <span className="text-[11px] text-text-subtle">
+                Last checked {formatRelative(lastCheckedAt)} · via{' '}
+                <span className="text-text-muted">GitHub Releases</span>
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-text-muted hover:bg-surface-elevated hover:text-text"
+                onClick={() => void check()}
+                disabled={isChecking}
+              >
+                <IconRefresh size={12} className={isChecking ? 'animate-spin' : ''} />
+                Check now
+              </Button>
+            </div>
           </div>
         </Section>
       </div>
@@ -153,14 +170,5 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </h2>
       {children}
     </section>
-  )
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-elevated/30 px-4 py-2.5">
-      <span className="text-[12.5px] text-text-muted">{label}</span>
-      {children}
-    </div>
   )
 }

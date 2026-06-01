@@ -135,7 +135,7 @@ export function LogsPage() {
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <CmdKHint label="Search tables, connections, actions" />
+          <CmdKHint variant="input" label="Search tables, connections, actions" />
           <Button
             size="sm"
             variant="ghost"
