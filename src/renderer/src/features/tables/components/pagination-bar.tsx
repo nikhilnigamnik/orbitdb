@@ -4,6 +4,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
+  IconChevronsRight,
   IconSelector
 } from '@tabler/icons-react'
 import { Popover } from '@renderer/components/ui/popover'
@@ -35,18 +36,22 @@ export function PaginationBar({
   const hasPrev = offset > 0
   const hasNext = loadedCount >= pageSize
   const currentPage = Math.floor(offset / pageSize) + 1
+  const totalPages =
+    totalEstimate != null ? Math.max(1, Math.ceil(totalEstimate / pageSize)) : null
+  const lastOffset = totalPages != null ? (totalPages - 1) * pageSize : null
 
   return (
     <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-surface/40 px-5 py-2">
-      <div className="flex items-center gap-2 text-[11.5px]">
-        <span className="text-text">
-          <span className="font-mono">{formatNumber(start)}</span>
-          <span className="text-text-subtle"> – </span>
-          <span className="font-mono">{formatNumber(end)}</span>
+      <div className="flex items-center gap-1.5 text-[11.5px]">
+        <span className="inline-flex items-center gap-1 rounded-md bg-surface-elevated/40 px-1.5 py-0.5 font-mono text-text ring-1 ring-white/5">
+          {formatNumber(start)}
+          <span className="text-text-subtle">–</span>
+          {formatNumber(end)}
         </span>
         {totalEstimate != null && (
           <span className="text-text-subtle">
-            of <span className="font-mono">~{formatNumber(totalEstimate)}</span>
+            of <span className="font-mono text-text-muted">~{formatNumber(totalEstimate)}</span>{' '}
+            rows
           </span>
         )}
       </div>
@@ -99,18 +104,8 @@ export function PaginationBar({
           </Popover>
         </div>
 
-        <div className="flex items-center gap-2 text-[11.5px] text-text-subtle">
-          <span>
-            Page <span className="font-mono text-text">{currentPage}</span>
-          </span>
-        </div>
-
         <div className="flex items-center gap-0.5 rounded-md border border-border bg-surface-elevated/30 p-0.5">
-          <PagerButton
-            label="First page"
-            disabled={!hasPrev}
-            onClick={() => onChangePage(0)}
-          >
+          <PagerButton label="First page" disabled={!hasPrev} onClick={() => onChangePage(0)}>
             <IconChevronsLeft size={13} />
           </PagerButton>
           <PagerButton
@@ -120,6 +115,17 @@ export function PaginationBar({
           >
             <IconChevronLeft size={13} />
           </PagerButton>
+
+          <div className="flex select-none items-center gap-1 px-2 text-[11.5px] tabular-nums text-text-subtle">
+            <span className="font-mono text-text">{currentPage}</span>
+            {totalPages != null && (
+              <>
+                <span className="text-text-subtle/60">/</span>
+                <span className="font-mono text-text-muted">{formatNumber(totalPages)}</span>
+              </>
+            )}
+          </div>
+
           <PagerButton
             label="Next page"
             disabled={!hasNext}
@@ -127,6 +133,15 @@ export function PaginationBar({
           >
             <IconChevronRight size={13} />
           </PagerButton>
+          {lastOffset != null && (
+            <PagerButton
+              label="Last page"
+              disabled={!hasNext}
+              onClick={() => onChangePage(lastOffset)}
+            >
+              <IconChevronsRight size={13} />
+            </PagerButton>
+          )}
         </div>
       </div>
     </div>

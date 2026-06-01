@@ -432,19 +432,23 @@ export function TableDataView({
         />
 
         {selectedCount > 0 && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center">
-            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-surface px-2 py-1.5 shadow-lg shadow-black/40">
-              <span className="pl-2 text-[12px] text-text">
-                <span className="font-mono text-text">{selectedCount}</span>
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
+            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1.5 rounded-lg border border-border bg-surface/90 px-1.5 py-1.5 shadow-xl shadow-black/40 ring-1 ring-white/5 backdrop-blur-md">
+              <span className="flex items-center gap-1.5 pl-1.5 pr-0.5 text-[12px]">
+                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-md bg-surface-elevated px-1 font-mono text-[11px] font-medium text-text ring-1 ring-white/5">
+                  {selectedCount}
+                </span>
                 <span className="text-text-subtle">
-                  {' '}
                   row{selectedCount === 1 ? '' : 's'} selected
                 </span>
               </span>
+
+              <span className="mx-0.5 h-5 w-px bg-border" />
+
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 gap-1 rounded-full px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+                className="h-7 gap-1 rounded-md px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
                 onClick={() => setRowSelection({})}
               >
                 <IconX size={12} />
@@ -460,21 +464,24 @@ export function TableDataView({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 gap-1 rounded-full px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+                  className="h-7 gap-1 rounded-md px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
                 >
                   <IconDownload size={12} />
                   Export {selectedCount}
                 </Button>
               </ExportMenu>
               {canMutate && (
-                <Button
-                  size="sm"
-                  className="h-7 gap-1 rounded-full bg-red-500/90 px-2.5 text-white hover:bg-red-500"
-                  onClick={bulkDeleteConfirm.open}
-                >
-                  <IconTrash size={12} />
-                  Delete {selectedCount}
-                </Button>
+                <>
+                  <span className="mx-0.5 h-5 w-px bg-border" />
+                  <Button
+                    size="sm"
+                    className="h-7 gap-1 rounded-md bg-red-500/90 px-2.5 text-white shadow-sm shadow-red-950/40 hover:bg-red-500"
+                    onClick={bulkDeleteConfirm.open}
+                  >
+                    <IconTrash size={12} />
+                    Delete {selectedCount}
+                  </Button>
+                </>
               )}
             </div>
           </div>
