@@ -46,7 +46,7 @@ function DropdownMenuItem({
       className={cn(
         ITEM_BASE,
         variant === 'danger'
-          ? 'text-rose-400 data-highlighted:bg-rose-500/10 data-highlighted:text-rose-400'
+          ? 'text-rose-500 data-highlighted:bg-rose-500/10 data-highlighted:text-rose-500'
           : 'text-text-muted data-highlighted:bg-surface-elevated data-highlighted:text-text',
         className
       )}
