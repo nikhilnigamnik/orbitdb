@@ -1,16 +1,15 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { IconDatabase, IconPlug } from '@tabler/icons-react'
+import { IconDatabase } from '@tabler/icons-react'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { LoadingState } from '@renderer/components/common/loading-state'
-import { Button } from '@renderer/components/ui/button'
 import { useAsync } from '@renderer/hooks/use-async'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { TableDataView } from '@renderer/features/tables/components/table-data-view'
-import { ROUTES, tableRoute } from '@renderer/config/routes'
+import { tableRoute } from '@renderer/config/routes'
 import { pushRecent } from '@renderer/features/database/lib/table-prefs'
 import type { DdlOperation, DdlOperationKind, TableDetails } from '@renderer/types'
 import { SchemaTree } from './schema-tree'
@@ -18,6 +17,7 @@ import { TableHeader } from './table-header'
 import { TableStructure } from './table-structure'
 import { StructureAi } from './structure-ai'
 import { DdlDialog } from './ddl-dialog'
+import { ConnectionPicker } from './connection-picker'
 
 export function DatabasePage() {
   const navigate = useNavigate()
@@ -72,21 +72,8 @@ export function DatabasePage() {
 
   if (!active) {
     return (
-      <main className="flex flex-1 items-center justify-center rounded-xl border border-border bg-surface p-6 shadow-lg shadow-black/20">
-        <EmptyState
-          icon={<IconPlug size={24} />}
-          title="No active connection"
-          description="Pick a connection to start browsing schemas and tables."
-          action={
-            <Button
-              size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
-              onClick={() => navigate(ROUTES.connections)}
-            >
-              Go to connections
-            </Button>
-          }
-        />
+      <main className="flex flex-1 overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/20">
+        <ConnectionPicker />
       </main>
     )
   }
