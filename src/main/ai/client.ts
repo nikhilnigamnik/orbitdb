@@ -1,9 +1,13 @@
 import { createGroq } from '@ai-sdk/groq'
 import { generateText, Output } from 'ai'
 import type { z } from 'zod'
-import { GROQ_API_KEY, GROQ_MODEL } from './config'
+import { AI_PROXY_TOKEN, AI_PROXY_URL, GROQ_API_KEY, GROQ_MODEL, IS_PROXY_ENABLED } from './config'
 
-const groq = createGroq({ apiKey: GROQ_API_KEY })
+// Proxy mode: baseURL points at the Worker (which ends in /v1) and the device
+// token rides as the Bearer credential. Direct mode: talk to Groq with the key.
+const groq = IS_PROXY_ENABLED
+  ? createGroq({ baseURL: AI_PROXY_URL, apiKey: AI_PROXY_TOKEN })
+  : createGroq({ apiKey: GROQ_API_KEY })
 
 export const aiModel = groq(GROQ_MODEL)
 
