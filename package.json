@@ -1,7 +1,7 @@
 {
   "name": "orbitdb",
   "productName": "OrbitDB",
-  "version": "0.2.3",
+  "version": "0.2.2",
   "description": "OrbitDB — a database client for Postgres, MySQL, and Cloudflare D1",
   "main": "./out/main/index.js",
   "author": "OrbitDB",
