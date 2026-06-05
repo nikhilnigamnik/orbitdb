@@ -149,7 +149,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
       <div className="shrink-0 px-3 pt-4 pb-3">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-linear-to-b from-accent/25 to-accent/5 text-accent ring-1 ring-inset ring-accent/30 shadow-[inset_0_1px_0_rgba(125,152,248,0.4)]">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-linear-to-b from-surface-elevated to-surface-elevated/40 text-text-muted ring-1 ring-inset ring-border shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
               <IconDatabase size={13} />
             </div>
             <div className="flex flex-col leading-tight">

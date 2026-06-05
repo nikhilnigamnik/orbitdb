@@ -13,7 +13,7 @@ import { ROUTES } from '@renderer/config/routes'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { useUpdateCheck } from '@renderer/features/settings/store'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
-import orbitdbLogo from '@renderer/assets/orbitdb-brand.png'
+import orbitdbLogo from '@renderer/assets/orbitdb-icon-transparent.png'
 
 const NAV_ITEMS = [
   { to: ROUTES.connections, label: 'Connections', icon: IconPlug, end: true },
@@ -35,16 +35,12 @@ export function Sidebar() {
   const isLogsActive = pathname.startsWith(ROUTES.logs)
   const isSettingsActive = pathname.startsWith(ROUTES.settings)
   const isConnectionsActive =
-    !isBrowserActive &&
-    !isDiagramActive &&
-    !isQueryActive &&
-    !isLogsActive &&
-    !isSettingsActive
+    !isBrowserActive && !isDiagramActive && !isQueryActive && !isLogsActive && !isSettingsActive
 
   return (
     <aside className="m-1 flex h-[calc(100vh-0.5rem)] w-14 shrink-0 flex-col items-center rounded-xl bg-surface shadow-lg shadow-black/20">
       <div className="flex items-center justify-center pt-4 pb-4">
-        <img src={orbitdbLogo} alt={APP_NAME} className="h-7 w-7" />
+        <img src={orbitdbLogo} alt={APP_NAME} className="h-6 w-6 object-contain" />
       </div>
 
       <nav className="flex flex-1 flex-col items-center gap-1">
