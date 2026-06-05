@@ -65,16 +65,76 @@
     <div id="root">
       <div id="splash">
         <svg
-          class="logo"
-          viewBox="0 0 100 100"
-          fill="#1C1C1E"
           xmlns="http://www.w3.org/2000/svg"
+          width="200"
+          height="200"
+          viewBox="0 0 100 100"
+          class="animate-pulse [animation-duration:1.6s]"
           aria-label="OrbitDB"
         >
-          <path
-            fill-rule="evenodd"
-            d="M 50 50 m -50 0 a 50 50 0 1 0 100 0 a 50 50 0 1 0 -100 0 Z M 50 50 m -42 0 a 42 42 0 1 0 84 0 a 42 42 0 1 0 -84 0 Z M 50 50 m -33 0 a 33 33 0 1 0 66 0 a 33 33 0 1 0 -66 0 Z M 50 50 m -25 0 a 25 25 0 1 0 50 0 a 25 25 0 1 0 -50 0 Z M 50 50 m -18 0 a 18 18 0 1 0 36 0 a 18 18 0 1 0 -36 0 Z M 50 50 m -12 0 a 12 12 0 1 0 24 0 a 12 12 0 1 0 -24 0 Z M 50 50 m -6 0 a 6 6 0 1 0 12 0 a 6 6 0 1 0 -12 0 Z"
+          <style>
+            @keyframes orbit-pulse {
+              0%,
+              100% {
+                opacity: 1;
+              }
+              50% {
+                opacity: 0.5;
+              }
+            }
+            svg {
+              animation: orbit-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+          </style>
+          <defs>
+            <linearGradient
+              id="_R_955esnealb_"
+              gradientUnits="userSpaceOnUse"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="100"
+            >
+              <stop offset="0%" stop-color="#ffffff" />
+              <stop offset="32%" stop-color="#ededed" />
+              <stop offset="52%" stop-color="#cdcdcd" />
+              <stop offset="72%" stop-color="#b0b0b0" />
+              <stop offset="100%" stop-color="#8c8c8c" />
+            </linearGradient>
+          </defs>
+          <circle
+            cx="50"
+            cy="50"
+            r="44"
+            fill="none"
+            stroke="url(#_R_955esnealb_)"
+            stroke-width="4"
+            stroke-linecap="round"
+            stroke-dasharray="226 50"
           />
+          <circle
+            cx="50"
+            cy="50"
+            r="32"
+            fill="none"
+            stroke="url(#_R_955esnealb_)"
+            stroke-width="4"
+            stroke-linecap="round"
+            stroke-dasharray="150 51"
+            transform="rotate(120 50 50)"
+          />
+          <circle
+            cx="50"
+            cy="50"
+            r="20"
+            fill="none"
+            stroke="url(#_R_955esnealb_)"
+            stroke-width="4"
+            stroke-linecap="round"
+            stroke-dasharray="88 38"
+            transform="rotate(240 50 50)"
+          />
+          <circle cx="50" cy="50" r="6" fill="url(#_R_955esnealb_)" />
         </svg>
         <div class="brand">OrbitDB</div>
       </div>

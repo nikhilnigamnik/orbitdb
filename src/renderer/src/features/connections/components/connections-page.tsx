@@ -18,7 +18,7 @@ import { ConnectionFormSheet } from './connection-form-sheet'
 import { ROUTES } from '@renderer/config/routes'
 import { APP_NAME, DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
-import orbitdbLogo from '@renderer/assets/orbitdb-cream.png'
+import orbitdbLogo from '@renderer/assets/orbitdb-icon-transparent.png'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 
 type SortMode = 'name-asc' | 'name-desc' | 'recent'
@@ -134,7 +134,7 @@ export function ConnectionsPage() {
           <div className="mt-8 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <img src={orbitdbLogo} alt={APP_NAME} className="h-7 w-7" />
+                <img src={orbitdbLogo} alt={APP_NAME} className="h-7 w-7 object-contain" />
                 <span className="truncate text-[18px] font-semibold text-text">{APP_NAME}</span>
               </div>
             </div>
