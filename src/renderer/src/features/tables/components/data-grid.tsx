@@ -418,8 +418,13 @@ export function DataGrid({
                 <tr
                   key={row.id}
                   className={cn(
-                    'group cursor-default transition-colors',
-                    isSelected ? 'bg-surface-elevated/70' : 'hover:bg-surface-elevated/40'
+                    // transition-colors would animate outline-color from currentColor
+                    // (white) on select — only transition the background
+                    'group cursor-default transition-[background-color]',
+                    isSelected
+                      ? // tr can't render Tailwind ring (box-shadow); outline works in Chromium
+                        'bg-surface-elevated/70 outline outline-border-strong -outline-offset-1'
+                      : 'hover:bg-surface-elevated/40'
                   )}
                 >
                   {row.getVisibleCells().map((cell) => {

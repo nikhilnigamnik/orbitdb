@@ -518,9 +518,9 @@ export function TableDataView({
 
         {selectedCount > 0 && (
           <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
-            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1.5 rounded-lg border border-border bg-surface/90 px-1.5 py-1.5 shadow-xl shadow-black/40 ring-1 ring-white/5 backdrop-blur-md">
-              <span className="flex items-center gap-1.5 pl-1.5 pr-0.5 text-[12px]">
-                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-md bg-surface-elevated px-1 font-mono text-[11px] font-medium text-text ring-1 ring-white/5">
+            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-full border border-border-strong/70 bg-surface/95 py-1.5 pl-2 pr-1.5 shadow-2xl shadow-black/60 inset-shadow-[0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl">
+              <span className="flex items-center gap-2 pl-1 pr-1.5 text-[12px]">
+                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-surface-elevated px-1.5 font-mono text-[11px] font-medium text-text ring-1 ring-inset ring-white/10 inset-shadow-[0_1px_0_rgba(255,255,255,0.08)]">
                   {selectedCount}
                 </span>
                 <span className="text-text-subtle">
@@ -528,12 +528,12 @@ export function TableDataView({
                 </span>
               </span>
 
-              <span className="mx-0.5 h-5 w-px bg-border" />
+              <span className="mx-1 h-4 w-px bg-white/10" />
 
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 gap-1 rounded-md px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+                className="h-7 gap-1 rounded-full px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
                 onClick={() => setRowSelection({})}
               >
                 <IconX size={12} />
@@ -549,7 +549,7 @@ export function TableDataView({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 gap-1 rounded-md px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+                  className="h-7 gap-1 rounded-full px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
                 >
                   <IconDownload size={12} />
                   Export {selectedCount}
@@ -557,10 +557,10 @@ export function TableDataView({
               </ExportMenu>
               {canMutate && (
                 <>
-                  <span className="mx-0.5 h-5 w-px bg-border" />
+                  <span className="mx-1 h-4 w-px bg-white/10" />
                   <Button
                     size="sm"
-                    className="h-7 gap-1 rounded-md bg-red-500/90 px-2.5 text-white shadow-sm shadow-red-950/40 hover:bg-red-500"
+                    className="h-7 gap-1 rounded-full bg-linear-to-b from-red-500 to-red-600 px-3 text-white ring-1 ring-inset ring-white/15 inset-shadow-[0_1px_0_rgba(255,255,255,0.25)] shadow-md shadow-red-950/50 hover:from-red-400 hover:to-red-500"
                     onClick={bulkDeleteConfirm.open}
                   >
                     <IconTrash size={12} />
