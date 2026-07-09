@@ -1,5 +1,5 @@
-import { IconLoader } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
+import { Spinner } from '@renderer/components/ui/spinner'
 
 interface LoadingStateProps {
   size?: number
@@ -14,11 +14,9 @@ interface LoadingStateProps {
  */
 export function LoadingState({ size = 20, label, className }: LoadingStateProps) {
   return (
-    <div
-      className={cn('flex h-full min-h-0 w-full flex-1 items-center justify-center', className)}
-    >
+    <div className={cn('flex h-full min-h-0 w-full flex-1 items-center justify-center', className)}>
       <div className="flex flex-col items-center gap-2">
-        <IconLoader size={size} className="animate-spin text-text-subtle" />
+        <Spinner size={size} className="text-text-subtle" />
         {label && <p className="text-[12px] text-text-subtle">{label}</p>}
       </div>
     </div>

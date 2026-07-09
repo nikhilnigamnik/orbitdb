@@ -10,6 +10,7 @@ import {
   IconTrash
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { Chip } from '@renderer/components/ui/chip'
 import { Input } from '@renderer/components/ui/input'
 import { Sheet } from '@renderer/components/ui/sheet'
@@ -153,7 +154,7 @@ export function LogsPage() {
             onClick={() => void load()}
             disabled={isLoading}
           >
-            <IconRefresh size={12} className={isLoading ? 'animate-spin' : ''} />
+            {isLoading ? <Spinner size={12} className="text-current" /> : <IconRefresh size={12} />}
             Refresh
           </Button>
           <Button

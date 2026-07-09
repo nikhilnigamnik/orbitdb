@@ -1,12 +1,7 @@
 import * as React from 'react'
-import {
-  IconSparkles,
-  IconBulb,
-  IconLoader2,
-  IconCheck,
-  IconAlertTriangle
-} from '@tabler/icons-react'
+import { IconSparkles, IconBulb, IconCheck, IconAlertTriangle } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { MarkdownView } from '@renderer/components/common/markdown'
 import { unwrap } from '@renderer/lib/ipc'
@@ -154,7 +149,7 @@ function ExplainSheet({
           <PanelHeader icon={<IconSparkles size={15} />} title={`Explain ${table}`} />
           {isLoading ? (
             <Centered>
-              <IconLoader2 size={15} className="animate-spin" />
+              <Spinner size={15} className="text-current" />
               <span className="text-[12px]">Analyzing table…</span>
             </Centered>
           ) : error ? (
@@ -249,7 +244,7 @@ function IndexesSheet({
           <PanelHeader icon={<IconBulb size={15} />} title={`Index suggestions for ${table}`} />
           {isLoading ? (
             <Centered>
-              <IconLoader2 size={15} className="animate-spin" />
+              <Spinner size={15} className="text-current" />
               <span className="text-[12px]">Analyzing structure…</span>
             </Centered>
           ) : error ? (
@@ -299,7 +294,7 @@ function IndexesSheet({
                       onClick={() => apply(s)}
                     >
                       {state === 'applying' ? (
-                        <IconLoader2 size={12} className="animate-spin" />
+                        <Spinner size={12} className="text-current" />
                       ) : state === 'done' ? (
                         <IconCheck size={12} />
                       ) : null}

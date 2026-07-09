@@ -7,6 +7,7 @@ import {
   IconAlertTriangle
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { unwrap } from '@renderer/lib/ipc'
 import { useUpdateCheck } from '@renderer/features/settings/store'
 import { APP_NAME, APP_TAGLINE, GITHUB_REPO_URL } from '@renderer/config/site'
@@ -87,7 +88,7 @@ export function SettingsPage() {
             <div className="p-4">
               {isChecking ? (
                 <div className="flex items-center gap-2.5 text-[13px] text-text-muted">
-                  <IconRefresh size={15} className="animate-spin text-text-subtle" />
+                  <Spinner size={15} className="text-text-subtle" />
                   Checking for updates…
                 </div>
               ) : error ? (
@@ -151,7 +152,11 @@ export function SettingsPage() {
                 onClick={() => void check()}
                 disabled={isChecking}
               >
-                <IconRefresh size={12} className={isChecking ? 'animate-spin' : ''} />
+                {isChecking ? (
+                  <Spinner size={12} className="text-current" />
+                ) : (
+                  <IconRefresh size={12} />
+                )}
                 Check now
               </Button>
             </div>

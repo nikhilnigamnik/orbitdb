@@ -1,12 +1,7 @@
 import * as React from 'react'
-import {
-  IconSparkles,
-  IconX,
-  IconArrowRight,
-  IconArrowUpRight,
-  IconLoader2
-} from '@tabler/icons-react'
+import { IconSparkles, IconX, IconArrowRight, IconArrowUpRight } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { Dialog } from '@renderer/components/ui/dialog'
 import { Kbd } from '@renderer/components/ui/kbd'
 
@@ -61,7 +56,7 @@ export function AiPrompt({
 
           <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-3">
             {isGenerating ? (
-              <IconLoader2 size={16} className="shrink-0 animate-spin text-accent" />
+              <Spinner size={16} className="text-accent" />
             ) : (
               <IconSparkles size={16} className="shrink-0 text-accent" />
             )}
@@ -132,7 +127,7 @@ export function AiPrompt({
               disabled={!prompt.trim() || isGenerating}
             >
               {isGenerating ? (
-                <IconLoader2 size={12} className="animate-spin" />
+                <Spinner size={12} className="text-current" />
               ) : (
                 <IconArrowRight size={12} />
               )}

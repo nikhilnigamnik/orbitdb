@@ -168,7 +168,11 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                 }}
                 aria-label="Refresh schemas"
               >
-                <IconRefresh size={12} className={isLoading ? 'animate-spin' : ''} />
+                {isLoading ? (
+                  <Spinner size={12} className="text-current" />
+                ) : (
+                  <IconRefresh size={12} />
+                )}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">Refresh schemas</TooltipContent>

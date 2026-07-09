@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { IconSeeding, IconLoader2, IconAlertTriangle } from '@tabler/icons-react'
+import { IconSeeding, IconAlertTriangle } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
@@ -157,7 +158,7 @@ export function SeedDataDialog({
               >
                 {isWorking ? (
                   <>
-                    <IconLoader2 size={12} className="animate-spin" />
+                    <Spinner size={12} className="text-current" />
                     Generating & inserting…
                   </>
                 ) : (
