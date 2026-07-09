@@ -50,6 +50,8 @@ export interface ColumnInfo {
   defaultValue: string | null
   ordinalPosition: number
   characterMaximumLength: number | null
+  /** Allowed values for enum columns (Postgres enum types, MySQL enum); null otherwise. */
+  enumValues: string[] | null
 }
 
 export interface IndexInfo {

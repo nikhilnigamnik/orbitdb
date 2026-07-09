@@ -298,7 +298,8 @@ async function tableDetails(
     isPrimaryKey: Number(r.pk) > 0,
     defaultValue: r.dflt_value == null ? null : String(r.dflt_value),
     ordinalPosition: Number(r.cid) + 1,
-    characterMaximumLength: null
+    characterMaximumLength: null,
+    enumValues: null
   }))
 
   const primaryKey = colEntry.results
@@ -676,7 +677,10 @@ async function getSchemaGraph(connectionId: string, schema: string): Promise<Sch
       }))
     })
 
-    const fkGroups = new Map<number, { table: string; pairs: { from: string; to: string; seq: number }[] }>()
+    const fkGroups = new Map<
+      number,
+      { table: string; pairs: { from: string; to: string; seq: number }[] }
+    >()
     for (const fk of fkEntry.results) {
       const id = Number(fk.id)
       const existing = fkGroups.get(id)

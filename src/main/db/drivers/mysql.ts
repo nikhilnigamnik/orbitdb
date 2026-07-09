@@ -208,6 +208,19 @@ function normalizeUdtName(dataType: string, columnType: string): string {
   return dt
 }
 
+function parseEnumValues(columnType: string): string[] | null {
+  const match = /^enum\((.*)\)$/i.exec(columnType)
+  if (!match) return null
+  // Labels are single-quoted; a literal quote inside a label is doubled ('').
+  const labels: string[] = []
+  const labelRe = /'((?:[^']|'')*)'/g
+  let m: RegExpExecArray | null
+  while ((m = labelRe.exec(match[1])) != null) {
+    labels.push(m[1].replace(/''/g, "'"))
+  }
+  return labels.length > 0 ? labels : null
+}
+
 async function tableDetails(
   connectionId: string,
   schema: string,
@@ -265,7 +278,8 @@ async function tableDetails(
     defaultValue: r.default_value == null ? null : String(r.default_value),
     ordinalPosition: Number(r.ordinal_position),
     characterMaximumLength:
-      r.character_maximum_length == null ? null : Number(r.character_maximum_length)
+      r.character_maximum_length == null ? null : Number(r.character_maximum_length),
+    enumValues: parseEnumValues(String(r.column_type))
   }))
 
   const [idxRows] = await pool.query<RowDataPacket[]>(
