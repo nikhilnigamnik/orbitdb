@@ -11,6 +11,7 @@ import type { ColumnInfo } from '@renderer/types'
 import { Chip } from '@renderer/components/ui/chip'
 import {
   coerceCellValue,
+  editableEnumValues,
   isBoolType,
   isJsonType,
   isNumericType,
@@ -42,7 +43,7 @@ function buildInitialFields(
   for (const col of columns) {
     const current = values?.[col.name]
     out[col.name] = {
-      raw: current == null ? '' : stringifyValue(current),
+      raw: current == null ? '' : stringifyValue(current, col.udtName),
       isNull: current === null && values != null,
       touched: false
     }
@@ -126,6 +127,7 @@ export function RowEditorSheet({
               const field = fields[col.name]
               const useTextarea = isJsonType(col.udtName)
               const inputType = isNumericType(col.udtName) ? 'number' : 'text'
+              const enumValues = editableEnumValues(col)
               return (
                 <FormField
                   key={col.name}
@@ -153,6 +155,19 @@ export function RowEditorSheet({
                             { value: 'false', label: 'false' }
                           ]}
                           placeholder="—"
+                          disabled={field.isNull}
+                          ariaLabel={col.name}
+                          className="h-9 w-full"
+                        />
+                      ) : enumValues != null ? (
+                        <Select
+                          value={field.raw}
+                          onChange={(value) => update(col.name, { raw: value, isNull: false })}
+                          options={enumValues.map((option) => ({
+                            value: option,
+                            label: option
+                          }))}
+                          placeholder={field.isNull ? 'NULL' : '—'}
                           disabled={field.isNull}
                           ariaLabel={col.name}
                           className="h-9 w-full"

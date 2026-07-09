@@ -103,9 +103,66 @@ export function DataGrid({
     columnId: string
   } | null>(null)
   const canEditCells = canMutate && !!onEditCell
+  // Cell saves patch `rows` in place; this flag keeps the editing session
+  // alive across that change so Tab-to-next-cell works.
+  const keepEditingOnRowsChange = React.useRef(false)
   React.useEffect(() => {
+    if (keepEditingOnRowsChange.current) {
+      keepEditingOnRowsChange.current = false
+      return
+    }
     setEditingCell(null)
+    // The flash is keyed by row index; a new row set (sort/page/reload) would
+    // make it light up an unrelated cell.
+    setSavedCell(null)
   }, [rows])
+
+  const [savedCell, setSavedCell] = React.useState<{ rowIndex: number; columnId: string } | null>(
+    null
+  )
+  const savedFlashTimer = React.useRef<number | null>(null)
+  const markSaved = React.useCallback((rowIndex: number, columnId: string) => {
+    if (savedFlashTimer.current) window.clearTimeout(savedFlashTimer.current)
+    // Drop the class for a frame so re-saving the same cell within the flash
+    // window restarts the CSS animation instead of silently continuing it.
+    setSavedCell(null)
+    requestAnimationFrame(() => {
+      setSavedCell({ rowIndex, columnId })
+      savedFlashTimer.current = window.setTimeout(() => setSavedCell(null), 900)
+    })
+  }, [])
+  React.useEffect(
+    () => () => {
+      if (savedFlashTimer.current) window.clearTimeout(savedFlashTimer.current)
+    },
+    []
+  )
+
+  const dataColumnIds = React.useMemo(() => columns.map((c) => c.name), [columns])
+  const moveEditing = React.useCallback(
+    (rowIndex: number, columnId: string, direction: 'next' | 'prev') => {
+      const colIndex = dataColumnIds.indexOf(columnId)
+      if (colIndex === -1) {
+        setEditingCell(null)
+        return
+      }
+      let nextCol = colIndex + (direction === 'next' ? 1 : -1)
+      let nextRow = rowIndex
+      if (nextCol >= dataColumnIds.length) {
+        nextCol = 0
+        nextRow += 1
+      } else if (nextCol < 0) {
+        nextCol = dataColumnIds.length - 1
+        nextRow -= 1
+      }
+      if (nextRow < 0 || nextRow >= rows.length) {
+        setEditingCell(null)
+        return
+      }
+      setEditingCell({ rowIndex: nextRow, columnId: dataColumnIds[nextCol] })
+    },
+    [dataColumnIds, rows.length]
+  )
 
   const sorting: SortingState = React.useMemo(
     () => (orderBy ? [{ id: orderBy, desc: orderDir === 'desc' }] : []),
@@ -216,21 +273,23 @@ export function DataGrid({
           const fkTarget = fkColumns?.get(col.name)
           if (fkTarget && onOpenForeignKey) {
             return (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenForeignKey(col.name, value)
-                }}
-                className="group/fk inline-flex max-w-full cursor-pointer items-center gap-1 truncate rounded text-accent transition-colors hover:text-accent/80 hover:underline"
-                title={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
-              >
-                <span className="truncate">{display}</span>
-                <IconArrowUpRight
-                  size={10}
-                  className="shrink-0 opacity-0 transition-opacity group-hover/fk:opacity-100"
-                />
-              </button>
+              <span className="flex max-w-full items-center gap-1">
+                <span className="truncate text-accent">{display}</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenForeignKey(col.name, value)
+                  }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="shrink-0 cursor-pointer rounded p-0.5 text-accent opacity-0 transition-opacity hover:bg-accent/15 group-hover:opacity-100"
+                  title={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
+                  aria-label={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
+                >
+                  <IconArrowUpRight size={11} />
+                </button>
+              </span>
             )
           }
           return <span className="text-text">{display}</span>
@@ -376,6 +435,10 @@ export function DataGrid({
                       ? columns.find((c) => c.name === cell.column.id)
                       : undefined
                     const cellValue = row.original[cell.column.id]
+                    const isSavedFlash =
+                      isData &&
+                      savedCell?.rowIndex === row.index &&
+                      savedCell?.columnId === cell.column.id
                     return (
                       <td
                         key={cell.id}
@@ -386,11 +449,15 @@ export function DataGrid({
                           isActions && 'sticky right-0 bg-surface px-2 py-1 group-hover:bg-surface',
                           isData && 'max-w-xs truncate font-mono text-[11.5px]',
                           isData && canEditCells && 'cursor-text',
-                          isEditingThis && 'bg-surface-elevated'
+                          isEditingThis && 'bg-accent/10 ring-1 ring-inset ring-accent/50',
+                          isSavedFlash && 'animate-cell-saved'
                         )}
                         title={isData && !isEditingThis ? formatCellValue(cellValue) : undefined}
                         onMouseDown={
-                          isData && canEditCells
+                          // While the editor popover is open its portal events bubble
+                          // through this td in the React tree — skip the handler so
+                          // double-click text selection inside the editor still works.
+                          isData && canEditCells && !isEditingThis
                             ? (e) => {
                                 // Stop the browser's double-click word-selection (the
                                 // highlight) while keeping single-click selection intact.
@@ -399,7 +466,7 @@ export function DataGrid({
                             : undefined
                         }
                         onDoubleClick={
-                          isData && canEditCells
+                          isData && canEditCells && !isEditingThis
                             ? () =>
                                 setEditingCell({ rowIndex: row.index, columnId: cell.column.id })
                             : undefined
@@ -410,10 +477,19 @@ export function DataGrid({
                             column={editColumn}
                             value={cellValue}
                             onSave={async (newValue) => {
-                              await onEditCell(row.original, cell.column.id, newValue)
-                              setEditingCell(null)
+                              keepEditingOnRowsChange.current = true
+                              try {
+                                await onEditCell(row.original, cell.column.id, newValue)
+                              } catch (err) {
+                                keepEditingOnRowsChange.current = false
+                                throw err
+                              }
+                              markSaved(row.index, cell.column.id)
                             }}
-                            onCancel={() => setEditingCell(null)}
+                            onClose={() => setEditingCell(null)}
+                            onNavigate={(direction) =>
+                              moveEditing(row.index, cell.column.id, direction)
+                            }
                           >
                             <span className="block max-w-full truncate">
                               {cellValue === null ? (

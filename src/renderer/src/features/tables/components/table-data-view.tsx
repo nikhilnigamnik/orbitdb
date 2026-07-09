@@ -124,10 +124,6 @@ export function TableDataView({
   )
   const selectedCount = selectedRows.length
 
-  React.useEffect(() => {
-    setRowSelection({})
-  }, [rows])
-
   const canMutate = details.type === 'table' && details.primaryKey.length > 0
 
   const requestIdRef = React.useRef(0)
@@ -154,6 +150,7 @@ export function TableDataView({
       setRows(data.rows)
       setColumns(data.columns)
       setTotalEstimate(data.totalEstimate)
+      setRowSelection({})
       setHasLoadedOnce(true)
       setIsLoading(false)
       setError(null)
@@ -178,6 +175,7 @@ export function TableDataView({
         setRows(data.rows)
         setColumns(data.columns)
         setTotalEstimate(data.totalEstimate)
+        setRowSelection({})
         setHasLoadedOnce(true)
       } catch (err) {
         if (requestId !== requestIdRef.current) return
@@ -232,6 +230,7 @@ export function TableDataView({
     setOrderDir('asc')
     setFilters([])
     setRows([])
+    setRowSelection({})
     setHasLoadedOnce(false)
     prefetchCacheRef.current = null
   }, [details.schema, details.name])
@@ -318,7 +317,7 @@ export function TableDataView({
   async function handleEditCell(row: Record<string, unknown>, column: string, value: unknown) {
     const pk: Record<string, unknown> = {}
     for (const key of details.primaryKey) pk[key] = row[key]
-    await unwrap(
+    const updated = await unwrap(
       window.api.db.updateRow({
         connectionId,
         schema: details.schema,
@@ -327,7 +326,16 @@ export function TableDataView({
         values: { [column]: value }
       })
     )
-    await load()
+    // The prefetched next page was fetched before this mutation — drop it so
+    // paging forward can't render stale pre-edit rows.
+    prefetchCacheRef.current = null
+    // mysql/d1 re-fetch by PK can miss (e.g. concurrent delete) and return {};
+    // fall back to a local merge rather than blanking the row.
+    const patched = Object.keys(updated).length > 0 ? updated : { ...row, [column]: value }
+    // Patch the saved row in place with what the DB returned (covers
+    // triggers/defaults) instead of reloading — no grid flash, and the
+    // cell-editing session survives for Tab navigation.
+    setRows((prev) => prev.map((r) => (r === row ? patched : r)))
   }
 
   async function handleDelete() {
