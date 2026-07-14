@@ -130,7 +130,7 @@ export function ConnectionCard({
           <TooltipContent side="bottom">
             {HEALTH_LABEL[health]}
             {health === 'fail' && healthError && (
-              <div className="mt-1 max-w-[20rem] font-mono text-[10px] text-text-subtle">
+              <div className="mt-1 max-w-[20rem] font-mono text-xs text-text-subtle">
                 {healthError}
               </div>
             )}
@@ -140,7 +140,7 @@ export function ConnectionCard({
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-[13.5px] font-medium leading-tight text-text">
+          <span className="truncate text-xs font-medium leading-tight text-text">
             {connection.name}
           </span>
           <Chip tone={ENVIRONMENT_TONE[environment]}>{ENVIRONMENT_LABEL[environment]}</Chip>
@@ -155,7 +155,7 @@ export function ConnectionCard({
             </Tooltip>
           )}
         </div>
-        <div className="mt-1 truncate font-mono text-[11px] leading-tight text-text-subtle">
+        <div className="mt-1 truncate font-mono text-xs leading-tight text-text-subtle">
           {parts.length === 0 ? (
             <span className="italic">no host configured</span>
           ) : (

@@ -80,10 +80,10 @@ export function DatabasePage() {
 
   return (
     <>
-      <aside className="flex h-full w-56 shrink-0 flex-col overflow-hidden rounded-xl  bg-surface shadow-lg shadow-black/20">
+      <aside className="flex h-full w-56 shrink-0 flex-col overflow-hidden rounded-xl bg-surface shadow-lg shadow-black/20">
         <SchemaTreeContainer connectionId={active.connectionId} />
       </aside>
-      <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl  bg-surface shadow-lg shadow-black/20">
+      <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-surface shadow-lg shadow-black/20">
         {schema && table ? (
           <TableViewContainer
             key={`${schema}.${table}`}

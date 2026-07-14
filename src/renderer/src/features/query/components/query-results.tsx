@@ -20,22 +20,22 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-text-subtle">
         <IconTable size={22} className="text-text-subtle/60" />
-        <p className="text-[12px]">Run a query to see results</p>
+        <p className="text-xs">Run a query to see results</p>
       </div>
     )
   }
   if (!result.success) {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex shrink-0 items-center gap-3 border-b border-border bg-surface/40 px-4 py-2 text-[11.5px]">
-          <span className="flex items-center gap-1 rounded-md bg-red-500/10 px-1.5 py-0.5 text-[10.5px] font-medium text-red-400">
+        <div className="flex shrink-0 items-center gap-3 border-b border-border bg-surface/40 px-4 py-2 text-xs">
+          <span className="flex items-center gap-1 rounded-md bg-red-500/10 px-1.5 py-0.5 text-xs font-medium text-red-400">
             <IconAlertTriangle size={11} />
             Error
           </span>
           <span className="font-mono text-text-subtle">{result.durationMs} ms</span>
         </div>
         <div className="flex-1 overflow-auto p-4">
-          <pre className="whitespace-pre-wrap break-words rounded-md border border-red-500/20 bg-red-500/5 p-3 font-mono text-[12px] text-red-300/90">
+          <pre className="whitespace-pre-wrap break-words rounded-md border border-red-500/20 bg-red-500/5 p-3 font-mono text-xs text-red-300/90">
             {result.error}
           </pre>
         </div>
@@ -54,13 +54,13 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-surface/40 px-4 py-2 text-[11.5px]">
-        <span className="flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10.5px] font-medium text-emerald-400">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-surface/40 px-4 py-2 text-xs">
+        <span className="flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-xs font-medium text-emerald-400">
           <IconCheck size={11} />
           OK
         </span>
         {result.command && (
-          <span className="rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[10.5px] uppercase tracking-wide text-text-muted">
+          <span className="rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-xs uppercase tracking-wide text-text-muted">
             {result.command}
           </span>
         )}
@@ -72,7 +72,7 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
         )}
         {result.truncated && (
           <span
-            className="flex items-center gap-1 rounded-md bg-yellow-500/10 px-1.5 py-0.5 text-[10.5px] font-medium text-yellow-400"
+            className="flex items-center gap-1 rounded-md bg-yellow-500/10 px-1.5 py-0.5 text-xs font-medium text-yellow-400"
             title={`Result was truncated to the first ${formatNumber(result.rows.length)} rows. Export to get the full set if your driver supports it.`}
           >
             <IconAlertTriangle size={11} />
@@ -94,7 +94,7 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
       </div>
 
       {fields.length === 0 ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center text-[12px] text-text-subtle">
+        <div className="flex min-h-0 flex-1 items-center justify-center text-xs text-text-subtle">
           Query executed successfully. No rows returned.
         </div>
       ) : (
@@ -127,16 +127,16 @@ function ResultTable({ rows, fields }: ResultTableProps) {
 
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-      <table className="min-w-full border-separate border-spacing-0 text-[12.5px]">
+      <table className="min-w-full border-separate border-spacing-0 text-xs">
         <thead className="sticky top-0 z-10">
           <tr>
-            <th className="w-10 border-b border-border bg-surface px-3 py-2 text-left text-[10.5px] font-medium text-text-subtle">
+            <th className="w-10 border-b border-border bg-surface px-3 py-2 text-left text-xs font-medium text-text-subtle">
               #
             </th>
             {fields.map((f) => (
               <th
                 key={f.name}
-                className="border-b border-border bg-surface px-3 py-2 text-left text-[11.5px] font-medium text-text-muted"
+                className="border-b border-border bg-surface px-3 py-2 text-left text-xs font-medium text-text-muted"
               >
                 {f.name}
               </th>
@@ -156,7 +156,7 @@ function ResultTable({ rows, fields }: ResultTableProps) {
                 key={virtualRow.index}
                 className="group cursor-default transition-colors hover:bg-surface-elevated/40"
               >
-                <td className="border-b border-border/60 px-3 py-1.5 text-[10.5px] text-text-subtle">
+                <td className="border-b border-border/60 px-3 py-1.5 text-xs text-text-subtle">
                   {virtualRow.index + 1}
                 </td>
                 {fields.map((f) => {
@@ -164,7 +164,7 @@ function ResultTable({ rows, fields }: ResultTableProps) {
                   return (
                     <td
                       key={f.name}
-                      className="max-w-xs truncate border-b border-border/60 px-3 py-1.5 font-mono text-[11.5px] text-text"
+                      className="max-w-xs truncate border-b border-border/60 px-3 py-1.5 font-mono text-xs text-text"
                       title={formatCellValue(value)}
                     >
                       {value === null ? (

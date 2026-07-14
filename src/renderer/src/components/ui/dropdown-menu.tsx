@@ -32,7 +32,7 @@ function DropdownMenuContent({
 }
 
 const ITEM_BASE =
-  'flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-[12px] outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
+  'flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-xs outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
 
 function DropdownMenuItem({
   className,

@@ -112,10 +112,10 @@ export function RowEditorSheet({
       content={
         <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
           <div className="flex shrink-0 flex-col gap-0.5 border-b border-border px-4 py-3 pr-12">
-            <h2 className="text-[13px] font-semibold text-text">
+            <h2 className="text-xs font-semibold text-text">
               {mode === 'insert' ? 'Insert row' : 'Edit row'}
             </h2>
-            <p className="text-[11px] text-text-subtle">
+            <p className="text-xs text-text-subtle">
               {mode === 'insert'
                 ? 'Untouched columns will use their default values.'
                 : 'Edit the values and save changes.'}

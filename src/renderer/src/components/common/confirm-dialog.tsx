@@ -50,11 +50,11 @@ export function ConfirmDialog({
               <IconAlertTriangle size={20} stroke={2} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <h2 className="text-[15px] font-semibold leading-tight tracking-tight text-text">
+              <h2 className="text-xs font-semibold leading-tight tracking-tight text-text">
                 {title}
               </h2>
               {description && (
-                <p className="text-[12.5px] leading-relaxed text-text-muted">{description}</p>
+                <p className="text-xs leading-relaxed text-text-muted">{description}</p>
               )}
             </div>
           </div>

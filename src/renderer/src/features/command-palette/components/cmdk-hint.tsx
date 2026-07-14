@@ -28,7 +28,7 @@ export function CmdKHint({ label = 'Open command palette', variant = 'compact', 
         )}
       >
         <IconSearch size={14} className="shrink-0" />
-        <span className="flex-1 truncate text-left text-[12px]">{label}</span>
+        <span className="flex-1 truncate text-left text-xs">{label}</span>
         <span className="flex shrink-0 items-center gap-1">
           <Kbd>{modKey}</Kbd>
           <Kbd>K</Kbd>

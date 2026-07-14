@@ -345,7 +345,7 @@ function Flow({ graph, schema }: SchemaGraphCanvasProps) {
             <IconPhoto size={15} />
           </ToolButton>
           <ToolButton title="Export as SVG" onClick={() => exportImage('svg')}>
-            <span className="text-[9px] font-semibold tracking-tight">SVG</span>
+            <span className="text-xs font-semibold tracking-tight">SVG</span>
           </ToolButton>
         </div>
       </Panel>

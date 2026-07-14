@@ -43,15 +43,15 @@ const CONTENT_CLASSES = [
 const COMMAND_CLASSES = [
   'flex flex-col',
   '[&_[cmdk-input]]:h-12 [&_[cmdk-input]]:w-full [&_[cmdk-input]]:bg-transparent [&_[cmdk-input]]:px-4 [&_[cmdk-input]]:pl-11',
-  '[&_[cmdk-input]]:text-[13.5px] [&_[cmdk-input]]:text-text [&_[cmdk-input]]:outline-none',
+  '[&_[cmdk-input]]:text-xs [&_[cmdk-input]]:text-text [&_[cmdk-input]]:outline-none',
   '[&_[cmdk-input]]:placeholder:text-text-subtle',
   '[&_[cmdk-list]]:max-h-[56vh] [&_[cmdk-list]]:overflow-y-auto [&_[cmdk-list]]:scroll-py-1 [&_[cmdk-list]]:p-2',
   '[&_[cmdk-group]]:mb-1 [&_[cmdk-group]:last-child]:mb-0',
   '[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2',
-  '[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider',
+  '[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider',
   '[&_[cmdk-group-heading]]:text-text-subtle',
   '[&_[cmdk-empty]]:flex [&_[cmdk-empty]]:flex-col [&_[cmdk-empty]]:items-center [&_[cmdk-empty]]:justify-center [&_[cmdk-empty]]:gap-1 [&_[cmdk-empty]]:py-10',
-  '[&_[cmdk-empty]]:text-[12px] [&_[cmdk-empty]]:text-text-subtle'
+  '[&_[cmdk-empty]]:text-xs [&_[cmdk-empty]]:text-text-subtle'
 ].join(' ')
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
@@ -222,13 +222,13 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         )}
 
         {active && tables.length === 0 && fetchedFor.current === active.connectionId && (
-          <p className="px-3 py-3 text-[11px] text-text-subtle">
+          <p className="px-3 py-3 text-xs text-text-subtle">
             {tablesError ? `Couldn't load tables: ${tablesError}` : 'No tables in this database.'}
           </p>
         )}
       </Command.List>
 
-      <div className="flex items-center justify-between gap-3 border-t border-border bg-surface-elevated/30 px-3 py-2 text-[10.5px] text-text-subtle">
+      <div className="flex items-center justify-between gap-3 border-t border-border bg-surface-elevated/30 px-3 py-2 text-xs text-text-subtle">
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1">
             <Kbd>↑</Kbd>
@@ -291,7 +291,7 @@ function PaletteItem({
       onSelect={onSelect}
       disabled={disabled}
       value={[label, ...(keywords ?? [])].join(' ')}
-      className={`group flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-[12.5px] transition-colors aria-selected:[&_.kbd-shortcut]:opacity-100 data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 ${toneText}`}
+      className={`group flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-xs transition-colors aria-selected:[&_.kbd-shortcut]:opacity-100 data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 ${toneText}`}
     >
       <span
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
@@ -305,7 +305,7 @@ function PaletteItem({
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
         <span className="truncate font-medium">{label}</span>
         {secondary && (
-          <span className="truncate font-mono text-[10.5px] text-text-subtle">{secondary}</span>
+          <span className="truncate font-mono text-xs text-text-subtle">{secondary}</span>
         )}
       </span>
       {tag && <Chip tone={tagTone === 'success' ? 'emerald' : 'neutral'}>{tag}</Chip>}

@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@renderer/lib/utils'
 
 const kbdVariants = cva(
-  'inline-flex h-4 min-w-4 items-center justify-center rounded px-1 font-mono text-[10px] leading-none',
+  'inline-flex h-4 min-w-4 items-center justify-center rounded px-1 font-mono text-xs leading-none',
   {
     variants: {
       tone: {

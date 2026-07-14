@@ -426,7 +426,7 @@ export function TableDataView({
             aria-label="Filter this table with natural language"
             className="group flex h-8 w-72 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-elevated focus-visible:border-accent focus-visible:outline-none"
           >
-            <span className="flex-1 truncate text-[12px] text-text-subtle transition-colors group-hover:text-text-muted">
+            <span className="flex-1 truncate text-xs text-text-subtle transition-colors group-hover:text-text-muted">
               Describe the rows you want…
             </span>
             <span className="flex shrink-0 items-center gap-0.5">
@@ -519,8 +519,8 @@ export function TableDataView({
         {selectedCount > 0 && (
           <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
             <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-full border border-border-strong/70 bg-surface/95 py-1.5 pl-2 pr-1.5 shadow-2xl shadow-black/60 inset-shadow-[0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl">
-              <span className="flex items-center gap-2 pl-1 pr-1.5 text-[12px]">
-                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-surface-elevated px-1.5 font-mono text-[11px] font-medium text-text ring-1 ring-inset ring-white/10 inset-shadow-[0_1px_0_rgba(255,255,255,0.08)]">
+              <span className="flex items-center gap-2 pl-1 pr-1.5 text-xs">
+                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-surface-elevated px-1.5 font-mono text-xs font-medium text-text ring-1 ring-inset ring-white/10 inset-shadow-[0_1px_0_rgba(255,255,255,0.08)]">
                   {selectedCount}
                 </span>
                 <span className="text-text-subtle">

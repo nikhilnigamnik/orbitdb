@@ -13,7 +13,7 @@ export function ErrorState({ title = 'Something went wrong', message, onRetry }:
     <div className="flex flex-col items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-4">
       <div className="flex items-center gap-2 text-red-400">
         <IconAlertTriangle size={16} />
-        <span className="text-sm font-medium">{title}</span>
+        <span className="text-xs font-medium">{title}</span>
         <Chip tone="rose">Error</Chip>
       </div>
       <p className="text-xs text-red-300/80 break-all font-mono">{message}</p>

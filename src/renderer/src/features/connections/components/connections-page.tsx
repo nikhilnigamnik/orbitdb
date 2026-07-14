@@ -135,7 +135,7 @@ export function ConnectionsPage() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <img src={orbitdbLogo} alt={APP_NAME} className="h-7 w-7 object-contain" />
-                <span className="truncate text-[18px] font-semibold text-text">{APP_NAME}</span>
+                <span className="truncate text-xs font-semibold text-text">{APP_NAME}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">

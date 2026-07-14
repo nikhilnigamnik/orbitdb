@@ -153,7 +153,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
               <IconDatabase size={13} />
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-[12.5px] font-semibold text-text">Schemas</span>
+              <span className="text-xs font-semibold text-text">Schemas</span>
             </div>
           </div>
           <Tooltip>
@@ -182,7 +182,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
           type="button"
           onClick={openPalette}
           aria-label="Open command palette"
-          className="group flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left text-[12px] text-text-subtle transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-muted"
+          className="group flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left text-xs text-text-subtle transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-muted"
         >
           <IconSearch size={12} className="shrink-0" />
           <span className="flex-1 truncate">Search tables…</span>
@@ -196,7 +196,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
       <div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
         {pinned.length > 0 && (
           <div className="mb-2 border-b border-border/60 pb-2">
-            <div className="px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-text-subtle">
+            <div className="px-2 pb-1 pt-1 text-xs font-semibold uppercase tracking-wider text-text-subtle">
               Pinned
             </div>
             <SlidingHoverList as="div">
@@ -214,7 +214,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                   >
                     <button
                       onClick={() => navigate(tableRoute(pin.schema, pin.table))}
-                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px]"
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs"
                       title={`${pin.schema}.${pin.table}`}
                     >
                       <IconTable
@@ -225,7 +225,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                         )}
                       />
                       <span className="truncate">{pin.table}</span>
-                      <span className="ml-auto truncate font-mono text-[9.5px] text-text-subtle">
+                      <span className="ml-auto truncate font-mono text-xs text-text-subtle">
                         {pin.schema}
                       </span>
                     </button>
@@ -256,8 +256,8 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
         ) : schemas.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-1 py-10 px-4 text-center">
             <IconDatabase size={20} className="text-text-subtle" />
-            <p className="text-[12px] font-medium text-text">No schemas</p>
-            <p className="text-[10.5px] text-text-subtle">This database has no visible schemas.</p>
+            <p className="text-xs font-medium text-text">No schemas</p>
+            <p className="text-xs text-text-subtle">This database has no visible schemas.</p>
           </div>
         ) : (
           schemas.map((schema) => {
@@ -274,7 +274,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
               >
                 <CollapsibleTrigger
                   className={cn(
-                    'group flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[12.5px] font-medium transition-colors hover:bg-surface-elevated/40',
+                    'group flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-surface-elevated/40',
                     isSchemaActive ? 'text-text' : 'text-text-muted hover:text-text'
                   )}
                 >
@@ -287,7 +287,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                   />
                   <span className="truncate">{schema}</span>
                   {state && !state.isLoading && (
-                    <span className="ml-auto text-[10px] text-text-subtle">{allTables.length}</span>
+                    <span className="ml-auto text-xs text-text-subtle">{allTables.length}</span>
                   )}
                 </CollapsibleTrigger>
 
@@ -298,9 +298,9 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                         <Spinner size={14} />
                       </div>
                     ) : state?.error ? (
-                      <p className="px-3 py-1.5 text-[11px] text-red-400/80">{state.error}</p>
+                      <p className="px-3 py-1.5 text-xs text-red-400/80">{state.error}</p>
                     ) : allTables.length === 0 ? (
-                      <p className="px-3 py-1.5 text-[11px] text-text-subtle">Empty schema</p>
+                      <p className="px-3 py-1.5 text-xs text-text-subtle">Empty schema</p>
                     ) : (
                       <SlidingHoverList as="div">
                         {allTables.map((table, idx) => {
@@ -322,7 +322,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                             >
                               <button
                                 onClick={() => selectTable(schema, table)}
-                                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px]"
+                                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs"
                                 title={table.name}
                               >
                                 <Icon
@@ -334,7 +334,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                                 />
                                 <span className="truncate">{table.name}</span>
                                 {isView && (
-                                  <span className="ml-auto rounded bg-surface-elevated px-1 py-0 text-[9px] font-medium uppercase tracking-wide text-text-subtle">
+                                  <span className="ml-auto rounded bg-surface-elevated px-1 py-0 text-xs font-medium uppercase tracking-wide text-text-subtle">
                                     view
                                   </span>
                                 )}
@@ -342,7 +342,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                                   !tableIsPinned &&
                                   table.estimatedRows != null &&
                                   table.estimatedRows > 0 && (
-                                    <span className="ml-auto font-mono text-[10px] text-text-subtle opacity-0 transition-opacity group-hover/row:opacity-100">
+                                    <span className="ml-auto font-mono text-xs text-text-subtle opacity-0 transition-opacity group-hover/row:opacity-100">
                                       {formatNumber(table.estimatedRows)}
                                     </span>
                                   )}

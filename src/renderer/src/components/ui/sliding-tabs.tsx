@@ -67,7 +67,7 @@ export function SlidingTabs<T extends string = string>({
             {typeof tab.count === 'number' && (
               <span
                 className={cn(
-                  'rounded-full px-1.5 py-px text-[10px] tabular-nums',
+                  'rounded-full px-1.5 py-px text-xs tabular-nums',
                   isActive
                     ? 'bg-surface text-text-muted'
                     : 'bg-surface-elevated/60 text-text-subtle'

@@ -201,10 +201,10 @@ export function ConnectionFormSheet({
       content={
         <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
           <div className="flex shrink-0 flex-col gap-0.5 border-b border-border px-4 py-3 pr-12">
-            <h2 className="text-[13px] font-semibold text-text">
+            <h2 className="text-xs font-semibold text-text">
               {initial ? 'Edit connection' : 'New connection'}
             </h2>
-            <p className="text-[11px] text-text-subtle">
+            <p className="text-xs text-text-subtle">
               Connect to a {ENGINE_LABEL[values.engine]} database.
             </p>
           </div>
@@ -241,7 +241,7 @@ export function ConnectionFormSheet({
                       </div>
                       <p
                         className={cn(
-                          'truncate text-[12px] font-semibold transition-colors',
+                          'truncate text-xs font-semibold transition-colors',
                           isSelected ? 'text-text' : 'text-text-muted group-hover:text-text'
                         )}
                       >
@@ -458,7 +458,7 @@ export function ConnectionFormSheet({
                   </FormField>
                 </div>
 
-                <label className="flex items-center justify-between gap-3 pt-1 text-[12.5px] text-text-muted">
+                <label className="flex items-center justify-between gap-3 pt-1 text-xs text-text-muted">
                   <span>Use SSL (insecure mode, ignores cert verification)</span>
                   <Switch
                     checked={values.ssl}
@@ -491,13 +491,13 @@ export function ConnectionFormSheet({
                     {testResult.success ? 'Connected' : 'Failed'}
                   </Chip>
                   {testResult.serverVersion && (
-                    <span className="truncate rounded-sm bg-surface-elevated/60 px-1.5 py-0.5 font-mono text-[10.5px] text-text-muted ring-1 ring-inset ring-white/5">
+                    <span className="truncate rounded-sm bg-surface-elevated/60 px-1.5 py-0.5 font-mono text-xs text-text-muted ring-1 ring-inset ring-white/5">
                       {shortServerVersion(testResult.serverVersion)}
                     </span>
                   )}
                 </div>
                 {!testResult.success && testResult.error && (
-                  <p className="mt-2 break-all font-mono text-[11px] text-rose-300/80">
+                  <p className="mt-2 break-all font-mono text-xs text-rose-300/80">
                     {testResult.error}
                   </p>
                 )}
@@ -505,7 +505,7 @@ export function ConnectionFormSheet({
             )}
 
             {formError && (
-              <p className="rounded-md border border-red-500/20 bg-red-500/5 p-2 font-mono text-[11px] text-red-300/80">
+              <p className="rounded-md border border-red-500/20 bg-red-500/5 p-2 font-mono text-xs text-red-300/80">
                 {formError}
               </p>
             )}

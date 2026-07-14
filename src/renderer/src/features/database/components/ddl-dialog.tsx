@@ -189,8 +189,8 @@ export function DdlDialog({
       content={
         <div className="flex h-full min-h-0 flex-col">
           <div className="flex shrink-0 flex-col gap-0.5 border-b border-border px-4 py-3 pr-12">
-            <h2 className="text-[13px] font-semibold text-text">{TITLES[kind]}</h2>
-            <p className="text-[11px] text-text-subtle">
+            <h2 className="text-xs font-semibold text-text">{TITLES[kind]}</h2>
+            <p className="text-xs text-text-subtle">
               {schema}.{table}
             </p>
           </div>
@@ -276,14 +276,14 @@ export function DdlDialog({
                       return (
                         <label
                           key={col.name}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[12.5px] text-text-muted transition-colors hover:bg-surface-elevated"
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs text-text-muted transition-colors hover:bg-surface-elevated"
                         >
                           <Checkbox
                             checked={checked}
                             onCheckedChange={(v) => toggleIndexColumn(col.name, !!v)}
                           />
                           <span className="font-medium text-text">{col.name}</span>
-                          <span className="font-mono text-[10.5px] text-text-subtle">
+                          <span className="font-mono text-xs text-text-subtle">
                             {col.dataType}
                           </span>
                         </label>
@@ -301,7 +301,7 @@ export function DdlDialog({
             )}
 
             {isDestructive && (
-              <div className="flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2.5 text-[12px] text-rose-200">
+              <div className="flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2.5 text-xs text-rose-200">
                 <IconAlertTriangle size={15} className="mt-px shrink-0" stroke={2} />
                 <span>
                   {kind === 'drop-column'
@@ -312,15 +312,15 @@ export function DdlDialog({
             )}
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+              <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
                 Generated SQL
               </span>
               {previewError ? (
-                <p className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-[12px] text-rose-200">
+                <p className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-xs text-rose-200">
                   {previewError}
                 </p>
               ) : (
-                <pre className="min-h-14 overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3 py-2.5 font-mono text-[12px] leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
+                <pre className="min-h-14 overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3 py-2.5 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
                   {sql || (
                     <span className="text-text-subtle">
                       Fill in the fields to preview the statement.
@@ -331,7 +331,7 @@ export function DdlDialog({
             </div>
 
             {execError && (
-              <p className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-[12px] text-rose-200">
+              <p className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-xs text-rose-200">
                 {execError}
               </p>
             )}
@@ -377,9 +377,9 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[12px] font-medium text-text">{label}</span>
+      <span className="text-xs font-medium text-text">{label}</span>
       {children}
-      {hint && <span className="text-[11px] text-text-subtle">{hint}</span>}
+      {hint && <span className="text-xs text-text-subtle">{hint}</span>}
     </label>
   )
 }
@@ -398,8 +398,8 @@ function ToggleRow({
   return (
     <div className="flex items-center justify-between gap-4">
       <div className="flex flex-col">
-        <span className="text-[12px] font-medium text-text">{label}</span>
-        {hint && <span className="text-[11px] text-text-subtle">{hint}</span>}
+        <span className="text-xs font-medium text-text">{label}</span>
+        {hint && <span className="text-xs text-text-subtle">{hint}</span>}
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
     </div>

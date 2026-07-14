@@ -42,7 +42,7 @@ export function PaginationBar({
 
   return (
     <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-surface/40 px-5 py-2">
-      <div className="flex items-center gap-1.5 text-[11.5px]">
+      <div className="flex items-center gap-1.5 text-xs">
         <span className="inline-flex items-center gap-1 rounded-md bg-surface-elevated/40 px-1.5 py-0.5 font-mono text-text ring-1 ring-white/5">
           {formatNumber(start)}
           <span className="text-text-subtle">–</span>
@@ -57,7 +57,7 @@ export function PaginationBar({
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 text-[11.5px] text-text-subtle">
+        <div className="flex items-center gap-1.5 text-xs text-text-subtle">
           <span>Rows per page</span>
           <Popover
             openPopover={isPageSizeOpen}
@@ -79,7 +79,7 @@ export function PaginationBar({
                         setIsPageSizeOpen(false)
                       }}
                       className={cn(
-                        'flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors',
+                        'flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs transition-colors',
                         isSelected
                           ? 'bg-surface-elevated text-text'
                           : 'text-text-muted hover:bg-surface-elevated/60 hover:text-text'
@@ -96,7 +96,7 @@ export function PaginationBar({
             <button
               type="button"
               aria-label="Rows per page"
-              className="flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-surface-elevated/30 px-2 text-[11.5px] text-text transition-colors hover:bg-surface-elevated hover:text-text"
+              className="flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-surface-elevated/30 px-2 text-xs text-text transition-colors hover:bg-surface-elevated hover:text-text"
             >
               <span className="font-mono">{pageSize}</span>
               <IconSelector size={12} className="text-text-subtle" />
@@ -116,7 +116,7 @@ export function PaginationBar({
             <IconChevronLeft size={13} />
           </PagerButton>
 
-          <div className="flex select-none items-center gap-1 px-2 text-[11.5px] tabular-nums text-text-subtle">
+          <div className="flex select-none items-center gap-1 px-2 text-xs tabular-nums text-text-subtle">
             <span className="font-mono text-text">{currentPage}</span>
             {totalPages != null && (
               <>
