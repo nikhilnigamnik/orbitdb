@@ -23,7 +23,7 @@ import { formatCellValue } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import { LoadingState } from '@renderer/components/common/loading-state'
-import { CellEditPopover } from './cell-edit-popover'
+import { CellInlineEditor } from './cell-inline-editor'
 import type { ColumnInfo, SortDirection } from '@renderer/types'
 
 type Row = Record<string, unknown>
@@ -225,14 +225,14 @@ export function DataGrid({
                 <div className="flex min-w-0 flex-col leading-tight">
                   <span
                     className={cn(
-                      'truncate text-[11.5px]',
+                      'truncate text-xs',
                       isActive ? 'font-semibold text-text' : 'font-medium text-text-muted'
                     )}
                   >
                     {col.name}
                   </span>
                   {col.dataType && (
-                    <span className="truncate font-mono text-[10px] font-normal text-text-subtle">
+                    <span className="truncate font-mono text-xs font-normal text-text-subtle">
                       {col.dataType}
                     </span>
                   )}
@@ -359,6 +359,49 @@ export function DataGrid({
     getCoreRowModel: getCoreRowModel()
   })
 
+  // Columns stay auto-sized until the user drags a header edge; only then is
+  // an explicit width pinned. Double-clicking the handle clears it back to auto.
+  // The drag is driven manually (not header.getResizeHandler()) because TanStack
+  // starts from its 150px default size, which makes auto-sized columns jump.
+  const columnSizing = table.getState().columnSizing
+  const resizedWidth = React.useCallback(
+    (columnId: string): number | undefined => columnSizing[columnId],
+    [columnSizing]
+  )
+  const [resizingColumn, setResizingColumn] = React.useState<string | null>(null)
+  const startResize = React.useCallback(
+    (e: React.MouseEvent<HTMLDivElement>, columnId: string) => {
+      e.preventDefault()
+      const th = e.currentTarget.closest('th')
+      if (!th) return
+      const startWidth = th.getBoundingClientRect().width
+      const startX = e.clientX
+      setResizingColumn(columnId)
+      const onMove = (ev: MouseEvent): void => {
+        const width = Math.min(1200, Math.max(64, startWidth + ev.clientX - startX))
+        table.setColumnSizing((prev) => ({ ...prev, [columnId]: width }))
+      }
+      const onUp = (): void => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+        setResizingColumn(null)
+      }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [table]
+  )
+  const resetColumnSize = React.useCallback(
+    (columnId: string) => {
+      table.setColumnSizing((prev) => {
+        const next = { ...prev }
+        delete next[columnId]
+        return next
+      })
+    },
+    [table]
+  )
+
   const visibleColCount = tableColumns.length
 
   if (isInitialLoad) {
@@ -369,10 +412,11 @@ export function DataGrid({
     <div
       className={cn(
         'min-h-0 flex-1 overflow-auto transition-opacity duration-150',
-        isLoading && 'pointer-events-none opacity-50'
+        isLoading && 'pointer-events-none opacity-50',
+        resizingColumn && 'cursor-col-resize select-none'
       )}
     >
-      <table className="min-w-full border-separate border-spacing-0 text-[12.5px]">
+      <table className="min-w-full border-separate border-spacing-0 text-xs">
         <thead className="sticky top-0 z-10">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
@@ -381,20 +425,44 @@ export function DataGrid({
                 const isIndex = header.column.id === INDEX_COLUMN_ID
                 const isActions = header.column.id === ACTIONS_COLUMN_ID
                 const isDataColumn = !isSelect && !isIndex && !isActions
+                const width = isDataColumn ? resizedWidth(header.column.id) : undefined
                 return (
                   <th
                     key={header.id}
+                    style={
+                      width !== undefined ? { width, minWidth: width, maxWidth: width } : undefined
+                    }
                     className={cn(
                       'border-b border-border bg-surface text-left font-medium',
                       isSelect && 'w-9 px-2 py-2',
-                      isIndex && 'w-10 px-3 py-2 text-[10.5px] text-text-subtle',
+                      isIndex &&
+                        'w-10 border-r border-r-border/40 px-3 py-2 text-xs text-text-subtle',
                       isActions && 'sticky right-0 w-20 px-3 py-2',
-                      isDataColumn && 'p-0 text-[11.5px] text-text-muted'
+                      isDataColumn && 'relative p-0 text-xs text-text-muted'
                     )}
                   >
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
+                    {isDataColumn && (
+                      <div
+                        onMouseDown={(e) => startResize(e, header.column.id)}
+                        onDoubleClick={() => resetColumnSize(header.column.id)}
+                        title="Drag to resize, double-click to reset"
+                        className="group/resize absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize touch-none select-none"
+                      >
+                        {/* right-0.5 puts the line on the exact pixel the td
+                            border-r occupies, so header and body dividers align */}
+                        <div
+                          className={cn(
+                            'absolute inset-y-0 right-0.5 w-px transition-colors',
+                            resizingColumn === header.column.id
+                              ? 'bg-border-strong'
+                              : 'bg-border/40 group-hover/resize:bg-border-strong'
+                          )}
+                        />
+                      </div>
+                    )}
                   </th>
                 )
               })}
@@ -406,7 +474,7 @@ export function DataGrid({
             <tr>
               <td
                 colSpan={visibleColCount}
-                className="px-3 py-10 text-center text-[12.5px] text-text-subtle"
+                className="px-3 py-10 text-center text-xs text-text-subtle"
               >
                 No rows.
               </td>
@@ -444,15 +512,22 @@ export function DataGrid({
                       isData &&
                       savedCell?.rowIndex === row.index &&
                       savedCell?.columnId === cell.column.id
+                    const width = isData ? resizedWidth(cell.column.id) : undefined
                     return (
                       <td
                         key={cell.id}
+                        style={
+                          width !== undefined
+                            ? { width, minWidth: width, maxWidth: width }
+                            : undefined
+                        }
                         className={cn(
                           'border-b border-border/60 px-3 py-1.5',
                           isSelect && 'px-2',
-                          isIndex && 'text-[10.5px] text-text-subtle',
+                          (isIndex || isData) && 'border-r border-r-border/40',
+                          isIndex && 'text-xs text-text-subtle',
                           isActions && 'sticky right-0 bg-surface px-2 py-1 group-hover:bg-surface',
-                          isData && 'max-w-xs truncate font-mono text-[11.5px]',
+                          isData && 'max-w-xs truncate font-mono text-xs',
                           isData && canEditCells && 'cursor-text',
                           isEditingThis && 'bg-accent/10 ring-1 ring-inset ring-accent/50',
                           isSavedFlash && 'animate-cell-saved'
@@ -478,7 +553,7 @@ export function DataGrid({
                         }
                       >
                         {isEditingThis && editColumn && onEditCell ? (
-                          <CellEditPopover
+                          <CellInlineEditor
                             column={editColumn}
                             value={cellValue}
                             onSave={async (newValue) => {
@@ -495,15 +570,7 @@ export function DataGrid({
                             onNavigate={(direction) =>
                               moveEditing(row.index, cell.column.id, direction)
                             }
-                          >
-                            <span className="block max-w-full truncate">
-                              {cellValue === null ? (
-                                <span className="italic text-text-subtle">NULL</span>
-                              ) : (
-                                formatCellValue(cellValue)
-                              )}
-                            </span>
-                          </CellEditPopover>
+                          />
                         ) : (
                           flexRender(cell.column.columnDef.cell, cell.getContext())
                         )}
