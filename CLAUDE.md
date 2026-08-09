@@ -29,6 +29,11 @@ Tests run on Vitest (`vitest.config.ts`). Every spec lives under the top-level `
 folder, mirroring the `src/` layout — **not** colocated with the source file, so the
 electron-vite build never has to glob around them. New behaviour ships with a spec.
 
+`vitest.config.ts` pins `TZ` to `Asia/Kolkata`. Date rendering is timezone-sensitive, so
+without it a spec that passes locally fails on a UTC runner — and a zero offset renders as
+`Z`, which never exercises the offset-carrying path. Assert exact offsets, not a loose
+pattern.
+
 Three testing shapes, cheapest first:
 
 - **Pure logic** — plain `.test.ts`. Prefer extracting decision-making out of a component

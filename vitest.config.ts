@@ -13,7 +13,11 @@ export default defineConfig({
     // .tsx specs render components into jsdom via the per-file
     // `@vitest-environment jsdom` pragma; everything else stays on node.
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
-    environment: 'node'
+    environment: 'node',
+    // Date formatting is timezone-sensitive, so pin one — otherwise a spec that
+    // passes in +05:30 fails on a UTC runner. Deliberately not UTC: an offset of
+    // zero renders as 'Z' and never exercises the offset path.
+    env: { TZ: 'Asia/Kolkata' }
   },
   esbuild: {
     jsx: 'automatic'

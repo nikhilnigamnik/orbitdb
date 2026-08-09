@@ -28,6 +28,11 @@ function column(udtName: string, overrides: Partial<ColumnInfo> = {}): ColumnInf
 const coerce = (udt: string, raw: string, isNull = false, overrides: Partial<ColumnInfo> = {}) =>
   coerceCellValue(column(udt, overrides), raw, isNull)
 
+// vitest.config.ts pins TZ to Asia/Kolkata, so these offsets are the same on
+// any machine — and a non-zero offset means the zone actually renders, rather
+// than collapsing to the 'Z' that UTC would produce.
+const OFFSET = '+05:30'
+
 describe('null', () => {
   it('wins over whatever was typed', () => {
     expect(coerce('text', 'ignored', true)).toBeNull()
@@ -177,7 +182,7 @@ describe('stringifyValue', () => {
 
   it('keeps the offset on a timestamptz, which is an absolute instant', () => {
     const value = new Date('2026-08-09T12:00:00Z')
-    expect(stringifyValue(value, 'timestamptz')).toMatch(/[+-]\d{2}:\d{2}$/)
+    expect(stringifyValue(value, 'timestamptz')).toBe(`2026-08-09 17:30:00${OFFSET}`)
   })
 
   it('drops the time from a date column', () => {
