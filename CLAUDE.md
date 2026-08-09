@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OrbitDB is an Electron desktop DB client for PostgreSQL, MySQL/MariaDB, and Cloudflare D1. React 19 + TypeScript renderer, Node main process, electron-vite build.
 
+This is an MIT-licensed open-source project. `README.md` is the user-facing description,
+`CONTRIBUTING.md` covers setup and review expectations, and `SECURITY.md` covers private
+disclosure — keep all three current when behaviour changes.
+
 ## Commands
 
 ```bash

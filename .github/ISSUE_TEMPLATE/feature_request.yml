@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest something OrbitDB should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The problem you're hitting, rather than the solution you have in mind — it often leads somewhere better.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you had in mind
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How you work around it today
