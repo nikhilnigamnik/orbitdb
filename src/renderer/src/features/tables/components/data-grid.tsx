@@ -103,6 +103,7 @@ export function DataGrid({
     setInternalRowSelection({})
   }, [rows, isControlled])
 
+  const [isEditorDirty, setIsEditorDirty] = React.useState(false)
   const [editingCell, setEditingCell] = React.useState<{
     rowIndex: number
     columnId: string
@@ -160,10 +161,9 @@ export function DataGrid({
         nextCol = dataColumnIds.length - 1
         nextRow -= 1
       }
-      if (nextRow < 0 || nextRow >= rows.length) {
-        setEditingCell(null)
-        return
-      }
+      // At the edge of the loaded rows, stay put rather than ending the session
+      // without a signal — the commit already happened either way.
+      if (nextRow < 0 || nextRow >= rows.length) return
       setEditingCell({ rowIndex: nextRow, columnId: dataColumnIds[nextCol] })
     },
     [dataColumnIds, rows.length]
@@ -553,7 +553,8 @@ export function DataGrid({
                           isActions && 'sticky right-0 bg-surface px-2 py-1 group-hover:bg-surface',
                           isData && 'max-w-xs truncate font-mono text-xs',
                           isData && canEditCells && 'cursor-text',
-                          isEditingThis && 'bg-accent/10 ring-1 ring-inset ring-accent-text/50',
+                          isEditingThis && 'bg-accent/10 ring-1 ring-inset',
+                          isEditingThis && (isEditorDirty ? 'ring-accent' : 'ring-accent-text/50'),
                           isSavedFlash && 'animate-cell-saved'
                         )}
                         title={
@@ -596,6 +597,7 @@ export function DataGrid({
                             onNavigate={(direction) =>
                               moveEditing(row.index, cell.column.id, direction)
                             }
+                            onDirtyChange={setIsEditorDirty}
                           />
                         ) : (
                           flexRender(cell.column.columnDef.cell, cell.getContext())

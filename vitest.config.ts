@@ -14,6 +14,7 @@ export default defineConfig({
     // `@vitest-environment jsdom` pragma; everything else stays on node.
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     environment: 'node',
+    setupFiles: ['tests/setup/jsdom-polyfills.ts'],
     // Date formatting is timezone-sensitive, so pin one — otherwise a spec that
     // passes in +05:30 fails on a UTC runner. Deliberately not UTC: an offset of
     // zero renders as 'Z' and never exercises the offset path.
