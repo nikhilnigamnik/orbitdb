@@ -5,6 +5,7 @@ export type {
   ConnectionInput,
   DatabaseEngine,
   DdlFormKind,
+  FilterJoin,
   DdlOperation,
   DdlOperationKind,
   DdlRequest,

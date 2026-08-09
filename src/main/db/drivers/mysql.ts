@@ -378,7 +378,12 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
 
-  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, filterDialect)
+  const { whereSql, params } = buildFilterSql(
+    opts.filters,
+    validColumns,
+    filterDialect,
+    opts.filterJoin
+  )
 
   let orderSql = ''
   if (opts.orderBy && validColumns.has(opts.orderBy)) {
@@ -405,7 +410,12 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
 async function countRows(opts: CountRowsOptions): Promise<number | null> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
-  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, filterDialect)
+  const { whereSql, params } = buildFilterSql(
+    opts.filters,
+    validColumns,
+    filterDialect,
+    opts.filterJoin
+  )
 
   // Unfiltered counts on a huge table buy precision nobody asked for at a price
   // the UI would feel; the estimate already covers that case.

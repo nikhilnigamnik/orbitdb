@@ -116,6 +116,12 @@ export interface RowFilter {
   value?: string
 }
 
+/**
+ * How several filters combine. A single top-level connector rather than
+ * arbitrary nesting: it covers "any of these" without a query-builder UI.
+ */
+export type FilterJoin = 'and' | 'or'
+
 export interface GetRowsOptions {
   connectionId: string
   schema: string
@@ -125,6 +131,7 @@ export interface GetRowsOptions {
   orderBy?: string
   orderDir?: SortDirection
   filters?: RowFilter[]
+  filterJoin?: FilterJoin
 }
 
 export interface CountRowsOptions {
@@ -132,6 +139,7 @@ export interface CountRowsOptions {
   schema: string
   table: string
   filters?: RowFilter[]
+  filterJoin?: FilterJoin
 }
 
 /**

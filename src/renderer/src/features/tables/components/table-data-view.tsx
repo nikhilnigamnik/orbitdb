@@ -10,11 +10,19 @@ import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { unwrap } from '@renderer/lib/ipc'
+import {
+  FILTERS_PARAM,
+  JOIN_PARAM,
+  decodeFilters,
+  decodeJoin,
+  encodeFilters
+} from '@renderer/features/tables/lib/filter-params'
 import { DEFAULT_PAGE_SIZE } from '@renderer/config/site'
 import { tableRouteWithFk } from '@renderer/config/routes'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import type {
   ColumnInfo,
+  FilterJoin,
   RowFilter,
   RowsResult,
   SortDirection,
@@ -45,7 +53,7 @@ export function TableDataView({
   onReady
 }: TableDataViewProps) {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const fkColumn = searchParams.get('fkColumn')
   const fkValue = searchParams.get('fkValue')
 
@@ -61,12 +69,53 @@ export function TableDataView({
   const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE)
   const [orderBy, setOrderBy] = React.useState<string | null>(null)
   const [orderDir, setOrderDir] = React.useState<SortDirection>('asc')
-  const [filters, setFilters] = React.useState<RowFilter[]>(() => {
+  // Filters live in the URL so a filtered view can be linked and reopened —
+  // an FK deep link already worked that way while a hand-built filter did not.
+  const [filters, setFiltersState] = React.useState<RowFilter[]>(() => {
+    const fromUrl = decodeFilters(searchParams.get(FILTERS_PARAM))
+    if (fromUrl.length > 0) return fromUrl
     if (fkColumn && fkValue != null) {
       return [{ column: fkColumn, operator: '=', value: fkValue }]
     }
     return []
   })
+  const [filterJoin, setFilterJoinState] = React.useState<FilterJoin>(() =>
+    decodeJoin(searchParams.get(JOIN_PARAM))
+  )
+
+  const writeFilterParams = React.useCallback(
+    (next: RowFilter[], join: FilterJoin) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev)
+          const encoded = encodeFilters(next)
+          if (encoded) params.set(FILTERS_PARAM, encoded)
+          else params.delete(FILTERS_PARAM)
+          if (join === 'or' && next.length > 1) params.set(JOIN_PARAM, join)
+          else params.delete(JOIN_PARAM)
+          return params
+        },
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
+
+  const setFilters = React.useCallback(
+    (next: RowFilter[]) => {
+      setFiltersState(next)
+      writeFilterParams(next, filterJoin)
+    },
+    [filterJoin, writeFilterParams]
+  )
+
+  const setFilterJoin = React.useCallback(
+    (join: FilterJoin) => {
+      setFilterJoinState(join)
+      writeFilterParams(filters, join)
+    },
+    [filters, writeFilterParams]
+  )
 
   const fkByColumn = React.useMemo(() => {
     const map = new Map<string, { schema: string; table: string; column: string }>()
@@ -141,7 +190,8 @@ export function TableDataView({
       offset,
       orderBy,
       orderDir,
-      filters
+      filters,
+      filterJoin
     })
 
     let data: RowsResult
@@ -170,7 +220,8 @@ export function TableDataView({
             offset,
             orderBy: orderBy ?? undefined,
             orderDir,
-            filters
+            filters,
+            filterJoin
           })
         )
         if (requestId !== requestIdRef.current) return
@@ -202,7 +253,8 @@ export function TableDataView({
       offset: nextOffset,
       orderBy,
       orderDir,
-      filters
+      filters,
+      filterJoin
     })
 
     void (async () => {
@@ -216,7 +268,8 @@ export function TableDataView({
             offset: nextOffset,
             orderBy: orderBy ?? undefined,
             orderDir,
-            filters
+            filters,
+            filterJoin
           })
         )
         prefetchCacheRef.current = { key: nextKey, data: nextData }
@@ -224,7 +277,17 @@ export function TableDataView({
         // silent — prefetch failures shouldn't surface
       }
     })()
-  }, [connectionId, details.schema, details.name, pageSize, offset, orderBy, orderDir, filters])
+  }, [
+    connectionId,
+    details.schema,
+    details.name,
+    pageSize,
+    offset,
+    orderBy,
+    orderDir,
+    filters,
+    filterJoin
+  ])
 
   React.useEffect(() => {
     setOffset(0)
@@ -251,7 +314,8 @@ export function TableDataView({
         connectionId,
         schema: details.schema,
         table: details.name,
-        filters
+        filters,
+        filterJoin
       })
     )
       .then((total) => {
@@ -263,7 +327,7 @@ export function TableDataView({
     return () => {
       cancelled = true
     }
-  }, [connectionId, details.schema, details.name, filters])
+  }, [connectionId, details.schema, details.name, filters, filterJoin])
 
   // Signal the container once the first page lands, so it can reveal the header
   // and grid together — a single loader instead of loader-then-loader.
@@ -503,6 +567,8 @@ export function TableDataView({
           columns={columns}
           filters={filters}
           onChange={setFilters}
+          join={filterJoin}
+          onChangeJoin={setFilterJoin}
           onApply={() => {
             setOffset(0)
           }}

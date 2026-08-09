@@ -340,7 +340,12 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
 
   // SQLite lacks ILIKE; the dialect folds it onto LIKE, which is already
   // case-insensitive for ASCII by default.
-  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, sqliteFilterDialect)
+  const { whereSql, params } = buildFilterSql(
+    opts.filters,
+    validColumns,
+    sqliteFilterDialect,
+    opts.filterJoin
+  )
 
   let orderSql = ''
   if (opts.orderBy && validColumns.has(opts.orderBy)) {
@@ -384,7 +389,12 @@ async function countRows(opts: CountRowsOptions): Promise<number | null> {
   const saved = loadSaved(opts.connectionId)
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
-  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, sqliteFilterDialect)
+  const { whereSql, params } = buildFilterSql(
+    opts.filters,
+    validColumns,
+    sqliteFilterDialect,
+    opts.filterJoin
+  )
 
   // SQLite keeps no row estimate, so there is no cheap total to fall back on —
   // count unconditionally. D1 databases are small enough for that to be fine.
