@@ -2,6 +2,7 @@ import type {
   ConnectionInput,
   DdlRequest,
   DistinctValuesOptions,
+  CountRowsOptions,
   GetRowsOptions,
   QueryResult,
   RowDelete,
@@ -35,6 +36,8 @@ export interface DatabaseDriver {
   getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph>
 
   getRows(opts: GetRowsOptions): Promise<RowsResult>
+  /** Exact row count for the current filters, or null when deliberately skipped. */
+  countRows(opts: CountRowsOptions): Promise<number | null>
   insertRow(opts: RowMutation): Promise<Record<string, unknown>>
   updateRow(opts: RowUpdate): Promise<Record<string, unknown>>
   deleteRow(opts: RowDelete): Promise<{ deleted: number }>
