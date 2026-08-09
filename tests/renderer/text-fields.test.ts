@@ -13,6 +13,7 @@ import { Textarea } from '@renderer/components/ui/textarea'
 import { CmdKHint } from '@renderer/features/command-palette/components/cmdk-hint'
 import { CommandPaletteProvider } from '@renderer/features/command-palette/store'
 import { FiltersBar } from '@renderer/features/tables/components/filters-bar'
+import type { RowFilter } from '@renderer/types'
 
 // createElement rather than JSX so these stay plain .ts specs; the components are
 // pure functions of their props, so static markup is enough to assert on classes.
@@ -181,18 +182,42 @@ describe('Kbd', () => {
 })
 
 describe('the filter row', () => {
-  const markup = () =>
+  const render = (filters: RowFilter[]) =>
     markupOf(
       createElement(FiltersBar, {
         connectionId: 'c',
         schema: 's',
         table: 't',
         columns: [],
-        filters: [{ column: 'id', operator: '=', value: '1' }],
+        filters,
         onChange: () => {},
         onApply: () => {}
       })
     )
+
+  const markup = () => render([{ column: 'id', operator: '=', value: '1' }])
+
+  it('offers each applied filter for editing, not only for removal', () => {
+    expect(markup()).toContain('aria-label="Edit filter on id"')
+    expect(markup()).toContain('aria-label="Remove filter"')
+  })
+
+  it('offers clear-all only once a second filter makes it worth having', () => {
+    expect(render([])).not.toContain('Clear all')
+    expect(render([{ column: 'id', operator: '=', value: '1' }])).not.toContain('Clear all')
+    expect(
+      render([
+        { column: 'id', operator: '=', value: '1' },
+        { column: 'name', operator: 'like', value: '%a%' }
+      ])
+    ).toContain('Clear all')
+  })
+
+  it('shows a unary filter without an empty value segment', () => {
+    const unary = render([{ column: 'deleted_at', operator: 'is null', value: '' }])
+    expect(unary).toContain('is null')
+    expect(unary).toContain('aria-label="Edit filter on deleted_at"')
+  })
 
   it('stands the applied-filter chip at control height, level with the trigger', () => {
     // The chip used to size itself off py-1, leaving it 2px short of the button

@@ -10,7 +10,12 @@ export default defineConfig({
     }
   },
   test: {
-    include: ['tests/**/*.test.ts'],
+    // .tsx specs render components into jsdom via the per-file
+    // `@vitest-environment jsdom` pragma; everything else stays on node.
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     environment: 'node'
+  },
+  esbuild: {
+    jsx: 'automatic'
   }
 })
