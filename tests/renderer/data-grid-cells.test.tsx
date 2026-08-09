@@ -77,6 +77,26 @@ describe('timestamps', () => {
   })
 })
 
+describe('the column header', () => {
+  it('puts the name and its type on one line', () => {
+    const { container } = setup([column('created_at', 'timestamptz')], [])
+    const name = screen.getByText('created_at')
+    const wrapper = name.parentElement!
+
+    expect(wrapper.className).not.toContain('flex-col')
+    expect(wrapper.className).toContain('items-baseline')
+    // Both live in the same row, so the type sits beside the name.
+    expect(wrapper.textContent).toBe('created_attimestamptz')
+    expect(container.querySelectorAll('th').length).toBeGreaterThan(0)
+  })
+
+  it('lets the name truncate before the type, which is short and load-bearing', () => {
+    setup([column('a_very_long_column_name_indeed', 'uuid')], [])
+    expect(screen.getByText('a_very_long_column_name_indeed').className).toContain('truncate')
+    expect(screen.getByText('uuid').className).toContain('shrink-0')
+  })
+})
+
 describe('row controls', () => {
   it('reveals the row actions on keyboard focus, not on hover alone', () => {
     // Hover-only would leave anyone tabbing through the grid with invisible
