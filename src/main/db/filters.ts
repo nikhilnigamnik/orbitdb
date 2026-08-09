@@ -1,4 +1,4 @@
-import type { RowFilter } from '../../shared/types'
+import type { FilterJoin, RowFilter } from '../../shared/types'
 
 /**
  * Operators the renderer is allowed to ask for. Anything outside this set is
@@ -45,7 +45,8 @@ export interface FilterSql {
 export function buildFilterSql(
   filters: RowFilter[] | undefined,
   validColumns: Set<string>,
-  dialect: FilterDialect
+  dialect: FilterDialect,
+  join: FilterJoin = 'and'
 ): FilterSql {
   const params: unknown[] = []
   const clauses: string[] = []
@@ -68,8 +69,13 @@ export function buildFilterSql(
     clauses.push(`${column} ${operator} ${dialect.placeholder(params.length)}`)
   }
 
+  // Parenthesised so an OR set stays one unit if anything is ever appended.
+  const combined = clauses.join(join === 'or' ? ' or ' : ' and ')
   return {
-    whereSql: clauses.length > 0 ? `where ${clauses.join(' and ')}` : '',
+    whereSql:
+      clauses.length > 0
+        ? `where ${clauses.length > 1 && join === 'or' ? `(${combined})` : combined}`
+        : '',
     params
   }
 }

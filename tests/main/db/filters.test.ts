@@ -104,6 +104,35 @@ describe('buildFilterSql', () => {
     })
   })
 
+  describe('how several filters combine', () => {
+    const two = [
+      { column: 'id', operator: '=' as const, value: '1' },
+      { column: 'name', operator: '=' as const, value: 'a' }
+    ]
+
+    it('ands them by default', () => {
+      expect(buildFilterSql(two, columns, postgres).whereSql).toBe(
+        'where "id" = $1 and "name" = $2'
+      )
+    })
+
+    it('ors them when asked, wrapped so the set stays one unit', () => {
+      // Without the parentheses, anything appended later would bind to the last
+      // OR branch instead of the whole set.
+      expect(buildFilterSql(two, columns, postgres, 'or').whereSql).toBe(
+        'where ("id" = $1 or "name" = $2)'
+      )
+    })
+
+    it('does not parenthesise a single filter', () => {
+      expect(buildFilterSql([two[0]], columns, postgres, 'or').whereSql).toBe('where "id" = $1')
+    })
+
+    it('numbers placeholders the same either way', () => {
+      expect(buildFilterSql(two, columns, postgres, 'or').params).toEqual(['1', 'a'])
+    })
+  })
+
   describe('per-engine differences', () => {
     it('keeps ilike where the engine has it', () => {
       const { whereSql } = buildFilterSql(
