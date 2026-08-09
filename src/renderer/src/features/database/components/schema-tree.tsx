@@ -48,6 +48,14 @@ interface TablesState {
   error: string | null
 }
 
+/**
+ * Tables rendered per schema before the rest are held back. The sidebar has one
+ * scroll container spanning every schema, so virtualising nested collapsibles
+ * would be a large change; a cap keeps an unbounded list from becoming an
+ * unbounded render, and the palette is the way to find a specific table anyway.
+ */
+const VISIBLE_TABLE_LIMIT = 200
+
 export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: SchemaTreeProps) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -67,6 +75,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
   }, [schemas])
   const [tablesBySchema, setTablesBySchema] = React.useState<Record<string, TablesState>>({})
   const [pinned, setPinned] = React.useState<TableRef[]>(() => loadPinned(connectionId))
+  const [expandedLists, setExpandedLists] = React.useState<Set<string>>(() => new Set())
   const { open: openPalette } = useCommandPalette()
 
   React.useEffect(() => {
@@ -274,6 +283,8 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
             const isOpen = expanded.has(schema)
             const state = tablesBySchema[schema]
             const allTables = state?.tables ?? []
+            const showsAll = expandedLists.has(schema) || allTables.length <= VISIBLE_TABLE_LIMIT
+            const visibleTables = showsAll ? allTables : allTables.slice(0, VISIBLE_TABLE_LIMIT)
             const isSchemaActive = activeSchema === schema
             return (
               <Collapsible
@@ -318,7 +329,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                       <p className="px-3 py-1.5 text-xs text-text-subtle">Empty schema</p>
                     ) : (
                       <SlidingHoverList as="div">
-                        {allTables.map((table, idx) => {
+                        {visibleTables.map((table, idx) => {
                           const isActive = isSchemaActive && activeTable === table.name
                           const isView = table.type === 'view' || table.type === 'materialized_view'
                           const Icon = isView ? IconEye : IconTable
@@ -391,6 +402,15 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                           )
                         })}
                       </SlidingHoverList>
+                    )}
+                    {!showsAll && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedLists((prev) => new Set(prev).add(schema))}
+                        className="mt-0.5 w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs text-text-subtle transition-colors hover:bg-surface-elevated/40 hover:text-text"
+                      >
+                        Show {formatNumber(allTables.length - VISIBLE_TABLE_LIMIT)} more…
+                      </button>
                     )}
                   </div>
                 </CollapsibleContent>
