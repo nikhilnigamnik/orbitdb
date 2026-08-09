@@ -1,5 +1,6 @@
 import { Pool, type PoolConfig } from 'pg'
 import { recordQuery } from '../query-log'
+import { detectCommand, isSchemaChanging } from '../sql-command'
 import {
   MAX_QUERY_RESULT_ROWS,
   type ColumnInfo,
@@ -24,7 +25,7 @@ import {
   type TableInfo,
   type TestConnectionResult
 } from '../../../shared/types'
-import { getConnection } from '../../store/connections-store'
+import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
@@ -59,8 +60,7 @@ function toPoolConfig(input: ConnectionInput): PoolConfig {
 function getPool(connectionId: string): Pool {
   const existing = pools.get(connectionId)
   if (existing) return existing
-  const saved = getConnection(connectionId)
-  if (!saved) throw new Error(`Connection ${connectionId} is not saved`)
+  const saved = requireConnection(connectionId)
   if (saved.engine !== 'postgres') throw new Error(`Wrong driver for connection ${connectionId}`)
   const pool = new Pool(toPoolConfig(saved))
   pool.on('error', (err) => {
@@ -556,6 +556,8 @@ const pgInflight = new Map<string, PgInflightQuery>()
 async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   const pool = getPool(opts.connectionId)
   const started = Date.now()
+  // Runs on a dedicated client (so the backend PID is stable for cancellation),
+  // which bypasses the instrumented pool.query — log it explicitly.
   const client = await pool.connect()
   try {
     let pid: number | null = null
@@ -575,19 +577,42 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
       const allRows = primary.rows ?? []
       const truncated = allRows.length > MAX_QUERY_RESULT_ROWS
       const rows = truncated ? allRows.slice(0, MAX_QUERY_RESULT_ROWS) : allRows
+      const rowCount = results.reduce((sum, r) => sum + (r.rowCount ?? 0), 0)
+      recordQuery({
+        connectionId: opts.connectionId,
+        engine: 'postgres',
+        sql: opts.sql,
+        params: opts.params ?? [],
+        durationMs: Date.now() - started,
+        rowCount,
+        success: true
+      })
+      if (isSchemaChanging(opts.sql)) invalidateTableDetailsForConnection(opts.connectionId)
       return {
         success: true,
         rows,
         fields: (primary.fields ?? []).map((f) => ({ name: f.name, dataTypeID: f.dataTypeID })),
-        rowCount: results.reduce((sum, r) => sum + (r.rowCount ?? 0), 0),
-        command: primary.command ?? null,
+        rowCount,
+        command: primary.command ?? detectCommand(opts.sql),
         durationMs: Date.now() - started,
         truncated
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      recordQuery({
+        connectionId: opts.connectionId,
+        engine: 'postgres',
+        sql: opts.sql,
+        params: opts.params ?? [],
+        durationMs: Date.now() - started,
+        success: false,
+        error: message
+      })
+      // A partially-applied DDL batch can still have changed the schema.
+      if (isSchemaChanging(opts.sql)) invalidateTableDetailsForConnection(opts.connectionId)
       return {
         success: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: message,
         rows: [],
         fields: [],
         rowCount: null,
@@ -614,6 +639,10 @@ async function cancelQuery(connectionId: string, queryId: string): Promise<void>
 }
 
 async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
+  const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
+  if (!details.columns.some((c) => c.name === opts.column)) {
+    throw new Error(`Column ${opts.column} does not exist on ${opts.schema}.${opts.table}`)
+  }
   const pool = getPool(opts.connectionId)
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500)
   const params: unknown[] = []

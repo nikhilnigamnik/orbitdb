@@ -52,7 +52,8 @@ export function parseConnectionUrl(input: string): ParsedConnection | null {
   const engine = detectEngine(url.protocol)
   if (!engine) return null
 
-  const host = url.hostname
+  // URL keeps IPv6 literals bracketed ([::1]); the drivers want the bare address.
+  const host = url.hostname.replace(/^\[(.+)\]$/, '$1')
   if (!host) return null
 
   const portStr = url.port

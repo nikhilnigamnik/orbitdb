@@ -40,29 +40,3 @@ export function listQueryLogs(): QueryLogEntry[] {
 export function clearQueryLogs(): void {
   buffer.length = 0
 }
-
-export async function trackQuery<T>(
-  meta: { connectionId: string; engine: DatabaseEngine; sql: string; params?: unknown[] },
-  fn: () => Promise<T>,
-  rowCountFrom?: (result: T) => number | null
-): Promise<T> {
-  const t0 = Date.now()
-  try {
-    const res = await fn()
-    recordQuery({
-      ...meta,
-      durationMs: Date.now() - t0,
-      rowCount: rowCountFrom ? (rowCountFrom(res) ?? null) : null,
-      success: true
-    })
-    return res
-  } catch (err) {
-    recordQuery({
-      ...meta,
-      durationMs: Date.now() - t0,
-      success: false,
-      error: err instanceof Error ? err.message : String(err)
-    })
-    throw err
-  }
-}
