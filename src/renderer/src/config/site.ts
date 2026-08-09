@@ -10,6 +10,26 @@ export const DEFAULT_PAGE_SIZE = 50
 export const PAGE_SIZE_OPTIONS = [25, 50, 100, 250] as const
 export const MAX_PAGE_SIZE = 1000
 
+/**
+ * How long the undo prompt (and the marker on the row it belongs to) stays up
+ * after a cell edit. The undo itself outlives it — this is only the hint.
+ */
+export const UNDO_PROMPT_MS = 7_000
+
+/** How long a toast stays up, by tone. A failure needs reading; a success does not. */
+export const TOAST_DURATION_MS = {
+  success: 4_000,
+  info: 4_000,
+  warning: 6_000,
+  error: 10_000
+} as const
+
+/** Floor for any toast carrying an action, so the button is actually clickable. */
+export const TOAST_ACTION_MIN_MS = 10_000
+
+/** Beyond this the stack covers the screen it is reporting on. */
+export const MAX_TOASTS = 3
+
 export const ENGINE_LABEL: Record<DatabaseEngine, string> = {
   postgres: 'Postgres',
   mysql: 'MySQL',
