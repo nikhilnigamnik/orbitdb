@@ -155,6 +155,26 @@ function TableViewContainer({
     [connectionId, schema, table]
   )
 
+  // The header reports the table's own size, unfiltered — the pagination bar
+  // answers the different question of how many rows the current filters match.
+  // Null while it loads, and for tables too large to count, where the header
+  // falls back to the estimate.
+  const [totalRows, setTotalRows] = React.useState<number | null>(null)
+  React.useEffect(() => {
+    let cancelled = false
+    setTotalRows(null)
+    void unwrap(window.api.db.countRows({ connectionId, schema, table }))
+      .then((total) => {
+        if (!cancelled) setTotalRows(total)
+      })
+      .catch(() => {
+        // A count is an enhancement; the estimate covers the failure.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [connectionId, schema, table])
+
   const ddlDialog = useDisclosure(false)
   const [ddlState, setDdlState] = React.useState<{
     kind: DdlOperationKind
@@ -197,7 +217,12 @@ function TableViewContainer({
   return (
     <>
       {headerShown && (
-        <TableHeader details={data} activeTab={activeTab} onChangeTab={onChangeTab} />
+        <TableHeader
+          details={data}
+          activeTab={activeTab}
+          onChangeTab={onChangeTab}
+          totalRows={totalRows}
+        />
       )}
       {activeTab === 'data' ? (
         <TableDataView
