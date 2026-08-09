@@ -225,25 +225,24 @@ export function DataGrid({
                 isActive && 'bg-surface-elevated/60'
               )}
             >
-              <div className="flex min-w-0 items-center gap-1.5">
+              {/* Name left, type right against the sort control: the types line
+                  up down the grid instead of sitting at a ragged offset that
+                  moves with each name, and the name gets the room left over. */}
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
                 {col.isPrimaryKey && <IconKey size={10} className="shrink-0 text-text-subtle" />}
-                {/* One line: the name truncates first, since the type is short
-                    and is what tells you how the column behaves. */}
-                <div className="flex min-w-0 items-baseline gap-1.5 leading-tight">
-                  <span
-                    className={cn(
-                      'truncate text-xs',
-                      isActive ? 'font-semibold text-text' : 'font-medium text-text-muted'
-                    )}
-                  >
-                    {col.name}
-                  </span>
-                  {col.dataType && (
-                    <span className="shrink-0 font-mono text-[10px] font-normal text-text-subtle">
-                      {col.dataType}
-                    </span>
+                <span
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-xs',
+                    isActive ? 'font-semibold text-text' : 'font-medium text-text-muted'
                   )}
-                </div>
+                >
+                  {col.name}
+                </span>
+                {col.dataType && (
+                  <span className="shrink-0 pl-2 font-mono text-[10px] font-normal text-text-subtle">
+                    {col.dataType}
+                  </span>
+                )}
               </div>
               <button
                 type="button"
