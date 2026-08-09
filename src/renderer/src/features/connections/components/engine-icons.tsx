@@ -106,17 +106,8 @@ export function D1Icon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-export function SqliteIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-      <path d="M20.5 3H6a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h11.2c.7 0 1.3-.4 1.6-1l2.1-4.6c.1-.3.1-.7-.1-1L18 9.6a1 1 0 0 0-.8-.4H8.4a1 1 0 0 0-.9 1.4l2.7 6.1c.2.4.6.6 1 .6h3.3l-.9 2H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h14.5a.5.5 0 0 0 0-2Z" />
-    </svg>
-  )
-}
-
 export const ENGINE_ICON: Record<DatabaseEngine, FC<SVGProps<SVGSVGElement>>> = {
   postgres: PostgresIcon,
   mysql: MysqlIcon,
-  d1: D1Icon,
-  sqlite: SqliteIcon
+  d1: D1Icon
 }

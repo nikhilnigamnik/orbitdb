@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const connectionSchema = z
   .object({
     name: z.string().min(1, 'Name is required').max(80, 'Name is too long'),
-    engine: z.enum(['postgres', 'mysql', 'd1', 'sqlite']),
+    engine: z.enum(['postgres', 'mysql', 'd1']),
     environment: z.enum(['dev', 'stage', 'prod']),
     host: z.string(),
     port: z
@@ -17,8 +17,7 @@ export const connectionSchema = z
     ssl: z.boolean(),
     accountId: z.string().optional().default(''),
     databaseId: z.string().optional().default(''),
-    apiToken: z.string().optional().default(''),
-    filePath: z.string().optional().default('')
+    apiToken: z.string().optional().default('')
   })
   .superRefine((val, ctx) => {
     if (val.engine === 'd1') {
@@ -39,13 +38,6 @@ export const connectionSchema = z
           code: z.ZodIssueCode.custom,
           path: ['apiToken'],
           message: 'API token is required'
-        })
-    } else if (val.engine === 'sqlite') {
-      if (!val.filePath.trim())
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['filePath'],
-          message: 'Database file is required'
         })
     } else {
       if (!val.host.trim())
