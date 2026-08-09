@@ -145,20 +145,22 @@ export function FiltersBar({
       <div className="flex flex-wrap items-center gap-1.5">
         {filters.map((f, i) => {
           const unary = f.operator === 'is null' || f.operator === 'is not null'
+          // h-7 stands the chip level with the trigger beside it and the fields
+          // above it; the segments stretch to fill rather than set their own height.
           return (
             <div
               key={i}
-              className="inline-flex items-stretch overflow-hidden rounded-md border border-border bg-surface-elevated/60 text-xs text-text"
+              className="inline-flex h-7 items-stretch overflow-hidden rounded-md border border-border bg-surface-elevated/60 text-xs text-text"
             >
-              <div className="flex items-center gap-1.5 px-2 py-1">
+              <div className="flex items-center gap-1.5 px-2">
                 <IconDatabase size={11} className="text-text-subtle" />
                 <span>{f.column}</span>
               </div>
-              <div className="flex items-center border-l border-border px-2 py-1 font-mono text-text-muted">
+              <div className="flex items-center border-l border-border px-2 font-mono text-text-muted">
                 {f.operator}
               </div>
               {!unary && (
-                <div className="flex max-w-40 items-center truncate border-l border-border px-2 py-1 font-mono">
+                <div className="flex max-w-40 items-center truncate border-l border-border px-2 font-mono">
                   {String(f.value ?? '')}
                 </div>
               )}
@@ -166,7 +168,7 @@ export function FiltersBar({
                 type="button"
                 onClick={() => removeFilter(i)}
                 aria-label="Remove filter"
-                className="flex cursor-pointer items-center border-l border-border px-2 py-1 text-danger transition-colors hover:bg-danger/10"
+                className="flex cursor-pointer items-center border-l border-border px-2 text-danger transition-colors hover:bg-danger/10"
               >
                 <IconX size={11} />
               </button>
@@ -348,13 +350,14 @@ export function FiltersBar({
             </div>
           }
         >
-          <button
+          <Button
             type="button"
-            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-text-muted/15 bg-text-muted/8 text-text-muted transition-colors hover:bg-text-muted/15 hover:text-text focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none"
+            variant="subtle"
+            size="icon-sm"
             aria-label={hasFilters ? 'Add filter' : 'Open filters'}
           >
             {hasFilters ? <IconPlus stroke={2} size={14} /> : <IconFilter2 stroke={2} size={14} />}
-          </button>
+          </Button>
         </Popover>
       </div>
     </div>
