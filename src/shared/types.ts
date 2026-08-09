@@ -183,6 +183,13 @@ export type DdlOperation =
 
 export type DdlOperationKind = DdlOperation['kind']
 
+/**
+ * The operations the DDL form can build. Truncate and drop are table-wide and
+ * take no form input — they go through their own confirm flow, which shows the
+ * SQL and names the consequence.
+ */
+export type DdlFormKind = Exclude<DdlOperationKind, 'truncate-table' | 'drop-table'>
+
 export interface DdlRequest {
   connectionId: string
   schema: string

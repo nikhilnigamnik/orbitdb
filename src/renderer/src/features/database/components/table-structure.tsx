@@ -1,11 +1,11 @@
 import { IconKey, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
-import type { DdlOperationKind, TableDetails } from '@renderer/types'
+import type { DdlFormKind, TableDetails } from '@renderer/types'
 
 interface TableStructureProps {
   details: TableDetails
   /** Opens the DDL dialog. Absent for views / read-only tables. */
-  onEdit?: (kind: DdlOperationKind, target?: string) => void
+  onEdit?: (kind: DdlFormKind, target?: string) => void
   /** Optional content rendered above the sections (e.g. the AI actions bar). */
   header?: React.ReactNode
 }
