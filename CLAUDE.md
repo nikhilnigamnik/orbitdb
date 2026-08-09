@@ -15,6 +15,8 @@ pnpm typecheck:node   # main + preload + shared (tsconfig.node.json)
 pnpm typecheck:web    # renderer only (tsconfig.web.json)
 pnpm lint             # eslint --cache
 pnpm format           # prettier --write .
+pnpm test             # vitest run
+pnpm test:watch       # vitest (watch mode)
 pnpm build            # typecheck + electron-vite build (no installer)
 pnpm build:mac        # build + electron-builder --mac (SKIPS typecheck)
 pnpm build:linux      # build + electron-builder --linux
@@ -23,7 +25,15 @@ pnpm build:win        # build + electron-builder --win
 
 Releases are tag-driven: `pnpm release:{patch,minor,major}` bumps `package.json`, commits, tags `vX.Y.Z`, pushes — GitHub Actions builds & uploads to a draft release. Do **not** run these casually; they push commits.
 
-There is no test runner configured. Don't fabricate `pnpm test`.
+Tests run on Vitest (`vitest.config.ts`). Every spec lives under the top-level `tests/`
+folder, mirroring the `src/` layout — **not** colocated with the source file, so the
+electron-vite build never has to glob around them. Main-process modules that import
+`electron` are tested by mocking it (see `tests/main/store/connections-store.test.ts` for
+the `vi.hoisted` + `vi.mock('electron')` pattern, and `vi.resetModules()` to reset
+module-level caches between cases). New behaviour ships with a spec.
+
+CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build on every push to
+`main`/`dev` and on every PR. Releases stay tag-driven in `release.yml`.
 
 ## Architecture
 
