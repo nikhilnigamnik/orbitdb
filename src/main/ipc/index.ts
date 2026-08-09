@@ -2,6 +2,8 @@ import { ipcMain, app, shell } from 'electron'
 import { safeExternalUrl } from '../app/open-external'
 import { checkForUpdate } from '../app/update-check'
 import type {
+  AiSettingsView,
+  UsageSummary,
   ConnectionInput,
   CountRowsOptions,
   DdlRequest,
@@ -22,6 +24,20 @@ import { explainTable } from '../ai/explain-table'
 import { filterTable } from '../ai/filter-table'
 import { suggestIndexes } from '../ai/suggest-indexes'
 import { seedTable } from '../ai/generate-seed'
+import { resetModelCache } from '../ai/client'
+import { testAiKey } from '../ai/test-key'
+import { AI_PROVIDERS } from '../../shared/ai-models'
+import { clearUsage, getUsageSummary } from '../store/usage-store'
+import {
+  clearAiApiKey,
+  getActiveProvider,
+  getAiKeyHint,
+  getProviderSettings,
+  isAiKeyUnreadable,
+  setAiApiKey,
+  setAiModel,
+  setAiProvider
+} from '../store/settings-store'
 import {
   createConnection,
   deleteConnection,
@@ -204,6 +220,66 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'ai:generate-seed',
     wrap(async (opts: GenerateSeedOptions) => seedTable(opts))
+  )
+
+  ipcMain.handle(
+    'settings:get-ai',
+    wrap(
+      (): AiSettingsView => ({
+        active: getActiveProvider(),
+        providers: AI_PROVIDERS.map((p) => {
+          const { apiKey, model } = getProviderSettings(p.id)
+          return {
+            id: p.id,
+            hasKey: apiKey.length > 0,
+            keyHint: getAiKeyHint(p.id),
+            isKeyUnreadable: isAiKeyUnreadable(p.id),
+            model
+          }
+        })
+      })
+    )
+  )
+  ipcMain.handle(
+    'settings:set-ai-key',
+    wrap(async (provider: string, apiKey: string) => {
+      setAiApiKey(provider, apiKey)
+      resetModelCache()
+    })
+  )
+  ipcMain.handle(
+    'settings:clear-ai-key',
+    wrap(async (provider: string) => {
+      clearAiApiKey(provider)
+      resetModelCache()
+    })
+  )
+  ipcMain.handle(
+    'settings:set-ai-model',
+    wrap(async (provider: string, model: string) => setAiModel(provider, model))
+  )
+  ipcMain.handle(
+    'settings:set-ai-provider',
+    wrap(async (provider: string) => {
+      const next = setAiProvider(provider)
+      resetModelCache()
+      return next
+    })
+  )
+  ipcMain.handle(
+    'settings:test-ai',
+    wrap(async (provider: string) => testAiKey(provider))
+  )
+
+  ipcMain.handle(
+    'usage:summary',
+    wrap((): UsageSummary => getUsageSummary())
+  )
+  ipcMain.handle(
+    'usage:clear',
+    wrap(async () => {
+      clearUsage()
+    })
   )
 
   ipcMain.handle(
