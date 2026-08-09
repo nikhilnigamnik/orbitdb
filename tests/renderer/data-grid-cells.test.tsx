@@ -79,15 +79,20 @@ describe('timestamps', () => {
 
 describe('the column header', () => {
   it('puts the name and its type on one line', () => {
-    const { container } = setup([column('created_at', 'timestamptz')], [])
-    const name = screen.getByText('created_at')
-    const wrapper = name.parentElement!
+    setup([column('created_at', 'timestamptz')], [])
+    const wrapper = screen.getByText('created_at').parentElement!
 
     expect(wrapper.className).not.toContain('flex-col')
-    expect(wrapper.className).toContain('items-baseline')
     // Both live in the same row, so the type sits beside the name.
     expect(wrapper.textContent).toBe('created_attimestamptz')
-    expect(container.querySelectorAll('th').length).toBeGreaterThan(0)
+  })
+
+  it('pushes the type to the right so types line up down the grid', () => {
+    setup([column('created_at', 'timestamptz')], [])
+    // The name takes the leftover room, which is what puts the type on the right
+    // rather than at a ragged offset that moves with every name.
+    expect(screen.getByText('created_at').className).toContain('flex-1')
+    expect(screen.getByText('timestamptz').className).toContain('shrink-0')
   })
 
   it('lets the name truncate before the type, which is short and load-bearing', () => {
