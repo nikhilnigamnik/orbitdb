@@ -1,4 +1,5 @@
 import { ipcMain, app, shell } from 'electron'
+import { safeExternalUrl } from '../app/open-external'
 import { checkForUpdate } from '../app/update-check'
 import type {
   ConnectionInput,
@@ -216,18 +217,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'app:open-external',
     wrap(async (url: string) => {
-      // Handing an arbitrary string to the OS URL handler is a shell-launch
-      // primitive — only ever open web links.
-      let parsed: URL
-      try {
-        parsed = new URL(url)
-      } catch {
-        throw new Error(`Not a valid URL: ${url}`)
-      }
-      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-        throw new Error(`Refusing to open a ${parsed.protocol} URL`)
-      }
-      await shell.openExternal(parsed.toString())
+      const safe = safeExternalUrl(url)
+      if (!safe) throw new Error(`Refusing to open: ${url}`)
+      await shell.openExternal(safe)
     })
   )
 }
