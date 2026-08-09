@@ -49,7 +49,9 @@
     "release:major": "pnpm version major -m \"chore: release v%s\" && git push --follow-tags"
   },
   "dependencies": {
-    "@ai-sdk/groq": "^3.0.39",
+    "@ai-sdk/anthropic": "^3.0.107",
+    "@ai-sdk/google": "^3.0.104",
+    "@ai-sdk/openai": "^3.0.91",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@radix-ui/react-checkbox": "^1.3.3",

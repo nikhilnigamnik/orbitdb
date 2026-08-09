@@ -1,3 +1,7 @@
+import type { AiFeature, AiModelId, AiProviderId } from './ai-models'
+
+export type { AiFeature, AiModelId, AiProviderId }
+
 export type DatabaseEngine = 'postgres' | 'mysql' | 'd1'
 
 export type ConnectionEnvironment = 'dev' | 'stage' | 'prod'
@@ -246,7 +250,6 @@ export interface GenerateSqlOptions {
 
 export interface GenerateSqlResult {
   sql: string
-  explanation: string
 }
 
 export interface FilterTableOptions {
@@ -342,4 +345,55 @@ export interface QueryLogEntry {
   success: boolean
   error?: string
   ranAt: string
+}
+
+/**
+ * What the renderer is told about the AI settings. The key itself never crosses
+ * back — `keyHint` (the last four characters) is enough to show *which* key is
+ * saved, and useless to anything that gets hold of it.
+ */
+export interface AiProviderView {
+  id: AiProviderId
+  hasKey: boolean
+  /** Last four characters of the saved key. Null when none is set. */
+  keyHint: string | null
+  /** The saved key exists but could not be unsealed on this machine. */
+  isKeyUnreadable: boolean
+  model: AiModelId
+}
+
+/**
+ * Every provider's state at once, so the UI can show them side by side. No key
+ * is ever included — only whether there is one, and its last four characters.
+ */
+export interface AiSettingsView {
+  active: AiProviderId
+  providers: AiProviderView[]
+}
+
+/** One row of the usage breakdown. Unused dimensions are the empty string. */
+export interface UsageBreakdown {
+  provider: string
+  model: string
+  feature: string
+  calls: number
+  input: number
+  output: number
+}
+
+export interface UsageWindow {
+  calls: number
+  input: number
+  output: number
+  byModel: UsageBreakdown[]
+  byFeature: UsageBreakdown[]
+}
+
+/** Aggregated in main — the renderer receives numbers to show, not a log to fold. */
+export interface UsageSummary {
+  today: UsageWindow
+  last30: UsageWindow
+  allTime: UsageWindow
+  /** How far back anything is kept, so the UI can say so rather than imply forever. */
+  retentionDays: number
 }
