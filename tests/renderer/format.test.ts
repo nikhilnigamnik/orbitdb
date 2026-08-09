@@ -9,6 +9,11 @@ import {
 } from '@renderer/lib/format'
 import { stringifyValue } from '@renderer/features/tables/lib/cell-value'
 
+// vitest.config.ts pins TZ to Asia/Kolkata, so these offsets are the same on
+// any machine — and a non-zero offset means the zone actually renders, rather
+// than collapsing to the 'Z' that UTC would produce.
+const OFFSET = '+05:30'
+
 describe('formatCellValue', () => {
   it('names null rather than showing a blank', () => {
     expect(formatCellValue(null)).toBe('NULL')
@@ -36,7 +41,7 @@ describe('formatCellValue', () => {
     // value read differently before and after a double-click.
     const value = new Date('2026-08-09T12:00:00Z')
     expect(formatCellValue(value, 'timestamptz')).toBe(stringifyValue(value, 'timestamptz'))
-    expect(formatCellValue(value, 'timestamptz')).toMatch(/[+-]\d{2}:\d{2}$/)
+    expect(formatCellValue(value, 'timestamptz')).toBe(`2026-08-09 17:30:00${OFFSET}`)
   })
 
   it('agrees with the editor about a date column', () => {

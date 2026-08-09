@@ -35,6 +35,11 @@ function setup(columns: ColumnInfo[], rows: Record<string, unknown>[], canMutate
   )
 }
 
+// vitest.config.ts pins TZ to Asia/Kolkata, so these offsets are the same on
+// any machine — and a non-zero offset means the zone actually renders, rather
+// than collapsing to the 'Z' that UTC would produce.
+const OFFSET = '+05:30'
+
 describe('blank strings', () => {
   it('quotes an empty string so it is not an empty cell', () => {
     setup([column('note')], [{ note: '' }])
@@ -68,7 +73,7 @@ describe('binary cells', () => {
 describe('timestamps', () => {
   it('carries the offset for a timestamptz, as the editor does', () => {
     setup([column('created_at', 'timestamptz')], [{ created_at: new Date('2026-08-09T12:00:00Z') }])
-    expect(screen.getByText(/[+-]\d{2}:\d{2}$/)).toBeTruthy()
+    expect(screen.getByText(`2026-08-09 17:30:00${OFFSET}`)).toBeTruthy()
   })
 })
 
