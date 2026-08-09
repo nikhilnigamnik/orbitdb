@@ -185,14 +185,14 @@ export function CellInlineEditor({
             side="bottom"
             align="start"
             sideOffset={6}
-            className="animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-lg border border-border bg-surface text-text drop-shadow-xs"
+            className="animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-none border border-border-strong bg-surface text-text shadow-2xl shadow-black/70"
           >
             <SelectPrimitive.Viewport className="p-1">
               {selectOptions.map((option) => (
                 <SelectPrimitive.Item
                   key={option}
                   value={option}
-                  className="relative flex cursor-pointer items-center gap-2 rounded-md py-1.5 pr-7 pl-2 font-mono text-xs text-text-muted outline-none transition-colors select-none focus:bg-surface-elevated focus:text-text data-[state=checked]:text-text"
+                  className="relative flex cursor-pointer items-center gap-2 rounded-none py-1.5 pr-7 pl-2 font-mono text-xs text-text-muted outline-none transition-colors select-none focus:bg-surface-elevated focus:text-text data-[state=checked]:text-text"
                 >
                   <SelectPrimitive.ItemText>{option}</SelectPrimitive.ItemText>
                   <SelectPrimitive.ItemIndicator className="absolute right-2 flex items-center">
@@ -204,7 +204,7 @@ export function CellInlineEditor({
                 <button
                   type="button"
                   onClick={() => void commit('close', { toNull: true })}
-                  className="flex w-full cursor-pointer items-center rounded-md border-t border-border/60 py-1.5 pl-2 font-mono text-xs text-text-subtle italic transition-colors hover:bg-surface-elevated hover:text-text"
+                  className="flex w-full cursor-pointer items-center rounded-none border-t border-border/60 py-1.5 pl-2 font-mono text-xs text-text-subtle italic transition-colors hover:bg-surface-elevated hover:text-text"
                 >
                   NULL
                 </button>
@@ -234,7 +234,7 @@ export function CellInlineEditor({
             align="start"
             sideOffset={4}
             collisionPadding={12}
-            className="animate-slide-up-fade z-50 w-96 overflow-hidden rounded-lg border border-border-strong bg-surface shadow-2xl shadow-black/70"
+            className="animate-slide-up-fade z-50 w-96 overflow-hidden rounded-none border border-border-strong bg-surface shadow-2xl shadow-black/70"
           >
             <textarea
               ref={textareaRef}
