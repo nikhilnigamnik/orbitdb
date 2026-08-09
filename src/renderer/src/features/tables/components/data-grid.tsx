@@ -19,6 +19,7 @@ import {
   IconArrowUpRight
 } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
+import { formatColumnType } from '@renderer/lib/column-type'
 import { formatCellValue, isBlankString } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
@@ -225,23 +226,29 @@ export function DataGrid({
                 isActive && 'bg-surface-elevated/60'
               )}
             >
-              <div className="flex min-w-0 items-center gap-1.5">
+              {/* Name left, type right against the sort control: the types line
+                  up down the grid instead of sitting at a ragged offset that
+                  moves with each name, and the name gets the room left over. */}
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
                 {col.isPrimaryKey && <IconKey size={10} className="shrink-0 text-text-subtle" />}
-                <div className="flex min-w-0 flex-col leading-tight">
-                  <span
-                    className={cn(
-                      'truncate text-xs',
-                      isActive ? 'font-semibold text-text' : 'font-medium text-text-muted'
-                    )}
-                  >
-                    {col.name}
-                  </span>
-                  {col.dataType && (
-                    <span className="truncate font-mono text-xs font-normal text-text-subtle">
-                      {col.dataType}
-                    </span>
+                <span
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-xs',
+                    isActive ? 'font-semibold text-text' : 'font-medium text-text-muted'
                   )}
-                </div>
+                >
+                  {col.name}
+                </span>
+                {col.dataType && (
+                  // max-w so a long type can never crush the name, which is what
+                  // identifies the column.
+                  <span
+                    className="max-w-[55%] shrink-0 truncate pl-2 font-mono text-[10px] font-normal text-text-subtle"
+                    title={col.dataType}
+                  >
+                    {formatColumnType(col.dataType, col.udtName)}
+                  </span>
+                )}
               </div>
               <button
                 type="button"

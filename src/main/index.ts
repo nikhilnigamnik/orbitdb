@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, globalShortcut, nativeImage } from 'electron
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { safeExternalUrl } from './app/open-external'
 import { registerIpcHandlers } from './ipc'
 import { disconnectAll } from './db/manager'
 
@@ -25,8 +26,22 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    // A target="_blank" link in rendered content lands here. Without the check
+    // it reached the OS handler unvalidated, bypassing the one on the IPC path.
+    const safe = safeExternalUrl(details.url)
+    if (safe) void shell.openExternal(safe)
+    else console.warn('[window] refused to open', details.url)
     return { action: 'deny' }
+  })
+
+  // The renderer is a local bundle; navigating it anywhere else is either a bug
+  // or an attempt to leave the app inside its own window.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const isRendererUrl = url.startsWith('file://') || url === process.env['ELECTRON_RENDERER_URL']
+    if (isRendererUrl) return
+    event.preventDefault()
+    const safe = safeExternalUrl(url)
+    if (safe) void shell.openExternal(safe)
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

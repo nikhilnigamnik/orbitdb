@@ -25,7 +25,7 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const { pathname } = useLocation()
-  const { active, current } = useConnection()
+  const { active } = useConnection()
   const { result } = useUpdateCheck()
   const hasUpdate = !!result?.hasUpdate
 
@@ -85,7 +85,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="flex flex-col items-center gap-1.5 border-t border-border px-2 py-3">
+      <div className="flex flex-col items-center gap-1.5 px-2 py-3">
         <Tooltip>
           <TooltipTrigger asChild>
             <NavLink
@@ -111,32 +111,6 @@ export function Sidebar() {
             {hasUpdate ? 'Settings — update available' : 'Settings'}
           </TooltipContent>
         </Tooltip>
-
-        {active && current ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-md"
-                aria-label={`Connected to ${current.name}`}
-              >
-                <span className="h-2 w-2 rounded-full bg-success" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="right">Connected to {current.name}</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-md"
-                aria-label="No active connection"
-              >
-                <span className="h-2 w-2 rounded-full bg-text-subtle/50" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="right">No connection</TooltipContent>
-          </Tooltip>
-        )}
       </div>
     </aside>
   )

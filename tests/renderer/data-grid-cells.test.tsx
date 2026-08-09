@@ -6,10 +6,10 @@ import type { ColumnInfo } from '@renderer/types'
 
 afterEach(cleanup)
 
-function column(name: string, udtName = 'text'): ColumnInfo {
+function column(name: string, udtName = 'text', dataType?: string): ColumnInfo {
   return {
     name,
-    dataType: udtName,
+    dataType: dataType ?? udtName,
     udtName,
     isNullable: true,
     isPrimaryKey: false,
@@ -74,6 +74,38 @@ describe('timestamps', () => {
   it('carries the offset for a timestamptz, as the editor does', () => {
     setup([column('created_at', 'timestamptz')], [{ created_at: new Date('2026-08-09T12:00:00Z') }])
     expect(screen.getByText(`2026-08-09 17:30:00${OFFSET}`)).toBeTruthy()
+  })
+})
+
+describe('the column header', () => {
+  it('puts the name and its type on one line', () => {
+    setup([column('created_at', 'timestamptz')], [])
+    const wrapper = screen.getByText('created_at').parentElement!
+
+    expect(wrapper.className).not.toContain('flex-col')
+    // Both live in the same row, so the type sits beside the name.
+    expect(wrapper.textContent).toBe('created_attimestamptz')
+  })
+
+  it('pushes the type to the right so types line up down the grid', () => {
+    setup([column('created_at', 'timestamptz')], [])
+    // The name takes the leftover room, which is what puts the type on the right
+    // rather than at a ragged offset that moves with every name.
+    expect(screen.getByText('created_at').className).toContain('flex-1')
+    expect(screen.getByText('timestamptz').className).toContain('shrink-0')
+  })
+
+  it('shows a short type label, not the verbose SQL spelling', () => {
+    // "timestamp with time zone" is long enough to crush the column name.
+    setup([column('updated_at', 'timestamptz', 'timestamp with time zone')], [])
+    const grid = screen.getByText('updated_at').closest('th')!
+    expect(grid.textContent).toContain('timestamptz')
+  })
+
+  it('lets the name truncate before the type, which is short and load-bearing', () => {
+    setup([column('a_very_long_column_name_indeed', 'uuid')], [])
+    expect(screen.getByText('a_very_long_column_name_indeed').className).toContain('truncate')
+    expect(screen.getByText('uuid').className).toContain('shrink-0')
   })
 })
 
