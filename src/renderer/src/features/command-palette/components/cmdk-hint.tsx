@@ -12,7 +12,11 @@ interface CmdKHintProps {
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
-export function CmdKHint({ label = 'Open command palette', variant = 'compact', className }: CmdKHintProps) {
+export function CmdKHint({
+  label = 'Open command palette',
+  variant = 'compact',
+  className
+}: CmdKHintProps) {
   const { open } = useCommandPalette()
   const modKey = isMac ? '⌘' : 'Ctrl'
 
@@ -23,7 +27,7 @@ export function CmdKHint({ label = 'Open command palette', variant = 'compact', 
         onClick={open}
         aria-label={label}
         className={cn(
-          'flex h-8 w-64 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-text-subtle transition-colors hover:border-border-strong hover:bg-surface-elevated',
+          'flex h-7 w-64 cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-input px-2.5 text-text-subtle transition-colors hover:bg-surface-elevated/40 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none',
           className
         )}
       >

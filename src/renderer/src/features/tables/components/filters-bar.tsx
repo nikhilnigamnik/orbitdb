@@ -350,7 +350,7 @@ export function FiltersBar({
         >
           <button
             type="button"
-            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-text-muted/12 text-text-muted ring-1 ring-inset ring-text-muted/25 transition-all hover:bg-text-muted/20 hover:text-text-muted"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-text-muted/15 bg-text-muted/8 text-text-muted transition-colors hover:bg-text-muted/15 hover:text-text focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none"
             aria-label={hasFilters ? 'Add filter' : 'Open filters'}
           >
             {hasFilters ? <IconPlus stroke={2} size={14} /> : <IconFilter2 stroke={2} size={14} />}

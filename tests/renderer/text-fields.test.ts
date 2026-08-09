@@ -10,6 +10,8 @@ import { Kbd } from '@renderer/components/ui/kbd'
 import { Select } from '@renderer/components/ui/select'
 import { Switch } from '@renderer/components/ui/switch'
 import { Textarea } from '@renderer/components/ui/textarea'
+import { CmdKHint } from '@renderer/features/command-palette/components/cmdk-hint'
+import { CommandPaletteProvider } from '@renderer/features/command-palette/store'
 
 // createElement rather than JSX so these stay plain .ts specs; the components are
 // pure functions of their props, so static markup is enough to assert on classes.
@@ -107,28 +109,79 @@ describe('control heights', () => {
     }
   })
 
-  it('keeps the AI filter field level with the buttons beside it', () => {
-    // A bespoke field-shaped button rather than a primitive, so it is checked at
-    // the source. Keyed on the aria-label so it survives moving around the file.
-    const source = readFileSync(
-      resolve('src/renderer/src/features/tables/components/table-data-view.tsx'),
-      'utf8'
+  // Buttons shaped like a field — a search or filter box that opens a panel
+  // instead of taking a caret. They are bespoke rather than primitives, so they
+  // are checked at the source, keyed on the aria-label so they survive being
+  // moved around their file.
+  const fieldShapedTriggers = [
+    {
+      what: 'the AI filter field',
+      file: 'src/renderer/src/features/tables/components/table-data-view.tsx',
+      ariaLabel: 'Filter this table with natural language'
+    },
+    {
+      what: 'the sidebar table search',
+      file: 'src/renderer/src/features/database/components/schema-tree.tsx',
+      ariaLabel: 'Open command palette'
+    }
+  ]
+
+  it.each(fieldShapedTriggers)(
+    'dresses $what as a field, at control height',
+    ({ file, ariaLabel }) => {
+      const source = readFileSync(resolve(file), 'utf8')
+      const trigger = new RegExp(
+        `aria-label="${ariaLabel}"[\\s\\S]{0,400}?className="([^"]*)"`
+      ).exec(source)
+
+      expect(trigger, `the trigger moved or lost its aria-label in ${file}`).not.toBeNull()
+      const classes = trigger![1].split(/\s+/)
+      expect(classes).toContain(CONTROL_HEIGHT)
+      expect(classes).toContain('bg-input')
+      expect(classes.filter((c) => c.startsWith('hover:border'))).toEqual([])
+    }
+  )
+
+  it('dresses the command-palette hint as a field too', () => {
+    const markup = markupOf(
+      createElement(CommandPaletteProvider, null, createElement(CmdKHint, { variant: 'input' }))
     )
-    const trigger =
-      /aria-label="Filter this table with natural language"[\s\S]{0,400}?className="([^"]*)"/.exec(
-        source
-      )
-    expect(trigger, 'the AI filter trigger moved or lost its aria-label').not.toBeNull()
-    expect(trigger![1].split(/\s+/)).toContain(CONTROL_HEIGHT)
+    const classes = classesOf(markup).split(/\s+/)
+    expect(classes).toContain(CONTROL_HEIGHT)
+    expect(classes).toContain('bg-input')
+    expect(classes.filter((c) => c.startsWith('hover:border'))).toEqual([])
   })
 })
 
 describe('Kbd', () => {
+  const kbdClasses = () => classesOf(markupOf(createElement(Kbd, null, '⌘'))).split(/\s+/)
+
   it('stays small enough to sit inside a control without crowding it', () => {
-    const classes = classesOf(markupOf(createElement(Kbd, null, '⌘'))).split(/\s+/)
-    expect(classes).toContain('h-4')
-    expect(classes).toContain('min-w-4')
-    expect(classes).toContain('text-[10px]')
+    expect(kbdClasses()).toContain('h-4')
+    expect(kbdClasses()).toContain('min-w-4')
+    expect(kbdClasses()).toContain('text-[10px]')
+  })
+
+  it('lends its hairline-over-a-whisper surface to the filter button', () => {
+    // The invariant is "these two match", not two copies of the same literal —
+    // restyling Kbd should surface the filter button as drifted, not pass quietly.
+    const surface = kbdClasses().filter(
+      (c) => c.startsWith('border-text-muted/') || c.startsWith('bg-text-muted/')
+    )
+    expect(surface).toHaveLength(2)
+
+    const source = readFileSync(
+      resolve('src/renderer/src/features/tables/components/filters-bar.tsx'),
+      'utf8'
+    )
+    const trigger = /aria-label=\{hasFilters \? 'Add filter'[\s\S]{0,80}/.exec(source)
+    expect(trigger, 'the filter trigger moved or lost its aria-label').not.toBeNull()
+
+    const button = /className="([^"]*)"[\s\S]{0,120}?aria-label=\{hasFilters/.exec(source)
+    expect(button, 'could not find the filter trigger className').not.toBeNull()
+    for (const token of surface) {
+      expect(button![1].split(/\s+/), `filter button is missing ${token}`).toContain(token)
+    }
   })
 })
 
