@@ -59,7 +59,7 @@ export function TableActionsMenu({
             onClick={(e) => e.stopPropagation()}
             className={cn(
               'mr-1 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-text-subtle transition-opacity hover:bg-surface hover:text-text',
-              'opacity-0 group-hover/row:opacity-100 data-[state=open]:opacity-100'
+              'opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100'
             )}
             aria-label="Table actions"
             title="Table actions"

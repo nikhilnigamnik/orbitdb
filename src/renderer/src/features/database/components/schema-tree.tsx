@@ -25,6 +25,7 @@ import {
 } from '@renderer/components/ui/collapsible'
 import { SlidingHoverList } from '@renderer/components/ui/sliding-hover-list'
 import { Skeleton } from '@renderer/components/ui/skeleton'
+import { ErrorState } from '@renderer/components/common/error-state'
 import { Kbd } from '@renderer/components/ui/kbd'
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
@@ -53,7 +54,17 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
   const activeSchema = searchParams.get('schema') ?? ''
   const activeTable = searchParams.get('table') ?? ''
 
-  const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set(['public']))
+  const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set())
+  // 'public' only exists on Postgres — D1 calls its one schema 'main' and MySQL
+  // uses database names, so hardcoding it left those engines collapsed on every
+  // launch. Open the conventional one if it is there, otherwise the only one.
+  const hasAutoExpanded = React.useRef(false)
+  React.useEffect(() => {
+    if (hasAutoExpanded.current || schemas.length === 0) return
+    hasAutoExpanded.current = true
+    const initial = schemas.includes('public') ? 'public' : schemas.length === 1 ? schemas[0] : null
+    if (initial) setExpanded((prev) => new Set(prev).add(initial))
+  }, [schemas])
   const [tablesBySchema, setTablesBySchema] = React.useState<Record<string, TablesState>>({})
   const [pinned, setPinned] = React.useState<TableRef[]>(() => loadPinned(connectionId))
   const { open: openPalette } = useCommandPalette()
@@ -297,7 +308,12 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                         <Spinner size={14} />
                       </div>
                     ) : state?.error ? (
-                      <p className="px-3 py-1.5 text-xs text-danger">{state.error}</p>
+                      <div className="px-1 py-1.5">
+                        <ErrorState
+                          message={state.error}
+                          onRetry={() => void fetchTables(schema)}
+                        />
+                      </div>
                     ) : allTables.length === 0 ? (
                       <p className="px-3 py-1.5 text-xs text-text-subtle">Empty schema</p>
                     ) : (
@@ -332,19 +348,23 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                                   )}
                                 />
                                 <span className="truncate">{table.name}</span>
-                                {isView && (
+                                {isView ? (
                                   <span className="ml-auto rounded bg-surface-elevated px-1 py-0 text-xs font-medium uppercase tracking-wide text-text-subtle">
                                     view
                                   </span>
-                                )}
-                                {!isView &&
-                                  !tableIsPinned &&
-                                  table.estimatedRows != null &&
-                                  table.estimatedRows > 0 && (
-                                    <span className="ml-auto font-mono text-xs text-text-subtle opacity-0 transition-opacity group-hover/row:opacity-100">
-                                      {formatNumber(table.estimatedRows)}
+                                ) : (
+                                  table.estimatedRows != null && (
+                                    // Marked approximate to agree with the table
+                                    // header: this is the engine's statistic, not
+                                    // a count. Zero is a real answer and stays.
+                                    <span
+                                      className="ml-auto font-mono text-xs text-text-subtle opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100"
+                                      title={`About ${formatNumber(table.estimatedRows)} rows, from table statistics`}
+                                    >
+                                      ~{formatNumber(table.estimatedRows)}
                                     </span>
-                                  )}
+                                  )
+                                )}
                               </button>
                               {tableIsPinned && (
                                 <button
