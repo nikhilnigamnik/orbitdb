@@ -52,13 +52,13 @@ export function AiPrompt({
       setOpen={onOpenChange}
       content={
         <>
-          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-accent/60 to-transparent" />
+          <div className="absolute inset-x-0 top-0 h-px bg-accent/40" />
 
           <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-3">
             {isGenerating ? (
-              <Spinner size={16} className="text-accent" />
+              <Spinner size={16} className="text-accent-text" />
             ) : (
-              <IconSparkles size={16} className="shrink-0 text-accent" />
+              <IconSparkles size={16} className="shrink-0 text-accent-text" />
             )}
             <input
               autoFocus
@@ -101,7 +101,7 @@ export function AiPrompt({
               >
                 <IconSparkles
                   size={12}
-                  className="shrink-0 text-text-subtle transition-colors group-hover/sug:text-accent"
+                  className="shrink-0 text-text-subtle transition-colors group-hover/sug:text-accent-text"
                 />
                 <span className="truncate">{s}</span>
                 <IconArrowUpRight
@@ -122,7 +122,6 @@ export function AiPrompt({
             </span>
             <Button
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={() => submit()}
               disabled={!prompt.trim() || isGenerating}
             >

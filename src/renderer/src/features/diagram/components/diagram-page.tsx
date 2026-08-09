@@ -30,7 +30,6 @@ export function DiagramPage() {
           action={
             <Button
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={() => navigate(ROUTES.connections)}
             >
               Go to connections
@@ -112,7 +111,7 @@ function DiagramToolbar({ schemas, activeSchema, onPickSchema }: DiagramToolbarP
         openPopover={open}
         setOpenPopover={setOpen}
         align="start"
-        popoverContentClassName="w-56 overflow-hidden shadow-xl shadow-black/40"
+        popoverContentClassName="w-56 overflow-hidden"
         content={
           <div className="flex max-h-64 flex-col overflow-auto p-1">
             {schemas.map((name) => (

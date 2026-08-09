@@ -28,14 +28,14 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
     return (
       <div className="flex h-full flex-col">
         <div className="flex shrink-0 items-center gap-3 border-b border-border bg-surface/40 px-4 py-2 text-xs">
-          <span className="flex items-center gap-1 rounded-md bg-red-500/10 px-1.5 py-0.5 text-xs font-medium text-red-400">
+          <span className="flex items-center gap-1 rounded-md bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger">
             <IconAlertTriangle size={11} />
             Error
           </span>
           <span className="font-mono text-text-subtle">{result.durationMs} ms</span>
         </div>
         <div className="flex-1 overflow-auto p-4">
-          <pre className="whitespace-pre-wrap break-words rounded-md border border-red-500/20 bg-red-500/5 p-3 font-mono text-xs text-red-300/90">
+          <pre className="whitespace-pre-wrap break-words rounded-md border border-danger/20 bg-danger/5 p-3 font-mono text-xs text-danger">
             {result.error}
           </pre>
         </div>
@@ -55,7 +55,7 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center gap-3 border-b border-border bg-surface/40 px-4 py-2 text-xs">
-        <span className="flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-xs font-medium text-emerald-400">
+        <span className="flex items-center gap-1 rounded-md bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success">
           <IconCheck size={11} />
           OK
         </span>
@@ -72,7 +72,7 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
         )}
         {result.truncated && (
           <span
-            className="flex items-center gap-1 rounded-md bg-yellow-500/10 px-1.5 py-0.5 text-xs font-medium text-yellow-400"
+            className="flex items-center gap-1 rounded-md bg-warning/10 px-1.5 py-0.5 text-xs font-medium text-warning"
             title={`Result was truncated to the first ${formatNumber(result.rows.length)} rows. Export to get the full set if your driver supports it.`}
           >
             <IconAlertTriangle size={11} />

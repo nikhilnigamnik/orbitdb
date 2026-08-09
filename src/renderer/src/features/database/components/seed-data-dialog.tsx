@@ -109,8 +109,7 @@ export function SeedDataDialog({
                 </Button>
                 <Button
                   size="sm"
-                  className="bg-accent text-white hover:bg-accent/90"
-                  onClick={onClose}
+                      onClick={onClose}
                 >
                   Done
                 </Button>
@@ -152,8 +151,7 @@ export function SeedDataDialog({
 
               <Button
                 size="sm"
-                className="bg-accent text-white hover:bg-accent/90"
-                onClick={seed}
+                  onClick={seed}
                 disabled={isWorking}
               >
                 {isWorking ? (
@@ -167,7 +165,7 @@ export function SeedDataDialog({
               </Button>
 
               {error && (
-                <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2 text-left text-xs text-red-300">
+                <div className="flex items-start gap-2 rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-left text-xs text-danger">
                   <IconAlertTriangle size={14} className="mt-0.5 shrink-0" />
                   <span className="wrap-break-word">{error}</span>
                 </div>

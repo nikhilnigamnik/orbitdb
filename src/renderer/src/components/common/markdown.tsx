@@ -26,7 +26,7 @@ export function MarkdownView({ children, className }: MarkdownViewProps) {
           strong: (p) => <strong className="font-semibold text-text" {...p} />,
           em: (p) => <em className="italic" {...p} />,
           a: (p) => (
-            <a className="text-accent underline underline-offset-2" target="_blank" rel="noreferrer" {...p} />
+            <a className="text-accent-text underline underline-offset-2" target="_blank" rel="noreferrer" {...p} />
           ),
           hr: (p) => <hr className="my-3 border-border" {...p} />,
           blockquote: (p) => (
@@ -34,7 +34,7 @@ export function MarkdownView({ children, className }: MarkdownViewProps) {
           ),
           pre: (p) => (
             <pre
-              className="my-2 overflow-auto rounded-md border border-border bg-surface-elevated/50 p-3 font-mono text-xs leading-relaxed"
+              className="my-2 overflow-auto rounded-md border border-border bg-surface-sunken p-3 font-mono text-xs leading-relaxed"
               {...p}
             />
           ),
@@ -49,7 +49,7 @@ export function MarkdownView({ children, className }: MarkdownViewProps) {
             }
             return (
               <code
-                className="rounded bg-surface-elevated px-1 py-0.5 font-mono text-xs text-text"
+                className="rounded bg-surface-sunken px-1 py-0.5 font-mono text-xs text-text"
                 {...rest}
               >
                 {children}

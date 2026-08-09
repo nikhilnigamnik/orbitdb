@@ -81,7 +81,6 @@ export function QueryPage() {
           action={
             <Button
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={() => navigate(ROUTES.connections)}
             >
               Go to connections
@@ -195,7 +194,7 @@ export function QueryPage() {
             )}
             onClick={() => setIsAiOpen((open) => !open)}
           >
-            <IconSparkles size={12} className="text-accent" />
+            <IconSparkles size={12} className="text-accent-text" />
             Ask AI
           </Button>
           <Sheet
@@ -220,7 +219,7 @@ export function QueryPage() {
                   <Button
                     size="icon-xs"
                     variant="ghost"
-                    className="text-text-subtle hover:bg-surface-elevated hover:text-red-400"
+                    className="text-text-subtle hover:bg-surface-elevated hover:text-danger"
                     onClick={() => setHistory([])}
                     disabled={history.length === 0}
                     aria-label="Clear history"
@@ -247,7 +246,7 @@ export function QueryPage() {
                         <p
                           className={cn(
                             'line-clamp-2 font-mono text-xs leading-snug',
-                            entry.success ? 'text-text' : 'text-red-300/80'
+                            entry.success ? 'text-text' : 'text-danger'
                           )}
                         >
                           {entry.sql}
@@ -296,7 +295,7 @@ export function QueryPage() {
           {isRunning ? (
             <Button
               size="sm"
-              className="bg-red-500/80 text-white hover:bg-red-500"
+              className="bg-danger-fill text-white shadow-[inset_0_-2px_0_0_var(--color-danger-shade),0_1px_3px_0_rgba(0,0,0,0.4)] hover:bg-danger hover:shadow-none active:shadow-none"
               onClick={cancelRunningQuery}
             >
               <IconPlayerStop size={12} />
@@ -305,7 +304,6 @@ export function QueryPage() {
           ) : (
             <Button
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={runQuery}
               disabled={sql.trim() === ''}
             >

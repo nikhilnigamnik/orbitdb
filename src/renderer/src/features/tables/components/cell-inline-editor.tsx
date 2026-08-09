@@ -234,7 +234,7 @@ export function CellInlineEditor({
             align="start"
             sideOffset={4}
             collisionPadding={12}
-            className="animate-slide-up-fade z-50 w-96 overflow-hidden rounded-lg border border-border bg-surface shadow-2xl shadow-black/50"
+            className="animate-slide-up-fade z-50 w-96 overflow-hidden rounded-lg border border-border-strong bg-surface shadow-2xl shadow-black/70"
           >
             <textarea
               ref={textareaRef}
@@ -249,7 +249,7 @@ export function CellInlineEditor({
               )}
             />
             {activeError && (
-              <p className="border-t border-rose-500/20 bg-rose-500/5 px-3 py-1.5 text-xs leading-snug text-rose-200">
+              <p className="border-t border-danger/20 bg-danger/5 px-3 py-1.5 text-xs leading-snug text-danger">
                 {activeError}
               </p>
             )}
@@ -285,7 +285,7 @@ export function CellInlineEditor({
                   </button>
                 )}
                 {charLimit != null && (
-                  <span className={cn('font-mono', isOverLimit && 'text-rose-300')}>
+                  <span className={cn('font-mono', isOverLimit && 'text-danger')}>
                     {raw.length}/{charLimit}
                   </span>
                 )}
@@ -314,7 +314,7 @@ export function CellInlineEditor({
             disabled={isSaving}
             className={cn(
               'w-full bg-transparent p-0 font-mono text-xs text-text outline-none placeholder:italic placeholder:text-text-subtle disabled:opacity-60',
-              isOverLimit && 'text-rose-300'
+              isOverLimit && 'text-danger'
             )}
           />
         </div>
@@ -326,7 +326,7 @@ export function CellInlineEditor({
             align="start"
             sideOffset={6}
             onOpenAutoFocus={(e) => e.preventDefault()}
-            className="animate-slide-up-fade z-50 max-w-72 rounded-md border border-rose-500/20 bg-surface px-2 py-1.5 text-xs leading-snug text-rose-200 shadow-lg shadow-black/40"
+            className="animate-slide-up-fade z-50 max-w-72 rounded-md border border-danger/20 bg-surface px-2 py-1.5 text-xs leading-snug text-danger shadow-lg shadow-black/40"
           >
             {error}
           </PopoverPrimitive.Content>

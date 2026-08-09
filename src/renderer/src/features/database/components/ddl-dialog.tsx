@@ -301,7 +301,7 @@ export function DdlDialog({
             )}
 
             {isDestructive && (
-              <div className="flex items-start gap-2 rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2.5 text-xs text-rose-200">
+              <div className="flex items-start gap-2 rounded-lg border border-danger/20 bg-danger/5 px-3 py-2.5 text-xs text-danger">
                 <IconAlertTriangle size={15} className="mt-px shrink-0" stroke={2} />
                 <span>
                   {kind === 'drop-column'
@@ -316,11 +316,11 @@ export function DdlDialog({
                 Generated SQL
               </span>
               {previewError ? (
-                <p className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-xs text-rose-200">
+                <p className="rounded-lg border border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger">
                   {previewError}
                 </p>
               ) : (
-                <pre className="min-h-14 overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3 py-2.5 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
+                <pre className="min-h-14 overflow-auto rounded-lg border border-border bg-surface-sunken px-3 py-2.5 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
                   {sql || (
                     <span className="text-text-subtle">
                       Fill in the fields to preview the statement.
@@ -331,7 +331,7 @@ export function DdlDialog({
             </div>
 
             {execError && (
-              <p className="rounded-lg border border-rose-500/20 bg-rose-500/5 px-3 py-2 text-xs text-rose-200">
+              <p className="rounded-lg border border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger">
                 {execError}
               </p>
             )}
@@ -351,8 +351,8 @@ export function DdlDialog({
               size="sm"
               className={
                 isDestructive
-                  ? 'bg-red-500 text-white hover:bg-red-500/90'
-                  : 'bg-accent text-white hover:bg-accent/90'
+                  ? 'bg-danger-fill text-white shadow-[inset_0_-2px_0_0_var(--color-danger-shade),0_1px_3px_0_rgba(0,0,0,0.4)] hover:bg-danger hover:shadow-none active:shadow-none'
+                  : ''
               }
               onClick={handleConfirm}
               disabled={!operation || !sql || isExecuting}

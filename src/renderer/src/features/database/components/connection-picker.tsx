@@ -17,12 +17,12 @@ import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 type ChipTone = React.ComponentProps<typeof Chip>['tone']
 
 const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; iconClass: string }> = {
-  postgres: { bg: 'bg-sky-500/8', iconClass: 'text-sky-300/80' },
-  mysql: { bg: 'bg-orange-500/8', iconClass: 'text-orange-300/80' },
-  d1: { bg: 'bg-amber-500/8', iconClass: 'text-amber-300/80' }
+  postgres: { bg: 'bg-info/8', iconClass: 'text-info' },
+  mysql: { bg: 'bg-orange/8', iconClass: 'text-orange' },
+  d1: { bg: 'bg-warning/8', iconClass: 'text-warning' }
 }
 
-const ENGINE_FALLBACK = { bg: 'bg-neutral-500/8', iconClass: 'text-neutral-300/80' }
+const ENGINE_FALLBACK = { bg: 'bg-text-muted/8', iconClass: 'text-text-muted' }
 
 const ENVIRONMENT_TONE: Record<ConnectionEnvironment, ChipTone> = {
   dev: 'emerald',
@@ -90,7 +90,6 @@ export function ConnectionPicker() {
         action={
           <Button
             size="sm"
-            className="bg-accent text-white hover:bg-accent/90"
             onClick={() => navigate(ROUTES.connections)}
           >
             Add a connection

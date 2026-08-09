@@ -93,7 +93,7 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 function ErrorLine({ message }: { message: string }) {
   return (
-    <div className="flex shrink-0 items-start gap-2 px-4 py-3 text-xs text-red-300">
+    <div className="flex shrink-0 items-start gap-2 px-4 py-3 text-xs text-danger">
       <IconAlertTriangle size={14} className="mt-0.5 shrink-0" />
       <span>{message}</span>
     </div>
@@ -251,7 +251,7 @@ function IndexesSheet({
             <ErrorLine message={error} />
           ) : suggestions.length === 0 ? (
             <Centered>
-              <IconCheck size={15} className="text-emerald-400" />
+              <IconCheck size={15} className="text-success" />
               <span className="text-xs">No useful indexes are missing.</span>
             </Centered>
           ) : (
@@ -278,7 +278,7 @@ function IndexesSheet({
                         {s.rationale}
                       </p>
                       {typeof state === 'string' && state !== 'applying' && state !== 'done' && (
-                        <p className="mt-1 text-xs text-red-300">{state}</p>
+                        <p className="mt-1 text-xs text-danger">{state}</p>
                       )}
                     </div>
                     <Button
@@ -288,7 +288,7 @@ function IndexesSheet({
                       className={cn(
                         'shrink-0',
                         state === 'done'
-                          ? 'text-emerald-400'
+                          ? 'text-success'
                           : 'text-text-muted hover:bg-surface-elevated hover:text-text'
                       )}
                       onClick={() => apply(s)}

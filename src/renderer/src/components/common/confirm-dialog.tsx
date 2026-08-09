@@ -41,10 +41,10 @@ export function ConfirmDialog({
             <div aria-hidden className={cn('pointer-events-none absolute inset-x-0 top-0 h-px')} />
             <div
               className={cn(
-                'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-linear-to-b ring-1 ring-inset',
+                'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset',
                 isDanger
-                  ? 'from-rose-500/20 to-rose-500/5 text-rose-200 ring-rose-500/25 shadow-[inset_0_1px_0_rgba(253,164,175,0.35)]'
-                  : 'from-neutral-500/20 to-neutral-500/5 text-neutral-200 ring-neutral-500/25 shadow-[inset_0_1px_0_rgba(229,229,229,0.25)]'
+                  ? 'bg-danger/12 text-danger ring-danger/25'
+                  : 'bg-text-muted/12 text-text-muted ring-text-muted/25'
               )}
             >
               <IconAlertTriangle size={20} stroke={2} />
@@ -75,8 +75,8 @@ export function ConfirmDialog({
               size="sm"
               className={
                 isDanger
-                  ? 'bg-red-500 text-white hover:bg-red-500/90'
-                  : 'bg-accent text-white hover:bg-accent/90'
+                  ? 'bg-danger-fill text-white shadow-[inset_0_-2px_0_0_var(--color-danger-shade),0_1px_3px_0_rgba(0,0,0,0.4)] hover:bg-danger hover:shadow-none active:shadow-none'
+                  : ''
               }
               onClick={onConfirm}
               disabled={isLoading}

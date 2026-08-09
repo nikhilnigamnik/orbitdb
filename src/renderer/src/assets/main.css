@@ -10,17 +10,34 @@
     'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
 
-  --color-bg: #0e0e0f;
-  --color-surface: #151517;
-  --color-surface-elevated: #1c1c1e;
-  --color-border: hsl(0 0% 14%);
-  --color-border-strong: hsl(0 0% 20%);
+  --color-bg: #0e1013; /* window chrome, behind the floating panels */
+  --color-surface: #131519; /* panels, sidebars, popovers */
+  --color-surface-elevated: #1c2026; /* hover / selected rows */
+  --color-input: #202429; /* text fields — sits above the panel */
+  --color-surface-sunken: #0b0d10; /* code blocks, SQL editor, DDL preview */
 
-  --color-text: hsl(0 0% 92%);
-  --color-text-muted: hsl(0 0% 60%);
-  --color-text-subtle: hsl(0 0% 42%);
+  --color-border: #202429;
+  --color-border-strong: #2c3138;
 
-  --color-accent: #4878ea;
+  --color-text: #e6e8ec;
+  --color-text-muted: #9aa1ac;
+  --color-text-subtle: #6a7280;
+
+  /* #1249dc is a fill colour — 7.0:1 under white ink, but only 2.7:1 as text on
+     --color-bg. Anything that renders accent-coloured *text* uses accent-text. */
+  --color-accent: #1249dc;
+  --color-accent-fg: #ffffff;
+  --color-accent-text: #5c8af5;
+  --color-accent-hover: #1b43b1; /* same hue, darker — buttons darken on hover */
+  --color-accent-shade: #143285; /* 2px inset bottom bevel under the fill */
+
+  --color-success: #3fb950;
+  --color-warning: #d29922;
+  --color-danger: #f85149;
+  --color-danger-fill: #c93c37; /* solid destructive fills; #f85149 is 3.3:1 under white */
+  --color-danger-shade: #8f2b27; /* bevel under destructive fills */
+  --color-info: #5c8af5;
+  --color-orange: #db6d28;
 }
 
 .orbit-flow {
@@ -32,8 +49,8 @@
   --xy-controls-box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 
   --xy-minimap-background-color: var(--color-surface);
-  --xy-minimap-mask-background-color: rgba(0, 0, 0, 0.5);
-  --xy-minimap-node-background-color: rgba(125, 152, 248, 0.5);
+  --xy-minimap-mask-background-color: rgba(0, 0, 0, 0.55);
+  --xy-minimap-node-background-color: rgba(92, 138, 245, 0.5);
   --xy-minimap-node-stroke-color: transparent;
 
   --xy-edge-stroke: var(--color-border-strong);
@@ -49,8 +66,17 @@
 
   html,
   body {
-    @apply bg-bg text-text font-sans antialiased selection:bg-accent selection:text-text;
+    @apply bg-bg text-text font-sans antialiased selection:bg-accent selection:text-accent-fg;
     letter-spacing: -0.005em;
+  }
+
+  /* Without this, anything that doesn't define its own focus style falls back to
+     Chromium's `outline: auto`, which paints the macOS system accent colour and
+     lands outside the palette. Components that set `outline-none` still win. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent-text);
+    outline-offset: 1px;
+    border-radius: inherit;
   }
 
   ::-webkit-scrollbar {
@@ -61,13 +87,13 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: hsl(0 0% 16%);
+    background-color: rgba(230, 232, 236, 0.16);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(0 0% 24%);
+    background-color: rgba(230, 232, 236, 0.28);
     background-clip: padding-box;
     border: 2px solid transparent;
   }
@@ -142,7 +168,7 @@
 
 @keyframes cell-saved {
   from {
-    background-color: rgba(52, 211, 153, 0.28);
+    background-color: rgba(63, 185, 80, 0.28);
   }
   to {
     background-color: transparent;

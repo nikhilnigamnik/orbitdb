@@ -13,14 +13,14 @@ interface FormFieldProps {
 export function FormField({ label, htmlFor, error, hint, className, children }: FormFieldProps) {
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <label htmlFor={htmlFor} className="text-xs font-medium text-neutral-300">
+      <label htmlFor={htmlFor} className="text-xs font-medium text-text-muted">
         {label}
       </label>
       {children}
       {error ? (
-        <p className="text-xs text-red-400">{error}</p>
+        <p className="text-xs text-danger">{error}</p>
       ) : hint ? (
-        <p className="text-xs text-neutral-500">{hint}</p>
+        <p className="text-xs text-text-subtle">{hint}</p>
       ) : null}
     </div>
   )

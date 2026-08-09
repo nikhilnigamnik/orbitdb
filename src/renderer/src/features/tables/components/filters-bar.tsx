@@ -166,7 +166,7 @@ export function FiltersBar({
                 type="button"
                 onClick={() => removeFilter(i)}
                 aria-label="Remove filter"
-                className="flex cursor-pointer items-center border-l border-border px-2 py-1 text-red-400 transition-colors hover:bg-red-500/10"
+                className="flex cursor-pointer items-center border-l border-border px-2 py-1 text-danger transition-colors hover:bg-danger/10"
               >
                 <IconX size={11} />
               </button>
@@ -266,7 +266,7 @@ export function FiltersBar({
                             <Spinner size={14} />
                           </div>
                         ) : valuesError ? (
-                          <p className="text-xs text-red-300/80">{valuesError}</p>
+                          <p className="text-xs text-danger">{valuesError}</p>
                         ) : values.length > 0 ? (
                           <div className="flex flex-col gap-1">
                             <span className="text-xs font-medium uppercase tracking-wider text-text-subtle">
@@ -350,7 +350,7 @@ export function FiltersBar({
         >
           <button
             type="button"
-            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-linear-to-b from-neutral-500/20 to-neutral-500/5 text-neutral-200 ring-1 ring-inset ring-neutral-500/25 shadow-[inset_0_1px_0_rgba(229,229,229,0.25)] transition-all hover:from-neutral-500/30 hover:to-neutral-500/10 hover:text-neutral-100"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-text-muted/12 text-text-muted ring-1 ring-inset ring-text-muted/25 transition-all hover:bg-text-muted/20 hover:text-text-muted"
             aria-label={hasFilters ? 'Add filter' : 'Open filters'}
           >
             {hasFilters ? <IconPlus stroke={2} size={14} /> : <IconFilter2 stroke={2} size={14} />}

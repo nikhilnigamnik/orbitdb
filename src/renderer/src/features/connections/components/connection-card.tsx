@@ -33,11 +33,11 @@ interface ConnectionCardProps {
 }
 
 const HEALTH_DOT_CLASSES: Record<ConnectionHealth, string> = {
-  unknown: 'bg-linear-to-b from-neutral-400/70 to-neutral-600/70',
+  unknown: 'bg-text-subtle/55',
   checking:
-    'bg-linear-to-b from-amber-300 to-amber-500 shadow-[0_0_4px_0_rgba(251,191,36,0.45)] animate-pulse',
-  ok: 'bg-linear-to-b from-emerald-300 to-emerald-500 shadow-[0_0_4px_0_rgba(52,211,153,0.4)]',
-  fail: 'bg-linear-to-b from-rose-300 to-rose-500 shadow-[0_0_4px_0_rgba(244,63,94,0.45)]'
+    'bg-warning shadow-[0_0_4px_0_rgba(251,191,36,0.45)] animate-pulse',
+  ok: 'bg-success shadow-[0_0_4px_0_rgba(52,211,153,0.4)]',
+  fail: 'bg-danger shadow-[0_0_4px_0_rgba(244,63,94,0.45)]'
 }
 
 const HEALTH_LABEL: Record<ConnectionHealth, string> = {
@@ -48,12 +48,12 @@ const HEALTH_LABEL: Record<ConnectionHealth, string> = {
 }
 
 const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; iconClass: string }> = {
-  postgres: { bg: 'bg-sky-500/8', iconClass: 'text-sky-300/80' },
-  mysql: { bg: 'bg-orange-500/8', iconClass: 'text-orange-300/80' },
-  d1: { bg: 'bg-amber-500/8', iconClass: 'text-amber-300/80' }
+  postgres: { bg: 'bg-info/8', iconClass: 'text-info' },
+  mysql: { bg: 'bg-orange/8', iconClass: 'text-orange' },
+  d1: { bg: 'bg-warning/8', iconClass: 'text-warning' }
 }
 
-const ENGINE_FALLBACK = { bg: 'bg-neutral-500/8', iconClass: 'text-neutral-300/80' }
+const ENGINE_FALLBACK = { bg: 'bg-text-muted/8', iconClass: 'text-text-muted' }
 
 const ENVIRONMENT_TONE: Record<ConnectionEnvironment, ChipTone> = {
   dev: 'emerald',
@@ -190,7 +190,7 @@ export function ConnectionCard({
           openPopover={menuOpen}
           setOpenPopover={setMenuOpen}
           align="end"
-          popoverContentClassName="w-36 overflow-hidden shadow-xl shadow-black/40"
+          popoverContentClassName="w-36 overflow-hidden"
           content={
             <div className="flex flex-col p-1">
               <button
@@ -210,7 +210,7 @@ export function ConnectionCard({
                   setMenuOpen(false)
                   onDelete()
                 }}
-                className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-rose-500 hover:bg-rose-500/10"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-danger hover:bg-danger/10"
               >
                 <IconTrash size={13} />
                 Delete

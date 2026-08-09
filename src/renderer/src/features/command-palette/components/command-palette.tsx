@@ -36,7 +36,7 @@ const OVERLAY_CLASSES = 'fixed inset-0 z-40 bg-black/20 backdrop-blur-sm animate
 const CONTENT_CLASSES = [
   'fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(600px,calc(100vw-2rem))]',
   'overflow-hidden rounded-2xl border border-border bg-surface',
-  'shadow-2xl shadow-black/60',
+  'shadow-2xl shadow-black/70',
   'animate-scale-in'
 ].join(' ')
 
@@ -283,7 +283,7 @@ function PaletteItem({
 }: PaletteItemProps) {
   const toneText =
     tone === 'danger'
-      ? 'text-red-400/80 aria-selected:text-red-300 aria-selected:bg-red-500/10'
+      ? 'text-danger aria-selected:text-danger aria-selected:bg-danger/10'
       : 'text-text-muted aria-selected:bg-surface-elevated aria-selected:text-text'
 
   return (
@@ -296,7 +296,7 @@ function PaletteItem({
       <span
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
           tone === 'danger'
-            ? 'border-red-500/20 bg-red-500/10 text-red-400 group-aria-selected:border-red-500/30 group-aria-selected:bg-red-500/15'
+            ? 'border-danger/20 bg-danger/10 text-danger group-aria-selected:border-danger/30 group-aria-selected:bg-danger/15'
             : 'border-border bg-surface-elevated text-text-muted group-aria-selected:border-border-strong group-aria-selected:bg-surface group-aria-selected:text-text'
         }`}
       >

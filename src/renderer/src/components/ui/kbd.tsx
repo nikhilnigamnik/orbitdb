@@ -2,14 +2,15 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@renderer/lib/utils'
 
+// Geometry mirrors Zed's <kbd>: h-5, 2px radius, px-1.5, 11px mono, hairline
+// border over a barely-there fill.
 const kbdVariants = cva(
-  'inline-flex h-4 min-w-4 items-center justify-center rounded px-1 font-mono text-xs leading-none',
+  'inline-flex h-5 min-w-5 items-center justify-center gap-0.5 rounded-[3px] border px-1.5 font-mono text-[11px] leading-none',
   {
     variants: {
       tone: {
-        default:
-          'bg-linear-to-b from-neutral-500/20 to-neutral-500/5 text-neutral-200 ring-1 ring-inset ring-neutral-500/25 shadow-[inset_0_1px_0_rgba(229,229,229,0.25)]',
-        accent: 'bg-white/15 text-white/90'
+        default: 'border-text-muted/15 bg-text-muted/8 text-text-muted',
+        accent: 'border-white/20 bg-white/10 text-white'
       }
     },
     defaultVariants: { tone: 'default' }

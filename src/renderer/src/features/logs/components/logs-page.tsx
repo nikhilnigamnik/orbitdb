@@ -130,7 +130,7 @@ export function LogsPage() {
             {errorCount > 0 && (
               <>
                 <span className="text-text-subtle/60"> · </span>
-                <span className="text-red-300/80">{errorCount} failed</span>
+                <span className="text-danger">{errorCount} failed</span>
               </>
             )}
           </p>
@@ -160,7 +160,7 @@ export function LogsPage() {
           <Button
             size="sm"
             variant="ghost"
-            className="text-text-muted hover:bg-surface-elevated hover:text-red-400"
+            className="text-text-muted hover:bg-surface-elevated hover:text-danger"
             onClick={clearConfirm.open}
             disabled={logs.length === 0}
           >
@@ -248,7 +248,7 @@ export function LogsPage() {
               <p
                 className={cn(
                   'mt-1 line-clamp-2 font-mono text-xs leading-snug',
-                  entry.success ? 'text-text' : 'text-red-300/80'
+                  entry.success ? 'text-text' : 'text-danger'
                 )}
               >
                 {entry.sql.trim() || '—'}
@@ -271,10 +271,10 @@ export function LogsPage() {
               <div className="flex shrink-0 items-start gap-3 border-b border-border px-4 py-3.5 pr-12">
                 <div
                   className={cn(
-                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-b ring-1 ring-inset',
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset',
                     selected.success
-                      ? 'from-emerald-500/20 to-emerald-500/5 text-emerald-200 ring-emerald-500/25 shadow-[inset_0_1px_0_rgba(110,231,183,0.35)]'
-                      : 'from-rose-500/20 to-rose-500/5 text-rose-200 ring-rose-500/25 shadow-[inset_0_1px_0_rgba(253,164,175,0.35)]'
+                      ? 'bg-success/12 text-success ring-success/25'
+                      : 'bg-danger/12 text-danger ring-danger/25'
                   )}
                 >
                   {selected.success ? (
@@ -308,7 +308,7 @@ export function LogsPage() {
                   <Stat
                     label="Status"
                     value={selected.success ? 'Success' : 'Failed'}
-                    valueClassName={selected.success ? 'text-emerald-300' : 'text-rose-300'}
+                    valueClassName={selected.success ? 'text-success' : 'text-danger'}
                     border
                   />
                 </div>
@@ -323,13 +323,13 @@ export function LogsPage() {
                       className="absolute right-2 top-2 z-10 flex h-6 cursor-pointer items-center gap-1 rounded-md border border-border bg-surface px-2 text-xs text-text-subtle opacity-0 transition-all group-hover/sql:opacity-100 hover:bg-surface-elevated hover:text-text"
                     >
                       {copied ? (
-                        <IconCheck size={11} className="text-emerald-400" />
+                        <IconCheck size={11} className="text-success" />
                       ) : (
                         <IconCopy size={11} />
                       )}
                       {copied ? 'Copied' : 'Copy'}
                     </button>
-                    <pre className="overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3.5 py-3 pr-14 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
+                    <pre className="overflow-auto rounded-lg border border-border bg-surface-sunken px-3.5 py-3 pr-14 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
                       {selected.sql.trim() || '—'}
                     </pre>
                   </div>
@@ -337,7 +337,7 @@ export function LogsPage() {
 
                 {selected.params.length > 0 && (
                   <DetailSection label="Params">
-                    <pre className="overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3.5 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-text-muted">
+                    <pre className="overflow-auto rounded-lg border border-border bg-surface-sunken px-3.5 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-text-muted">
                       {JSON.stringify(selected.params, null, 2)}
                     </pre>
                   </DetailSection>
@@ -345,7 +345,7 @@ export function LogsPage() {
 
                 {selected.error && (
                   <DetailSection label="Error" tone="error">
-                    <pre className="overflow-auto rounded-lg border border-rose-500/20 bg-rose-500/5 px-3.5 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-rose-200">
+                    <pre className="overflow-auto rounded-lg border border-danger/20 bg-danger/5 px-3.5 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-danger">
                       {selected.error}
                     </pre>
                   </DetailSection>
@@ -409,7 +409,7 @@ function DetailSection({
         <span
           className={cn(
             'text-xs font-semibold uppercase tracking-wider',
-            tone === 'error' ? 'text-rose-400/80' : 'text-text-subtle'
+            tone === 'error' ? 'text-danger' : 'text-text-subtle'
           )}
         >
           {label}

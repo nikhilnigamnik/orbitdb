@@ -8,7 +8,7 @@ interface SpinnerProps {
 export function Spinner({ size = 16, className }: SpinnerProps) {
   return (
     <div
-      className={cn('relative shrink-0 text-neutral-400', className)}
+      className={cn('relative shrink-0 text-text-subtle', className)}
       style={{ width: size, height: size }}
     >
       <div className="absolute top-1/2 left-1/2 size-full">

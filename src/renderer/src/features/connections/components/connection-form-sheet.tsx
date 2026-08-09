@@ -42,16 +42,16 @@ interface ConnectionFormSheetProps {
 const ENGINES: DatabaseEngine[] = ['postgres', 'mysql', 'd1']
 
 const ENGINE_STYLES: Record<DatabaseEngine, { bg: string; iconClass: string; tagline: string }> = {
-  postgres: { bg: 'bg-sky-500/10', iconClass: 'text-sky-300', tagline: 'PostgreSQL' },
-  mysql: { bg: 'bg-orange-500/10', iconClass: 'text-orange-300', tagline: 'MySQL / MariaDB' },
-  d1: { bg: 'bg-amber-500/10', iconClass: 'text-amber-300', tagline: 'Cloudflare SQLite' }
+  postgres: { bg: 'bg-info/10', iconClass: 'text-info', tagline: 'PostgreSQL' },
+  mysql: { bg: 'bg-orange/10', iconClass: 'text-orange', tagline: 'MySQL / MariaDB' },
+  d1: { bg: 'bg-warning/10', iconClass: 'text-warning', tagline: 'Cloudflare SQLite' }
 }
 
 const ENVIRONMENT_ACTIVE: Record<ConnectionEnvironment, { bg: string; text: string; dot: string }> =
   {
-    dev: { bg: 'bg-emerald-500/10', text: 'text-emerald-300', dot: 'bg-emerald-400' },
-    stage: { bg: 'bg-amber-500/10', text: 'text-amber-300', dot: 'bg-amber-400' },
-    prod: { bg: 'bg-rose-500/10', text: 'text-rose-300', dot: 'bg-rose-400' }
+    dev: { bg: 'bg-success/10', text: 'text-success', dot: 'bg-success' },
+    stage: { bg: 'bg-warning/10', text: 'text-warning', dot: 'bg-warning' },
+    prod: { bg: 'bg-danger/10', text: 'text-danger', dot: 'bg-danger' }
   }
 
 function toFormValues(initial?: SavedConnection | null): ConnectionFormValues {
@@ -223,9 +223,9 @@ export function ConnectionFormSheet({
                       onClick={() => changeEngine(engine)}
                       aria-pressed={isSelected}
                       className={cn(
-                        'group relative flex cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border bg-surface px-2 py-3 text-center shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] transition-all',
+                        'group relative flex cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border bg-surface px-2 py-3 text-center transition-all',
                         isSelected
-                          ? 'border-border-strong bg-surface-elevated/60 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]'
+                          ? 'border-border-strong bg-surface-elevated/60'
                           : 'border-border hover:border-border-strong hover:bg-surface-elevated/50'
                       )}
                     >
@@ -250,7 +250,7 @@ export function ConnectionFormSheet({
                       <span
                         aria-hidden
                         className={cn(
-                          'absolute right-1.5 top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-neutral-200 text-neutral-900 transition-all',
+                          'absolute right-1.5 top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-accent text-accent-fg transition-all',
                           isSelected ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
                         )}
                       >
@@ -473,8 +473,8 @@ export function ConnectionFormSheet({
                 className={cn(
                   'rounded-md border px-2.5 py-2',
                   testResult.success
-                    ? 'border-emerald-500/20 bg-emerald-500/4'
-                    : 'border-rose-500/20 bg-rose-500/4'
+                    ? 'border-success/20 bg-success/4'
+                    : 'border-danger/20 bg-danger/4'
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -484,8 +484,8 @@ export function ConnectionFormSheet({
                       className={cn(
                         'h-1.5 w-1.5 rounded-full',
                         testResult.success
-                          ? 'bg-emerald-300 shadow-[0_0_4px_0_rgba(110,231,183,0.6)]'
-                          : 'bg-rose-300 shadow-[0_0_4px_0_rgba(253,164,175,0.6)]'
+                          ? 'bg-success shadow-[0_0_4px_0_rgba(110,231,183,0.6)]'
+                          : 'bg-danger shadow-[0_0_4px_0_rgba(253,164,175,0.6)]'
                       )}
                     />
                     {testResult.success ? 'Connected' : 'Failed'}
@@ -497,7 +497,7 @@ export function ConnectionFormSheet({
                   )}
                 </div>
                 {!testResult.success && testResult.error && (
-                  <p className="mt-2 break-all font-mono text-xs text-rose-300/80">
+                  <p className="mt-2 break-all font-mono text-xs text-danger">
                     {testResult.error}
                   </p>
                 )}
@@ -505,7 +505,7 @@ export function ConnectionFormSheet({
             )}
 
             {formError && (
-              <p className="rounded-md border border-red-500/20 bg-red-500/5 p-2 font-mono text-xs text-red-300/80">
+              <p className="rounded-md border border-danger/20 bg-danger/5 p-2 font-mono text-xs text-danger">
                 {formError}
               </p>
             )}
@@ -535,7 +535,6 @@ export function ConnectionFormSheet({
             </Button>
             <SubmitButton
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={handleSubmit}
               isSubmitting={isSubmitting}
               loadingText={initial ? 'Updating…' : 'Saving…'}

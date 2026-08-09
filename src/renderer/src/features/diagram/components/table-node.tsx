@@ -83,9 +83,9 @@ export function TableNode({ data, selected }: NodeProps) {
               />
               <span className="flex w-3 shrink-0 items-center justify-center text-text-subtle">
                 {col.isPrimaryKey ? (
-                  <IconKey size={9} className="text-amber-300" />
+                  <IconKey size={9} className="text-warning" />
                 ) : col.isForeignKey ? (
-                  <IconLink size={9} className="text-sky-300" />
+                  <IconLink size={9} className="text-info" />
                 ) : null}
               </span>
               <span

@@ -201,7 +201,7 @@ export function RowEditorSheet({
             })}
 
             {error && (
-              <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 font-mono text-xs text-red-300/80">
+              <p className="rounded-lg border border-danger/30 bg-danger/10 p-2 font-mono text-xs text-danger">
                 {error}
               </p>
             )}
@@ -220,7 +220,6 @@ export function RowEditorSheet({
             </Button>
             <SubmitButton
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={handleSubmit}
               isSubmitting={isSubmitting}
               loadingText={mode === 'insert' ? 'Inserting…' : 'Updating…'}

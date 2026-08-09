@@ -37,7 +37,7 @@ import { estimateNodeHeight, layoutNodes, type LayoutDirection } from '../lib/au
 import { TableNode, type TableNodeData } from './table-node'
 
 const nodeTypes: NodeTypes = { table: TableNode }
-const ACCENT = 'var(--color-accent, #7d98f8)'
+const ACCENT = 'var(--color-accent-text, #5c8af5)'
 
 interface SchemaGraphCanvasProps {
   graph: SchemaGraph
@@ -281,7 +281,7 @@ function Flow({ graph, schema }: SchemaGraphCanvasProps) {
       const viewport = getViewportForBounds(bounds, imageWidth, imageHeight, 0.1, 4, padding)
 
       const options = {
-        backgroundColor: '#0e0e0f',
+        backgroundColor: '#131519',
         width: imageWidth,
         height: imageHeight,
         style: {

@@ -149,7 +149,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
       <div className="shrink-0 px-3 pt-4 pb-3">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-linear-to-b from-surface-elevated to-surface-elevated/40 text-text-muted ring-1 ring-inset ring-border shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-surface-elevated/40 text-text-muted ring-1 ring-inset ring-border">
               <IconDatabase size={13} />
             </div>
             <div className="flex flex-col leading-tight">
@@ -235,7 +235,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                         e.stopPropagation()
                         handleTogglePin(pin)
                       }}
-                      className="mr-1 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-amber-300/80 transition-colors hover:bg-surface hover:text-text"
+                      className="mr-1 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-warning transition-colors hover:bg-surface hover:text-text"
                       aria-label="Unpin table"
                       title="Unpin table"
                     >
@@ -298,7 +298,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                         <Spinner size={14} />
                       </div>
                     ) : state?.error ? (
-                      <p className="px-3 py-1.5 text-xs text-red-400/80">{state.error}</p>
+                      <p className="px-3 py-1.5 text-xs text-danger">{state.error}</p>
                     ) : allTables.length === 0 ? (
                       <p className="px-3 py-1.5 text-xs text-text-subtle">Empty schema</p>
                     ) : (
@@ -354,7 +354,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
                                     e.stopPropagation()
                                     handleTogglePin({ schema, table: table.name })
                                   }}
-                                  className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-amber-300/80 transition-colors hover:bg-surface hover:text-text"
+                                  className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-warning transition-colors hover:bg-surface hover:text-text"
                                   aria-label="Unpin table"
                                   title="Unpin table"
                                 >

@@ -66,8 +66,8 @@ function RowAction({
       variant="ghost"
       className={
         tone === 'rose'
-          ? 'border-transparent bg-transparent text-text-subtle hover:bg-linear-to-b hover:from-rose-500/25 hover:to-rose-500/5 hover:text-rose-200 hover:ring-1 hover:ring-inset hover:ring-rose-500/25 hover:shadow-[inset_0_1px_0_rgba(253,164,175,0.35)]'
-          : 'border-transparent bg-transparent text-text-subtle hover:bg-linear-to-b hover:from-neutral-500/25 hover:to-neutral-500/5 hover:text-neutral-200 hover:ring-1 hover:ring-inset hover:ring-neutral-500/25 hover:shadow-[inset_0_1px_0_rgba(229,229,229,0.25)]'
+          ? 'border-transparent bg-transparent text-text-subtle hover:bg-danger/15 hover:text-danger hover:ring-1 hover:ring-inset hover:ring-danger/25'
+          : 'border-transparent bg-transparent text-text-subtle hover:bg-text-muted/15 hover:text-text-muted hover:ring-1 hover:ring-inset hover:ring-text-muted/25'
       }
       onClick={onClick}
       title={label}
@@ -115,7 +115,7 @@ export function TableStructure({ details, onEdit, header }: TableStructureProps)
                 <td className={`${TD} font-medium text-text`}>
                   <span className="flex items-center gap-1.5">
                     {col.isPrimaryKey && (
-                      <IconKey size={11} className="shrink-0 text-amber-300/80" />
+                      <IconKey size={11} className="shrink-0 text-warning" />
                     )}
                     {col.name}
                   </span>

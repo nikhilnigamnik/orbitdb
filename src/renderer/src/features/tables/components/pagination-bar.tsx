@@ -86,7 +86,7 @@ export function PaginationBar({
                       )}
                     >
                       <span className="font-mono">{size}</span>
-                      {isSelected && <IconCheck size={12} className="text-accent" />}
+                      {isSelected && <IconCheck size={12} className="text-accent-text" />}
                     </button>
                   )
                 })}

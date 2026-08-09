@@ -424,7 +424,7 @@ export function TableDataView({
             type="button"
             onClick={aiPrompt.open}
             aria-label="Filter this table with natural language"
-            className="group flex h-8 w-72 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-elevated focus-visible:border-accent focus-visible:outline-none"
+            className="group flex h-8 w-72 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-elevated focus-visible:border-accent-text focus-visible:outline-none"
           >
             <span className="flex-1 truncate text-xs text-text-subtle transition-colors group-hover:text-text-muted">
               Describe the rows you want…
@@ -449,7 +449,6 @@ export function TableDataView({
           {canMutate && (
             <Button
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={insertModal.open}
             >
               Insert row
@@ -485,7 +484,7 @@ export function TableDataView({
       )}
 
       {!canMutate && details.type === 'table' && (
-        <div className="border-b border-yellow-500/20 bg-yellow-500/5 px-3 py-2 text-xs text-yellow-400">
+        <div className="border-b border-warning/20 bg-warning/5 px-3 py-2 text-xs text-warning">
           This table has no primary key — rows cannot be edited or deleted from the UI.
         </div>
       )}
@@ -518,9 +517,9 @@ export function TableDataView({
 
         {selectedCount > 0 && (
           <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
-            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-full border border-border-strong/70 bg-surface/95 py-1.5 pl-2 pr-1.5 shadow-2xl shadow-black/60 inset-shadow-[0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl">
+            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-full border border-border-strong/70 bg-surface/95 py-1.5 pl-2 pr-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl">
               <span className="flex items-center gap-2 pl-1 pr-1.5 text-xs">
-                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-surface-elevated px-1.5 font-mono text-xs font-medium text-text ring-1 ring-inset ring-white/10 inset-shadow-[0_1px_0_rgba(255,255,255,0.08)]">
+                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-surface-elevated px-1.5 font-mono text-xs font-medium text-text ring-1 ring-inset ring-white/10">
                   {selectedCount}
                 </span>
                 <span className="text-text-subtle">
@@ -560,7 +559,7 @@ export function TableDataView({
                   <span className="mx-1 h-4 w-px bg-white/10" />
                   <Button
                     size="sm"
-                    className="h-7 gap-1 rounded-full bg-linear-to-b from-red-500 to-red-600 px-3 text-white ring-1 ring-inset ring-white/15 inset-shadow-[0_1px_0_rgba(255,255,255,0.25)] shadow-md shadow-red-950/50 hover:from-red-400 hover:to-red-500"
+                    className="h-7 gap-1 rounded-full bg-danger-fill px-3 text-white ring-1 ring-inset ring-white/15 shadow-md shadow-danger-fill/40 hover:bg-danger"
                     onClick={bulkDeleteConfirm.open}
                   >
                     <IconTrash size={12} />
