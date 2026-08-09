@@ -12,6 +12,7 @@ import { Switch } from '@renderer/components/ui/switch'
 import { Textarea } from '@renderer/components/ui/textarea'
 import { CmdKHint } from '@renderer/features/command-palette/components/cmdk-hint'
 import { CommandPaletteProvider } from '@renderer/features/command-palette/store'
+import { FiltersBar } from '@renderer/features/tables/components/filters-bar'
 
 // createElement rather than JSX so these stay plain .ts specs; the components are
 // pure functions of their props, so static markup is enough to assert on classes.
@@ -162,26 +163,88 @@ describe('Kbd', () => {
     expect(kbdClasses()).toContain('text-[10px]')
   })
 
-  it('lends its hairline-over-a-whisper surface to the filter button', () => {
+  it('lends its hairline-over-a-whisper surface to the subtle button', () => {
     // The invariant is "these two match", not two copies of the same literal —
-    // restyling Kbd should surface the filter button as drifted, not pass quietly.
+    // restyling Kbd should report the button as drifted, not pass quietly.
     const surface = kbdClasses().filter(
       (c) => c.startsWith('border-text-muted/') || c.startsWith('bg-text-muted/')
     )
     expect(surface).toHaveLength(2)
 
+    const button = classesOf(markupOf(createElement(Button, { variant: 'subtle' }, 'Quiet'))).split(
+      /\s+/
+    )
+    for (const token of surface) {
+      expect(button, `the subtle button is missing ${token}`).toContain(token)
+    }
+  })
+})
+
+describe('the filter row', () => {
+  const markup = () =>
+    markupOf(
+      createElement(FiltersBar, {
+        connectionId: 'c',
+        schema: 's',
+        table: 't',
+        columns: [],
+        filters: [{ column: 'id', operator: '=', value: '1' }],
+        onChange: () => {},
+        onApply: () => {}
+      })
+    )
+
+  it('stands the applied-filter chip at control height, level with the trigger', () => {
+    // The chip used to size itself off py-1, leaving it 2px short of the button
+    // beside it and the fields above it.
+    const chip = /class="(inline-flex[^"]*)"/.exec(markup())
+    expect(chip, 'could not find the applied-filter chip').not.toBeNull()
+    expect(chip![1].split(/\s+/)).toContain('h-7')
+  })
+
+  it('wears the subtle surface on its trigger rather than a copy of it', () => {
+    const trigger = /data-variant="([^"]*)"[^>]*data-size="([^"]*)"/.exec(markup())
+    expect(trigger, 'the filter trigger is no longer a Button').not.toBeNull()
+    expect(trigger![1]).toBe('subtle')
+    expect(trigger![2]).toBe('icon-sm')
+  })
+})
+
+describe('the floating selection toolbar', () => {
+  it('is rounded, not a pill', () => {
+    // Rendering it needs a loaded table, so it is checked at the source, keyed
+    // on the entrance animation the bar is the only user of.
     const source = readFileSync(
-      resolve('src/renderer/src/features/tables/components/filters-bar.tsx'),
+      resolve('src/renderer/src/features/tables/components/table-data-view.tsx'),
       'utf8'
     )
-    const trigger = /aria-label=\{hasFilters \? 'Add filter'[\s\S]{0,80}/.exec(source)
-    expect(trigger, 'the filter trigger moved or lost its aria-label').not.toBeNull()
+    const bar = /className="(animate-slide-up-fade pointer-events-auto[^"]*)"/.exec(source)
+    expect(bar, 'could not find the floating selection bar').not.toBeNull()
+    expect(bar![1].split(/\s+/)).toContain('rounded-lg')
+    expect(source, 'nothing in this view should be a pill any more').not.toMatch(/rounded-full/)
+  })
 
-    const button = /className="([^"]*)"[\s\S]{0,120}?aria-label=\{hasFilters/.exec(source)
-    expect(button, 'could not find the filter trigger className').not.toBeNull()
-    for (const token of surface) {
-      expect(button![1].split(/\s+/), `filter button is missing ${token}`).toContain(token)
-    }
+  it('does not make the delete button glow', () => {
+    // A coloured drop shadow under a red fill reads as a halo, not depth.
+    const source = readFileSync(
+      resolve('src/renderer/src/features/tables/components/table-data-view.tsx'),
+      'utf8'
+    )
+    expect(source).not.toMatch(/shadow-danger/)
+  })
+})
+
+describe('the refresh-schemas button', () => {
+  it('wears the subtle surface too', () => {
+    // Lives inside a component needing router and palette context, so it is
+    // checked at the source — keyed on the aria-label.
+    const source = readFileSync(
+      resolve('src/renderer/src/features/database/components/schema-tree.tsx'),
+      'utf8'
+    )
+    const button = /variant="([^"]*)"[\s\S]{0,300}?aria-label="Refresh schemas"/.exec(source)
+    expect(button, 'the refresh button moved or lost its aria-label').not.toBeNull()
+    expect(button![1]).toBe('subtle')
   })
 })
 

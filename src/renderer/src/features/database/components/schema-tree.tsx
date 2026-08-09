@@ -160,8 +160,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
             <TooltipTrigger asChild>
               <Button
                 size="icon-xs"
-                variant="ghost"
-                tone="neutral"
+                variant="subtle"
                 onClick={() => {
                   setTablesBySchema({})
                   onRefresh()
