@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import type { DatabaseEngine, QueryLogEntry } from '../../shared/types'
+import type { DatabaseEngine, QueryLogEntry, QueryOrigin } from '../../shared/types'
 
 const MAX_ENTRIES = 200
 
 const buffer: QueryLogEntry[] = []
 
 interface RecordOptions {
+  /** Defaults to internal: most callers are the app's own introspection. */
+  origin?: QueryOrigin
   connectionId: string
   engine: DatabaseEngine
   sql: string
@@ -19,6 +21,7 @@ interface RecordOptions {
 export function recordQuery(opts: RecordOptions): void {
   const entry: QueryLogEntry = {
     id: randomUUID(),
+    origin: opts.origin ?? 'internal',
     connectionId: opts.connectionId,
     engine: opts.engine,
     sql: opts.sql,

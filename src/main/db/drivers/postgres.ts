@@ -579,6 +579,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
       const rows = truncated ? allRows.slice(0, MAX_QUERY_RESULT_ROWS) : allRows
       const rowCount = results.reduce((sum, r) => sum + (r.rowCount ?? 0), 0)
       recordQuery({
+        origin: 'user',
         connectionId: opts.connectionId,
         engine: 'postgres',
         sql: opts.sql,
@@ -600,6 +601,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       recordQuery({
+        origin: 'user',
         connectionId: opts.connectionId,
         engine: 'postgres',
         sql: opts.sql,

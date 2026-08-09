@@ -316,7 +316,14 @@ export interface ActiveConnectionMeta {
   currentUser: string
 }
 
+/**
+ * Who asked for a query: something the user typed or triggered, or the app's own
+ * introspection. Without the distinction the log is mostly pragmas.
+ */
+export type QueryOrigin = 'user' | 'internal'
+
 export interface QueryLogEntry {
+  origin: QueryOrigin
   id: string
   connectionId: string
   engine: DatabaseEngine

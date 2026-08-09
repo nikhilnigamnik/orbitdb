@@ -116,7 +116,11 @@ export function ConnectionsPage() {
     setIsDeleting(true)
     setDeleteError(null)
     try {
+      const wasActive = active?.connectionId === pendingDelete.id
       await unwrap(window.api.connections.delete(pendingDelete.id))
+      // The main process closes the pool, but the renderer would keep pointing
+      // at a connection that no longer exists and fail on the next call.
+      if (wasActive) await disconnect()
       await refresh()
       confirmModal.close()
       setPendingDelete(null)

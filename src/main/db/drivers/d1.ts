@@ -6,6 +6,7 @@ import {
   type DistinctValuesOptions,
   type GetRowsOptions,
   type IndexInfo,
+  type QueryOrigin,
   type QueryResult,
   type RowDelete,
   type RowMutation,
@@ -99,7 +100,8 @@ async function callD1<TRow = Record<string, unknown>>(
   input: ConnectionInput,
   sql: string,
   params: unknown[] = [],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  origin: QueryOrigin = 'internal'
 ): Promise<D1QueryResultEntry<TRow>> {
   const connectionId = 'id' in input ? (input as SavedConnection).id : '<test>'
   const t0 = Date.now()
@@ -112,7 +114,8 @@ async function callD1<TRow = Record<string, unknown>>(
       params,
       durationMs: Date.now() - t0,
       rowCount: entry.results?.length ?? null,
-      success: true
+      success: true,
+      origin
     })
     return entry
   } catch (err) {
@@ -123,7 +126,8 @@ async function callD1<TRow = Record<string, unknown>>(
       params,
       durationMs: Date.now() - t0,
       success: false,
-      error: err instanceof Error ? err.message : String(err)
+      error: err instanceof Error ? err.message : String(err),
+      origin
     })
     throw err
   }
@@ -519,7 +523,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
     d1Inflight.set(opts.queryId, { controller, connectionId: opts.connectionId })
   }
   try {
-    const entry = await callD1(saved, opts.sql, opts.params ?? [], controller.signal)
+    const entry = await callD1(saved, opts.sql, opts.params ?? [], controller.signal, 'user')
     const fieldNames = entry.results[0] ? Object.keys(entry.results[0]) : []
     const truncated = entry.results.length > MAX_QUERY_RESULT_ROWS
     const rows = truncated ? entry.results.slice(0, MAX_QUERY_RESULT_ROWS) : entry.results

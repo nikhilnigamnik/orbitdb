@@ -575,6 +575,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
       const header = isRowSet ? null : (result as ResultSetHeader)
       const rowCount = isRowSet ? allRows.length : (header?.affectedRows ?? null)
       recordQuery({
+        origin: 'user',
         connectionId: opts.connectionId,
         engine: 'mysql',
         sql: opts.sql,
@@ -602,6 +603,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       recordQuery({
+        origin: 'user',
         connectionId: opts.connectionId,
         engine: 'mysql',
         sql: opts.sql,
