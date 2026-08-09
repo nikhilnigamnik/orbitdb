@@ -120,11 +120,7 @@ export function AiPrompt({
               <Kbd>Esc</Kbd>
               <span>Dismiss</span>
             </span>
-            <Button
-              size="sm"
-              onClick={() => submit()}
-              disabled={!prompt.trim() || isGenerating}
-            >
+            <Button size="sm" onClick={() => submit()} disabled={!prompt.trim() || isGenerating}>
               {isGenerating ? (
                 <Spinner size={12} className="text-current" />
               ) : (

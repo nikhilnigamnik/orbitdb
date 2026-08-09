@@ -4,7 +4,8 @@ import { IconAlertTriangle, IconCheck, IconDownload, IconTable } from '@tabler/i
 import { Button } from '@renderer/components/ui/button'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { formatCellValue, formatNumber } from '@renderer/lib/format'
-import { buildExportFilename, downloadJson } from '@renderer/lib/export'
+import { ExportMenu } from '@renderer/features/tables/components/export-menu'
+import { pgTypeToUdt } from '@renderer/lib/pg-types'
 import type { QueryResult } from '@renderer/types'
 
 interface QueryResultsProps {
@@ -44,13 +45,7 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
   }
 
   const fields = result.fields
-  const rowsForExport = result.rows
-  const canExport = rowsForExport.length > 0
-
-  function handleExport() {
-    if (!canExport) return
-    downloadJson(buildExportFilename(['query-result'], 'json'), rowsForExport)
-  }
+  const canExport = result.rows.length > 0
 
   return (
     <div className="flex h-full flex-col">
@@ -81,15 +76,24 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
         )}
         <span className="ml-auto font-mono text-text-subtle">{result.durationMs} ms</span>
         {canExport && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="-my-1 h-6 px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
-            onClick={handleExport}
+          // The same three formats the data grid offers — this used to hand you
+          // JSON with no indication the others existed.
+          <ExportMenu
+            rows={result.rows}
+            columns={fields.map((f) => f.name)}
+            filenameParts={['query-result']}
+            side="bottom"
+            align="end"
           >
-            <IconDownload size={11} />
-            Export
-          </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="-my-1 h-6 px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+            >
+              <IconDownload size={11} />
+              Export
+            </Button>
+          </ExportMenu>
         )}
       </div>
 
@@ -161,16 +165,19 @@ function ResultTable({ rows, fields }: ResultTableProps) {
                 </td>
                 {fields.map((f) => {
                   const value = row[f.name]
+                  // Postgres reports its type OID here, which is enough to render
+                  // a timestamptz with its offset like the data grid does.
+                  const display = formatCellValue(value, pgTypeToUdt(f.dataTypeID))
                   return (
                     <td
                       key={f.name}
                       className="max-w-xs truncate border-b border-border/60 px-3 py-1.5 font-mono text-xs text-text"
-                      title={formatCellValue(value)}
+                      title={display}
                     >
                       {value === null ? (
                         <span className="italic text-text-subtle">NULL</span>
                       ) : (
-                        formatCellValue(value)
+                        display
                       )}
                     </td>
                   )

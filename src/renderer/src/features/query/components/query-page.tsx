@@ -19,6 +19,9 @@ import { useConnection } from '@renderer/features/connections/store/connection-s
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { ROUTES } from '@renderer/config/routes'
+import { DEFAULT_QUERY } from '@renderer/config/site'
+import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
+import { findDestructiveStatements } from '@renderer/lib/sql-danger'
 import { CmdKHint } from '@renderer/features/command-palette/components/cmdk-hint'
 import type { QueryResult } from '@renderer/types'
 import { SqlEditor } from './sql-editor'
@@ -35,21 +38,68 @@ interface HistoryEntry {
 
 const MIN_PANEL_PCT = 15
 const MAX_PANEL_PCT = 85
+const MAX_HISTORY = 50
+
+function draftKey(connectionId: string): string {
+  return `orbitdb:query-draft:${connectionId}`
+}
+
+function historyKey(connectionId: string): string {
+  return `orbitdb:query-history:${connectionId}`
+}
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function writeJson(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // private mode or quota — the draft just won't outlive the session
+  }
+}
 
 export function QueryPage() {
   const navigate = useNavigate()
-  const { active } = useConnection()
-  const [sql, setSql] = React.useState('select now();')
+  const { active, current } = useConnection()
+  const connectionId = active?.connectionId ?? ''
+  const engine = current?.engine ?? 'postgres'
+  const [sql, setSql] = React.useState('')
   const [result, setResult] = React.useState<QueryResult | null>(null)
   const [isRunning, setIsRunning] = React.useState(false)
   const runningQueryIdRef = React.useRef<string | null>(null)
   const [history, setHistory] = React.useState<HistoryEntry[]>([])
+  const [pendingRun, setPendingRun] = React.useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [isAiOpen, setIsAiOpen] = React.useState(false)
   const [isAiGenerating, setIsAiGenerating] = React.useState(false)
   const [editorPct, setEditorPct] = React.useState(50)
   const [isDragging, setIsDragging] = React.useState(false)
   const splitRef = React.useRef<HTMLDivElement>(null)
+
+  // Both used to live only in component state, so switching tabs threw away the
+  // query you were writing and everything you had run.
+  React.useEffect(() => {
+    if (!connectionId) return
+    setSql(readJson(draftKey(connectionId), DEFAULT_QUERY[engine]))
+    setHistory(readJson<HistoryEntry[]>(historyKey(connectionId), []))
+  }, [connectionId, engine])
+
+  React.useEffect(() => {
+    if (!connectionId) return
+    writeJson(draftKey(connectionId), sql)
+  }, [connectionId, sql])
+
+  React.useEffect(() => {
+    if (!connectionId) return
+    writeJson(historyKey(connectionId), history)
+  }, [connectionId, history])
 
   React.useEffect(() => {
     if (!isDragging) return
@@ -79,10 +129,7 @@ export function QueryPage() {
           title="No active connection"
           description="Connect to a database first to run queries."
           action={
-            <Button
-              size="sm"
-              onClick={() => navigate(ROUTES.connections)}
-            >
+            <Button size="sm" onClick={() => navigate(ROUTES.connections)}>
               Go to connections
             </Button>
           }
@@ -112,7 +159,7 @@ export function QueryPage() {
             success: queryResult.success
           },
           ...prev
-        ].slice(0, 50)
+        ].slice(0, MAX_HISTORY)
       )
     } catch (err) {
       setResult({
@@ -131,8 +178,21 @@ export function QueryPage() {
     }
   }
 
+  /**
+   * The only way a query reaches the database. Destructive statements stop for
+   * confirmation first — deleting a single row asks twice, so `delete from
+   * users` should at least ask once.
+   */
+  function requestRun(text: string) {
+    if (findDestructiveStatements(text).length > 0) {
+      setPendingRun(text)
+      return
+    }
+    void executeSql(text)
+  }
+
   function runQuery() {
-    void executeSql(sql)
+    requestRun(sql)
   }
 
   async function cancelRunningQuery() {
@@ -152,9 +212,11 @@ export function QueryPage() {
       const { sql: generated } = await unwrap(
         window.api.ai.generateSql({ connectionId: active.connectionId, prompt })
       )
+      // Put it in the editor rather than running it. The model is told to
+      // prefer SELECT, but that is a preference in a prompt — a misread request
+      // used to reach the database with nothing in between.
       setSql(generated)
       setIsAiOpen(false)
-      await executeSql(generated)
     } catch (err) {
       setIsAiOpen(false)
       setResult({
@@ -302,11 +364,7 @@ export function QueryPage() {
               Cancel
             </Button>
           ) : (
-            <Button
-              size="sm"
-              onClick={runQuery}
-              disabled={sql.trim() === ''}
-            >
+            <Button size="sm" onClick={runQuery} disabled={sql.trim() === ''}>
               <IconPlayerPlay size={12} />
               Run
               <Kbd tone="accent" className="ml-1">
@@ -324,18 +382,27 @@ export function QueryPage() {
           </div>
 
           <div
-            role="separator"
-            aria-orientation="horizontal"
-            aria-valuenow={Math.round(editorPct)}
-            aria-valuemin={MIN_PANEL_PCT}
-            aria-valuemax={MAX_PANEL_PCT}
             onMouseDown={(e) => {
               e.preventDefault()
               setIsDragging(true)
             }}
             onDoubleClick={() => setEditorPct(50)}
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize editor"
+            aria-valuenow={Math.round(editorPct)}
+            aria-valuemin={MIN_PANEL_PCT}
+            aria-valuemax={MAX_PANEL_PCT}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              // Arrow keys give the split to anyone not using a mouse.
+              const step = e.key === 'ArrowUp' ? -4 : e.key === 'ArrowDown' ? 4 : 0
+              if (step === 0) return
+              e.preventDefault()
+              setEditorPct((pct) => Math.min(MAX_PANEL_PCT, Math.max(MIN_PANEL_PCT, pct + step)))
+            }}
             className={cn(
-              'group/handle relative flex h-3 shrink-0 cursor-row-resize items-center justify-center border-y border-border bg-surface transition-colors',
+              'group/handle relative flex h-3 shrink-0 cursor-row-resize items-center justify-center border-y border-border bg-surface outline-none transition-colors focus-visible:bg-accent/20',
               isDragging && 'hover:bg-surface-elevated'
             )}
           >
@@ -360,6 +427,26 @@ export function QueryPage() {
         onOpenChange={setIsAiOpen}
         onSubmit={handleAiGenerate}
         isGenerating={isAiGenerating}
+      />
+
+      <ConfirmDialog
+        isOpen={pendingRun != null}
+        onClose={() => setPendingRun(null)}
+        onConfirm={() => {
+          const text = pendingRun
+          setPendingRun(null)
+          if (text) void executeSql(text)
+        }}
+        title="Run this destructive query?"
+        description={
+          pendingRun
+            ? `${findDestructiveStatements(pendingRun)
+                .map((s) => s.summary)
+                .join('. ')}. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Run anyway"
+        variant="danger"
       />
     </div>
   )

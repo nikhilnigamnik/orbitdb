@@ -3,6 +3,7 @@ import type { ExplainTableOptions, ExplainTableResult } from '../../shared/types
 import { getConnection } from '../store/connections-store'
 import { tableDetails } from '../db/manager'
 import { aiModel } from './client'
+import { AI_REQUEST_TIMEOUT_MS } from './config'
 import { buildTableContext, ENGINE_DIALECT } from './context'
 
 export async function explainTable(opts: ExplainTableOptions): Promise<ExplainTableResult> {
@@ -21,7 +22,8 @@ export async function explainTable(opts: ExplainTableOptions): Promise<ExplainTa
       `and table names. Cover what the table most likely represents, the role of each notable ` +
       `column, and how it relates to other tables via its foreign keys. ` +
       `Keep it under ~180 words and infer meaning from names and types.`,
-    prompt: `Explain this table:\n\n${context}`
+    prompt: `Explain this table:\n\n${context}`,
+    abortSignal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
   })
 
   return { explanation: text.trim() }

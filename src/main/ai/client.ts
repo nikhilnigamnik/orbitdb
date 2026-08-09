@@ -1,7 +1,14 @@
 import { createGroq } from '@ai-sdk/groq'
 import { generateText, Output } from 'ai'
 import type { z } from 'zod'
-import { AI_PROXY_TOKEN, AI_PROXY_URL, GROQ_API_KEY, GROQ_MODEL, IS_PROXY_ENABLED } from './config'
+import {
+  AI_PROXY_TOKEN,
+  AI_PROXY_URL,
+  AI_REQUEST_TIMEOUT_MS,
+  GROQ_API_KEY,
+  GROQ_MODEL,
+  IS_PROXY_ENABLED
+} from './config'
 
 // Proxy mode: baseURL points at the Worker (which ends in /v1) and the device
 // token rides as the Bearer credential. Direct mode: talk to Groq with the key.
@@ -40,28 +47,36 @@ export async function generateJson<T>(opts: {
   system: string
   prompt: string
 }): Promise<T> {
+  // Kept so a real failure — auth, rate limit, timeout — is reported as itself
+  // rather than as the retry's generic "invalid JSON".
+  let structuredFailure: unknown
   try {
     const { output } = await generateText({
       model: aiModel,
       system: opts.system,
       prompt: opts.prompt,
-      output: Output.object({ schema: opts.schema })
+      output: Output.object({ schema: opts.schema }),
+      abortSignal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
     })
     if (output != null) return output as T
-  } catch {
-    // fall through to the manual path
+  } catch (err) {
+    structuredFailure = err
   }
 
   const { text } = await generateText({
     model: aiModel,
     system: `${opts.system}\n\nRespond with raw JSON only — no prose, no markdown code fences.`,
-    prompt: opts.prompt
+    prompt: opts.prompt,
+    abortSignal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
   })
 
   let parsed: unknown
   try {
     parsed = JSON.parse(extractJson(stripFences(text)))
   } catch {
+    // If the first attempt failed for a reason of its own, that is the useful
+    // one to report.
+    if (structuredFailure instanceof Error) throw structuredFailure
     throw new Error('The model returned invalid JSON. Try rephrasing your request.')
   }
 
