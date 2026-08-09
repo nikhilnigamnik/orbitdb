@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type {
   ActiveConnectionMeta,
+  AiModelId,
+  AiProviderId,
+  AiSettingsView,
   ConnectionInput,
   DdlRequest,
   DistinctValuesOptions,
@@ -30,6 +33,7 @@ import type {
   SuggestIndexesResult,
   TableDetails,
   TableInfo,
+  UsageSummary,
   TestConnectionResult,
   UpdateCheckResult
 } from '../shared/types'
@@ -81,6 +85,21 @@ const api = {
       invoke<SuggestIndexesResult>('ai:suggest-indexes', opts),
     generateSeed: (opts: GenerateSeedOptions) =>
       invoke<GenerateSeedResult>('ai:generate-seed', opts)
+  },
+  settings: {
+    getAi: () => invoke<AiSettingsView>('settings:get-ai'),
+    setAiProvider: (provider: AiProviderId) =>
+      invoke<AiProviderId>('settings:set-ai-provider', provider),
+    setAiKey: (provider: AiProviderId, apiKey: string) =>
+      invoke<void>('settings:set-ai-key', provider, apiKey),
+    clearAiKey: (provider: AiProviderId) => invoke<void>('settings:clear-ai-key', provider),
+    setAiModel: (provider: AiProviderId, model: AiModelId) =>
+      invoke<AiModelId>('settings:set-ai-model', provider, model),
+    testAi: (provider: AiProviderId) => invoke<void>('settings:test-ai', provider)
+  },
+  usage: {
+    summary: () => invoke<UsageSummary>('usage:summary'),
+    clear: () => invoke<void>('usage:clear')
   },
   app: {
     getVersion: () => invoke<string>('app:get-version'),

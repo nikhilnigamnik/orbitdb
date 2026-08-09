@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryPage } from '@renderer/features/query/components/query-page'
 import { CommandPaletteProvider } from '@renderer/features/command-palette/store'
+import { ToastProvider } from '@renderer/components/ui/toast'
 
 const runQuery = vi.fn()
 const generateSql = vi.fn()
@@ -75,9 +76,11 @@ afterEach(cleanup)
 async function setup() {
   render(
     <MemoryRouter>
-      <CommandPaletteProvider>
-        <QueryPage />
-      </CommandPaletteProvider>
+      <ToastProvider>
+        <CommandPaletteProvider>
+          <QueryPage />
+        </CommandPaletteProvider>
+      </ToastProvider>
     </MemoryRouter>
   )
   await screen.findByPlaceholderText(/Write SQL here/)
@@ -164,5 +167,33 @@ describe('the draft', () => {
     await setup()
     // now() does not exist in SQLite; postgres gets its own opener.
     await waitFor(() => expect(editor().value).toBe('select now();'))
+  })
+})
+
+describe('generated SQL over an unsaved draft', () => {
+  async function generateOver(draft: string) {
+    generateSql.mockResolvedValue({ success: true, data: { sql: 'select 1' } })
+    await setup()
+    fireEvent.change(editor(), { target: { value: draft } })
+
+    fireEvent.click(await screen.findByRole('button', { name: /ask ai/i }))
+    const prompt = await screen.findByPlaceholderText(/Describe the query/)
+    fireEvent.change(prompt, { target: { value: 'all users' } })
+    fireEvent.keyDown(prompt, { key: 'Enter' })
+
+    await waitFor(() => expect(editor().value).toBe('select 1'))
+  }
+
+  it('offers a way back — the draft is persisted, and history only holds runs', async () => {
+    await generateOver('select * from half_written')
+
+    fireEvent.click(await screen.findByText('Undo'))
+
+    expect(editor().value).toBe('select * from half_written')
+  })
+
+  it('says nothing when there was nothing to lose', async () => {
+    await generateOver('   ')
+    expect(screen.queryByText('Replaced the editor contents')).toBeNull()
   })
 })

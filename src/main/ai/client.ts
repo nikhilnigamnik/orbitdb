@@ -1,22 +1,112 @@
-import { createGroq } from '@ai-sdk/groq'
-import { generateText, Output } from 'ai'
+import { createAnthropic } from '@ai-sdk/anthropic'
+import { createOpenAI } from '@ai-sdk/openai'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { APICallError, generateText, Output, type LanguageModel } from 'ai'
 import type { z } from 'zod'
 import {
-  AI_PROXY_TOKEN,
-  AI_PROXY_URL,
-  AI_REQUEST_TIMEOUT_MS,
-  GROQ_API_KEY,
-  GROQ_MODEL,
-  IS_PROXY_ENABLED
-} from './config'
+  MISSING_AI_KEY_MESSAGE,
+  isAiProviderId,
+  type AiFeature,
+  type AiModelId,
+  type AiProviderId
+} from '../../shared/ai-models'
+import { getAiSettings, getProviderSettings } from '../store/settings-store'
+import { recordUsage } from '../store/usage-store'
+import { AI_REQUEST_TIMEOUT_MS } from './config'
 
-// Proxy mode: baseURL points at the Worker (which ends in /v1) and the device
-// token rides as the Bearer credential. Direct mode: talk to Groq with the key.
-const groq = IS_PROXY_ENABLED
-  ? createGroq({ baseURL: AI_PROXY_URL, apiKey: AI_PROXY_TOKEN })
-  : createGroq({ apiKey: GROQ_API_KEY })
+export class MissingApiKeyError extends Error {
+  constructor() {
+    super(MISSING_AI_KEY_MESSAGE)
+    this.name = 'MissingApiKeyError'
+  }
+}
 
-export const aiModel = groq(GROQ_MODEL)
+/**
+ * One line per provider. Each SDK takes the same shape — a factory that closes
+ * over the key and returns a model builder — so adding a provider is a row here
+ * plus a row in `AI_PROVIDERS`.
+ */
+const FACTORY: Record<AiProviderId, (apiKey: string) => (model: string) => LanguageModel> = {
+  anthropic: (apiKey) => createAnthropic({ apiKey }),
+  openai: (apiKey) => createOpenAI({ apiKey }),
+  google: (apiKey) => createGoogleGenerativeAI({ apiKey })
+}
+
+// The credential is runtime state now, not build-time state, so the model can no
+// longer be a module constant: it has to be re-read after the user saves a key.
+// Rebuilt only when the provider, key or model actually changes.
+let cached: {
+  provider: AiProviderId
+  apiKey: string
+  model: AiModelId
+  instance: LanguageModel
+} | null = null
+
+/**
+ * Drops the built provider — and with it the copy of the key it closed over.
+ * Called when the key changes so a removed key does not linger in memory.
+ */
+export function resetModelCache(): void {
+  cached = null
+}
+
+/**
+ * A model for a *named* provider, using that provider's own saved key. `getModel`
+ * is the active one; this is for testing a key on a card you are not using yet.
+ * Not cached — it is pressed by hand, once.
+ */
+export function buildModelFor(provider: string): LanguageModel {
+  if (!isAiProviderId(provider)) throw new Error(`Unknown provider: ${provider}`)
+  const { apiKey, model } = getProviderSettings(provider)
+  if (!apiKey) throw new MissingApiKeyError()
+  return FACTORY[provider](apiKey)(model)
+}
+
+export function getModel(): LanguageModel {
+  const { provider, apiKey, model } = getAiSettings()
+  if (!apiKey) throw new MissingApiKeyError()
+  if (
+    cached &&
+    cached.provider === provider &&
+    cached.apiKey === apiKey &&
+    cached.model === model
+  ) {
+    return cached.instance
+  }
+  const instance = FACTORY[provider](apiKey)(model)
+  cached = { provider, apiKey, model, instance }
+  return instance
+}
+
+type TextArgs = Omit<Parameters<typeof generateText>[0], 'model'>
+
+/** Narrower than the SDK's own args, and enough for everything this app asks for. */
+
+/**
+ * The only way this app talks to a model. Everything goes through here so usage is
+ * recorded once, in one place — a second path would silently under-count.
+ */
+export async function runText(feature: AiFeature, args: TextArgs, provider?: string) {
+  const model = provider ? buildModelFor(provider) : getModel()
+  const result = await generateText({ ...args, model } as Parameters<typeof generateText>[0])
+
+  try {
+    const active = provider ? getProviderSettings(provider as AiProviderId) : null
+    const settings = getAiSettings()
+    recordUsage({
+      provider: (provider as AiProviderId) ?? settings.provider,
+      model: active?.model ?? settings.model,
+      feature,
+      inputTokens: result.totalUsage.inputTokens ?? 0,
+      outputTokens: result.totalUsage.outputTokens ?? 0
+    })
+  } catch (err) {
+    // Bookkeeping must never cost the user the answer they were waiting for.
+    console.error('[usage] failed to record token usage', err)
+  }
+
+  return result
+}
 
 // Strip ```sql / ```json fences some models add despite instructions.
 export function stripFences(text: string): string {
@@ -37,22 +127,42 @@ function extractJson(text: string): string {
 }
 
 /**
- * Structured output with two layers of defense:
- * 1. The provider's native `json_schema` mode (gpt-oss models support it).
- * 2. If that's unavailable/fails, fall back to plain text + defensive JSON
- *    extraction and zod validation.
+ * Some failures mean "the model's answer was the wrong shape" — worth a second,
+ * plainer attempt. Others mean the request never landed: a rejected key, a rate
+ * limit, a timeout. Retrying those buys a second round-trip and, in the rate
+ * limit's case, makes the thing it is retrying worse.
+ */
+function isWorthRetrying(err: unknown): boolean {
+  if (APICallError.isInstance(err)) return false
+  // AbortSignal.timeout — the model was too slow, and it will be again.
+  if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+    return false
+  }
+  return true
+}
+
+/**
+ * Structured output in two layers.
+ *
+ * 1. `generateText` + `Output.object` — the SDK's supported path as of v6, which
+ *    deprecated `generateObject`. Every model offered in Settings reports
+ *    `supportsStructuredOutput`, so the Anthropic provider sends a native
+ *    `output_config.format` carrying the schema rather than asking in prose.
+ * 2. A plain-text retry, parsed defensively. `Output.object` takes no repair
+ *    hook, so salvaging a fenced or preamble-wrapped reply means asking again —
+ *    which is why layer 1 failing for a *transport* reason must not land here.
  */
 export async function generateJson<T>(opts: {
+  feature: AiFeature
   schema: z.ZodType<T>
   system: string
   prompt: string
 }): Promise<T> {
-  // Kept so a real failure — auth, rate limit, timeout — is reported as itself
+  // Kept so a shape failure that also fails on the retry is reported as itself
   // rather than as the retry's generic "invalid JSON".
   let structuredFailure: unknown
   try {
-    const { output } = await generateText({
-      model: aiModel,
+    const { output } = await runText(opts.feature, {
       system: opts.system,
       prompt: opts.prompt,
       output: Output.object({ schema: opts.schema }),
@@ -60,11 +170,11 @@ export async function generateJson<T>(opts: {
     })
     if (output != null) return output as T
   } catch (err) {
+    if (!isWorthRetrying(err)) throw err
     structuredFailure = err
   }
 
-  const { text } = await generateText({
-    model: aiModel,
+  const { text } = await runText(opts.feature, {
     system: `${opts.system}\n\nRespond with raw JSON only — no prose, no markdown code fences.`,
     prompt: opts.prompt,
     abortSignal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
