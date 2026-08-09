@@ -85,7 +85,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="flex flex-col items-center gap-1.5 border-t border-border px-2 py-3">
+      <div className="flex flex-col items-center gap-1.5 px-2 py-3">
         <Tooltip>
           <TooltipTrigger asChild>
             <NavLink
