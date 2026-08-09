@@ -11,12 +11,15 @@ import {
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Kbd } from '@renderer/components/ui/kbd'
+import { Chip } from '@renderer/components/ui/chip'
+import { useToast } from '@renderer/components/ui/toast'
 import { AiPrompt } from '@renderer/features/query/components/ai-prompt'
 import { SeedDataDialog } from '@renderer/features/database/components/seed-data-dialog'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { formatCellValue } from '@renderer/lib/format'
+import { errorMessage } from '@renderer/lib/errors'
 import { cn } from '@renderer/lib/utils'
 import { unwrap } from '@renderer/lib/ipc'
 import {
@@ -26,7 +29,7 @@ import {
   decodeJoin,
   encodeFilters
 } from '@renderer/features/tables/lib/filter-params'
-import { DEFAULT_PAGE_SIZE } from '@renderer/config/site'
+import { DEFAULT_PAGE_SIZE, UNDO_PROMPT_MS } from '@renderer/config/site'
 import { tableRouteWithFk } from '@renderer/config/routes'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import type {
@@ -62,6 +65,7 @@ export function TableDataView({
   onReady
 }: TableDataViewProps) {
   const navigate = useNavigate()
+  const toast = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const fkColumn = searchParams.get('fkColumn')
   const fkValue = searchParams.get('fkValue')
@@ -151,7 +155,6 @@ export function TableDataView({
   const aiPrompt = useDisclosure(false)
   const seedDialog = useDisclosure(false)
   const [isAiFiltering, setIsAiFiltering] = React.useState(false)
-  const [aiError, setAiError] = React.useState<string | null>(null)
 
   const openAiPrompt = aiPrompt.open
   React.useEffect(() => {
@@ -170,7 +173,6 @@ export function TableDataView({
   const bulkDeleteConfirm = useDisclosure(false)
   const [editingRow, setEditingRow] = React.useState<Record<string, unknown> | null>(null)
   const [pendingDelete, setPendingDelete] = React.useState<Record<string, unknown> | null>(null)
-  const [mutationError, setMutationError] = React.useState<string | null>(null)
   const [isMutating, setIsMutating] = React.useState(false)
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
 
@@ -188,6 +190,10 @@ export function TableDataView({
 
   const requestIdRef = React.useRef(0)
   const prefetchCacheRef = React.useRef<{ key: string; data: RowsResult } | null>(null)
+  // Read inside load itself: as state they would have to be dependencies, and a
+  // load that reloads whenever its own outcome changes never settles.
+  const hasLoadedOnceRef = React.useRef(false)
+  const loadRef = React.useRef<() => Promise<void>>(async () => {})
 
   const load = React.useCallback(async () => {
     const requestId = ++requestIdRef.current
@@ -239,9 +245,19 @@ export function TableDataView({
         setTotalEstimate(data.totalEstimate)
         setRowSelection({})
         setHasLoadedOnce(true)
+        hasLoadedOnceRef.current = true
       } catch (err) {
         if (requestId !== requestIdRef.current) return
-        setError(err instanceof Error ? err.message : String(err))
+        const message = err instanceof Error ? err.message : String(err)
+        setError(message)
+        // Only once a grid is on screen. Before that the full-area error state
+        // is the whole view, and a toast on top of it would say it twice.
+        if (hasLoadedOnceRef.current) {
+          toast.error('Could not load rows', {
+            description: message,
+            action: { label: 'Refresh', onClick: () => void loadRef.current() }
+          })
+        }
         return
       } finally {
         if (requestId === requestIdRef.current) setIsLoading(false)
@@ -295,8 +311,11 @@ export function TableDataView({
     orderBy,
     orderDir,
     filters,
-    filterJoin
+    filterJoin,
+    toast
   ])
+
+  loadRef.current = load
 
   React.useEffect(() => {
     setOffset(0)
@@ -306,6 +325,7 @@ export function TableDataView({
     setRows([])
     setRowSelection({})
     setHasLoadedOnce(false)
+    hasLoadedOnceRef.current = false
     prefetchCacheRef.current = null
   }, [details.schema, details.name])
 
@@ -361,7 +381,6 @@ export function TableDataView({
 
   async function handleAiFilter(prompt: string) {
     setIsAiFiltering(true)
-    setAiError(null)
     try {
       const result = await unwrap(
         window.api.ai.filterTable({
@@ -377,14 +396,13 @@ export function TableDataView({
       setOffset(0)
       aiPrompt.close()
     } catch (err) {
-      setAiError(err instanceof Error ? err.message : String(err))
+      toast.error('AI filter failed', { description: errorMessage(err) })
     } finally {
       setIsAiFiltering(false)
     }
   }
 
   async function handleInsert(values: Record<string, unknown>) {
-    setMutationError(null)
     await unwrap(
       window.api.db.insertRow({
         connectionId,
@@ -398,7 +416,6 @@ export function TableDataView({
 
   async function handleUpdate(values: Record<string, unknown>) {
     if (!editingRow) throw new Error('No row selected')
-    setMutationError(null)
     const pk: Record<string, unknown> = {}
     for (const key of details.primaryKey) pk[key] = editingRow[key]
     await unwrap(
@@ -426,15 +443,19 @@ export function TableDataView({
   } | null>(null)
   // The prompt is a hint, not the capability: it fades, but cmd-Z keeps working
   // until another edit replaces it or the table changes. Tying the two together
-  // meant looking away for twelve seconds silently cost you the undo.
+  // meant that looking away for a few seconds silently cost you the undo.
   const [isUndoPromptVisible, setIsUndoPromptVisible] = React.useState(false)
   const [isUndoing, setIsUndoing] = React.useState(false)
 
   React.useEffect(() => {
     if (!lastEdit) return
-    const timer = setTimeout(() => setIsUndoPromptVisible(false), 12_000)
+    const timer = setTimeout(() => setIsUndoPromptVisible(false), UNDO_PROMPT_MS)
     return () => clearTimeout(timer)
   }, [lastEdit])
+
+  // The row marker points at the prompt, so it leaves with it. Bound to lastEdit
+  // instead it would outlive the bar and sit there highlighted forever.
+  const pendingUndoRow = isUndoPromptVisible ? (lastEdit?.pk ?? null) : null
 
   async function writeCell(
     pk: Record<string, unknown>,
@@ -472,7 +493,7 @@ export function TableDataView({
       await writeCell(lastEdit.pk, lastEdit.column, lastEdit.previousValue)
       setLastEdit(null)
     } catch (err) {
-      setMutationError(err instanceof Error ? err.message : String(err))
+      toast.error('Undo failed', { description: errorMessage(err) })
     } finally {
       setIsUndoing(false)
     }
@@ -507,7 +528,6 @@ export function TableDataView({
   async function handleDelete() {
     if (!pendingDelete) return
     setIsMutating(true)
-    setMutationError(null)
     try {
       const pk: Record<string, unknown> = {}
       for (const key of details.primaryKey) pk[key] = pendingDelete[key]
@@ -522,8 +542,9 @@ export function TableDataView({
       await load()
       deleteConfirm.close()
       setPendingDelete(null)
+      toast.success('Row deleted')
     } catch (err) {
-      setMutationError(err instanceof Error ? err.message : String(err))
+      toast.error('Delete failed', { description: errorMessage(err) })
     } finally {
       setIsMutating(false)
     }
@@ -532,7 +553,6 @@ export function TableDataView({
   async function handleBulkDelete() {
     if (selectedRows.length === 0) return
     setIsMutating(true)
-    setMutationError(null)
     try {
       await Promise.all(
         selectedRows.map((row) => {
@@ -548,11 +568,13 @@ export function TableDataView({
           )
         })
       )
+      const deleted = selectedRows.length
       setRowSelection({})
       await load()
       bulkDeleteConfirm.close()
+      toast.success(`${deleted} row${deleted === 1 ? '' : 's'} deleted`)
     } catch (err) {
-      setMutationError(err instanceof Error ? err.message : String(err))
+      toast.error('Delete failed', { description: errorMessage(err) })
     } finally {
       setIsMutating(false)
     }
@@ -630,24 +652,6 @@ export function TableDataView({
         </div>
       </div>
 
-      {error && (
-        <div className="p-3">
-          <ErrorState message={error} onRetry={load} />
-        </div>
-      )}
-
-      {mutationError && (
-        <div className="p-3">
-          <ErrorState title="Mutation failed" message={mutationError} />
-        </div>
-      )}
-
-      {aiError && (
-        <div className="p-3">
-          <ErrorState title="AI filter failed" message={aiError} />
-        </div>
-      )}
-
       {!canMutate && details.type === 'table' && (
         <div className="border-b border-warning/20 bg-warning/5 px-3 py-2 text-xs text-warning">
           This table has no primary key — rows cannot be edited or deleted from the UI.
@@ -678,7 +682,7 @@ export function TableDataView({
           isInitialLoad={isLoading && !hasLoadedOnce}
           fkColumns={fkByColumn}
           onOpenForeignKey={openForeignKey}
-          pendingUndoRow={lastEdit?.pk ?? null}
+          pendingUndoRow={pendingUndoRow}
           hasFilters={filters.length > 0}
           onClearFilters={() => {
             setFilters([])
@@ -697,9 +701,15 @@ export function TableDataView({
                   highlighted in the grid, which identifies it far better than a
                   fragment of a UUID could. */}
               <span className="flex min-w-0 items-center gap-1.5">
-                <span className="shrink-0 font-mono text-[11px] text-text-muted">
+                {/* Not uppercased or letter-spaced like the categorical chips:
+                    this is a real identifier, and in Postgres case is load-bearing. */}
+                <Chip
+                  tone="neutral"
+                  className="h-5 max-w-32 truncate rounded-md font-mono text-[11px] font-medium normal-case tracking-normal"
+                  title={lastEdit.column}
+                >
                   {lastEdit.column}
-                </span>
+                </Chip>
                 <UndoValue value={lastEdit.previousValue} muted />
                 <IconArrowNarrowRight size={12} className="shrink-0 text-text-subtle/60" />
                 <UndoValue value={lastEdit.newValue} />
