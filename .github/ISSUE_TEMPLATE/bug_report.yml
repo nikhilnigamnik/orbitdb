@@ -1,0 +1,41 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please don't include real credentials, connection strings, or row data.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what happened, and what you expected instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Database engine
+      options: [PostgreSQL, MySQL/MariaDB, Cloudflare D1, Not engine-specific]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OrbitDB version
+      placeholder: 0.2.2 — shown in Settings
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.1 (Apple Silicon)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant SQL or error
+      description: The query log often has the useful part. Redact anything sensitive.
+      render: text

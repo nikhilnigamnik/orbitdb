@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR per group rather than a dozen — these move together anyway.
+      dev-tooling:
+        patterns: ['@types/*', 'eslint*', 'prettier', 'vitest', '@testing-library/*', 'typescript']
+      electron:
+        patterns: ['electron', 'electron-*', '@electron*']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
