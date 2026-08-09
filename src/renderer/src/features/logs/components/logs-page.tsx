@@ -46,6 +46,9 @@ export function LogsPage() {
   const [isLoading, setIsLoading] = React.useState(true)
   const [filter, setFilter] = React.useState('')
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'success' | 'error'>('all')
+  // Introspection outnumbers user queries by a wide margin — pragmas, column
+  // lookups, the pagination count — so the useful view is the default one.
+  const [originFilter, setOriginFilter] = React.useState<'user' | 'all'>('user')
   const [selected, setSelected] = React.useState<QueryLogEntry | null>(null)
   const [copied, setCopied] = React.useState(false)
   const copyTimeout = React.useRef<number | null>(null)
@@ -107,6 +110,7 @@ export function LogsPage() {
   const lowered = filter.trim().toLowerCase()
   const filtered = React.useMemo(() => {
     return logs.filter((entry) => {
+      if (originFilter === 'user' && entry.origin !== 'user') return false
       if (statusFilter === 'success' && !entry.success) return false
       if (statusFilter === 'error' && entry.success) return false
       if (!lowered) return true
@@ -115,7 +119,7 @@ export function LogsPage() {
         connectionName(entry.connectionId).toLowerCase().includes(lowered)
       )
     })
-  }, [logs, lowered, statusFilter, connectionName])
+  }, [logs, lowered, statusFilter, originFilter, connectionName])
 
   const errorCount = logs.filter((entry) => !entry.success).length
 
@@ -183,6 +187,14 @@ export function LogsPage() {
             className="pl-7 text-xs"
           />
         </div>
+        <SlidingTabs
+          tabs={[
+            { id: 'user', label: 'Yours' },
+            { id: 'all', label: 'Everything' }
+          ]}
+          value={originFilter}
+          onChange={setOriginFilter}
+        />
         <SlidingTabs
           tabs={[
             { id: 'all', label: 'All' },
