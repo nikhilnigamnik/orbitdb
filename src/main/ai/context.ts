@@ -24,6 +24,17 @@ export const QUOTE_HINT: Record<DatabaseEngine, string> = {
   d1: 'ALWAYS wrap every table and column identifier in double quotes (e.g. "createdAt") so mixed-case names are preserved.'
 }
 
+/**
+ * Fences untrusted content — schema identifiers, row values — inside a tag so the
+ * model can tell data from instructions. Table and column names come from someone
+ * else's database and can say anything, including "ignore the above"; a closing
+ * tag inside the payload would end the fence early, so it is defanged first.
+ */
+export function asData(tag: string, content: string): string {
+  const closing = new RegExp(`</${tag}>`, 'gi')
+  return `<${tag}>\n${content.replace(closing, `<\u2215${tag}>`)}\n</${tag}>`
+}
+
 /** Compact, whole-database schema map for grounding free-form SQL generation. */
 export async function buildSchemaContext(
   connectionId: string,
