@@ -85,7 +85,8 @@ const api = {
   app: {
     getVersion: () => invoke<string>('app:get-version'),
     checkUpdate: () => invoke<UpdateCheckResult>('app:check-update'),
-    openExternal: (url: string) => invoke<void>('app:open-external', url)
+    openExternal: (url: string) => invoke<void>('app:open-external', url),
+    pickSqliteFile: () => invoke<string | null>('app:pick-sqlite-file')
   }
 }
 

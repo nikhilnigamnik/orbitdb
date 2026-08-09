@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { z } from 'zod'
-import { IconLink } from '@tabler/icons-react'
+import { IconFolderOpen, IconLink } from '@tabler/icons-react'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
@@ -39,12 +39,13 @@ interface ConnectionFormSheetProps {
   initial?: SavedConnection | null
 }
 
-const ENGINES: DatabaseEngine[] = ['postgres', 'mysql', 'd1']
+const ENGINES: DatabaseEngine[] = ['postgres', 'mysql', 'sqlite', 'd1']
 
 const ENGINE_STYLES: Record<DatabaseEngine, { bg: string; iconClass: string; tagline: string }> = {
   postgres: { bg: 'bg-info/10', iconClass: 'text-info', tagline: 'PostgreSQL' },
   mysql: { bg: 'bg-orange/10', iconClass: 'text-orange', tagline: 'MySQL / MariaDB' },
-  d1: { bg: 'bg-warning/10', iconClass: 'text-warning', tagline: 'Cloudflare SQLite' }
+  d1: { bg: 'bg-warning/10', iconClass: 'text-warning', tagline: 'Cloudflare SQLite' },
+  sqlite: { bg: 'bg-info/10', iconClass: 'text-info', tagline: 'Local database file' }
 }
 
 const ENVIRONMENT_ACTIVE: Record<ConnectionEnvironment, { bg: string; text: string; dot: string }> =
@@ -68,7 +69,8 @@ function toFormValues(initial?: SavedConnection | null): ConnectionFormValues {
     ssl: initial.ssl,
     accountId: initial.accountId ?? '',
     databaseId: initial.databaseId ?? '',
-    apiToken: initial.apiToken ?? ''
+    apiToken: initial.apiToken ?? '',
+    filePath: initial.filePath ?? ''
   }
 }
 
@@ -87,6 +89,15 @@ export function ConnectionFormSheet({
   const [isTesting, setIsTesting] = React.useState(false)
   const [testResult, setTestResult] = React.useState<TestConnectionResult | null>(null)
   const [urlInput, setUrlInput] = React.useState('')
+
+  async function browseForFile() {
+    try {
+      const picked = await unwrap(window.api.app.pickSqliteFile())
+      if (picked) update('filePath', picked)
+    } catch {
+      // the dialog was dismissed or unavailable — leave the field as typed
+    }
+  }
 
   const urlIsInvalid = urlInput.trim().length > 0 && parseConnectionUrl(urlInput) === null
 
@@ -351,7 +362,33 @@ export function ConnectionFormSheet({
               />
             </FormField>
 
-            {values.engine === 'd1' ? (
+            {values.engine === 'sqlite' ? (
+              <FormField
+                label="Database file"
+                htmlFor="conn-file"
+                error={errors.filePath}
+                hint="A .db, .sqlite or .sqlite3 file on this machine."
+              >
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    id="conn-file"
+                    value={values.filePath}
+                    onChange={(e) => update('filePath', e.target.value)}
+                    placeholder="/path/to/dev.db"
+                    className="font-mono"
+                  />
+                  <Button
+                    type="button"
+                    variant="subtle"
+                    size="sm"
+                    onClick={() => void browseForFile()}
+                  >
+                    <IconFolderOpen size={12} />
+                    Browse
+                  </Button>
+                </div>
+              </FormField>
+            ) : values.engine === 'd1' ? (
               <>
                 <FormField
                   label="Account ID"
@@ -497,9 +534,7 @@ export function ConnectionFormSheet({
                   )}
                 </div>
                 {!testResult.success && testResult.error && (
-                  <p className="mt-2 break-all font-mono text-xs text-danger">
-                    {testResult.error}
-                  </p>
+                  <p className="mt-2 break-all font-mono text-xs text-danger">{testResult.error}</p>
                 )}
               </div>
             )}

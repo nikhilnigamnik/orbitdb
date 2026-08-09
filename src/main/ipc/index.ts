@@ -1,4 +1,4 @@
-import { ipcMain, app, shell } from 'electron'
+import { ipcMain, app, dialog, shell } from 'electron'
 import { checkForUpdate } from '../app/update-check'
 import type {
   ConnectionInput,
@@ -203,6 +203,21 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'ai:generate-seed',
     wrap(async (opts: GenerateSeedOptions) => seedTable(opts))
+  )
+
+  ipcMain.handle(
+    'app:pick-sqlite-file',
+    wrap(async () => {
+      const result = await dialog.showOpenDialog({
+        title: 'Choose a SQLite database',
+        properties: ['openFile'],
+        filters: [
+          { name: 'SQLite database', extensions: ['db', 'sqlite', 'sqlite3', 'db3'] },
+          { name: 'All files', extensions: ['*'] }
+        ]
+      })
+      return result.canceled ? null : (result.filePaths[0] ?? null)
+    })
   )
 
   ipcMain.handle(

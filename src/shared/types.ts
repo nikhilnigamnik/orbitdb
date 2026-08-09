@@ -1,4 +1,4 @@
-export type DatabaseEngine = 'postgres' | 'mysql' | 'd1'
+export type DatabaseEngine = 'postgres' | 'mysql' | 'd1' | 'sqlite'
 
 export type ConnectionEnvironment = 'dev' | 'stage' | 'prod'
 
@@ -16,6 +16,8 @@ export interface ConnectionInput {
   accountId?: string
   databaseId?: string
   apiToken?: string
+  /** SQLite-only: absolute path to the database file. */
+  filePath?: string
 }
 
 export interface SavedConnection extends ConnectionInput {

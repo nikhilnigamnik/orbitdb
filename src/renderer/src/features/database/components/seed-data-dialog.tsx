@@ -107,10 +107,7 @@ export function SeedDataDialog({
                   <IconSeeding size={12} />
                   Seed more
                 </Button>
-                <Button
-                  size="sm"
-                      onClick={onClose}
-                >
+                <Button size="sm" onClick={onClose}>
                   Done
                 </Button>
               </div>
@@ -149,11 +146,7 @@ export function SeedDataDialog({
                 </div>
               </div>
 
-              <Button
-                size="sm"
-                  onClick={seed}
-                disabled={isWorking}
-              >
+              <Button size="sm" onClick={seed} disabled={isWorking}>
                 {isWorking ? (
                   <>
                     <Spinner size={12} className="text-current" />

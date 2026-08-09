@@ -225,11 +225,7 @@ export function ConnectionsPage() {
                     : `Tag a connection as ${ENVIRONMENT_LABEL[activeTab]} to see it here.`
                 }
                 action={
-                  <Button
-                    size="sm"
-                    className="rounded-lg px-3.5"
-                    onClick={openCreate}
-                  >
+                  <Button size="sm" className="rounded-lg px-3.5" onClick={openCreate}>
                     Add new
                   </Button>
                 }
