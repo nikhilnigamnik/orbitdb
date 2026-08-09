@@ -1,5 +1,17 @@
 import type { ConnectionEnvironment, DatabaseEngine } from '@renderer/types'
 
+// Re-exported so components follow the usual "constants come from config/" rule
+// rather than reaching across the shared boundary by relative path.
+export {
+  AI_FEATURES,
+  AI_PROVIDERS,
+  DEFAULT_AI_PROVIDER,
+  MISSING_AI_KEY_MESSAGE,
+  aiFeatureLabel,
+  aiModelLabel,
+  aiProvider
+} from '../../../shared/ai-models'
+
 export const APP_NAME = 'OrbitDB'
 export const APP_TAGLINE = 'Postgres + MySQL, made friendly'
 export const APP_VERSION = '0.1.0'

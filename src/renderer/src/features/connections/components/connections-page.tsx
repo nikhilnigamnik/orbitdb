@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconPlug, IconRefresh, IconArrowsSort } from '@tabler/icons-react'
+import { IconPlug, IconRefresh, IconArrowsSort, IconSettings } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Popover } from '@renderer/components/ui/popover'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
@@ -152,6 +152,17 @@ export function ConnectionsPage() {
               >
                 {isLoading ? <Spinner size={14} /> : <IconRefresh size={14} />}
                 Refresh
+              </Button>
+              {/* The sidebar's settings entry isn't here — this page renders
+                  before a connection exists, so this is the only way in. */}
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={() => navigate(ROUTES.settings)}
+                aria-label="Settings"
+                title="Settings"
+              >
+                <IconSettings size={14} />
               </Button>
             </div>
           </div>

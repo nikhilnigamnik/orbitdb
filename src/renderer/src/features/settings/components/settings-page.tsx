@@ -10,6 +10,9 @@ import { Button } from '@renderer/components/ui/button'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { unwrap } from '@renderer/lib/ipc'
 import { useUpdateCheck } from '@renderer/features/settings/store'
+import { AiSettings } from './ai-settings'
+import { UsageSettings } from './usage-settings'
+import { SettingFooter, SettingRow, SettingsCard } from './settings-card'
 import { APP_NAME, APP_TAGLINE, GITHUB_REPO_URL } from '@renderer/config/site'
 
 function formatRelative(date: Date | null): string {
@@ -62,29 +65,41 @@ export function SettingsPage() {
         </div>
 
         <Section title="About">
-          <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface-elevated/20 p-4">
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold tracking-tight text-text">
+          <SettingsCard>
+            <SettingRow
+              title={
+                <span className="flex items-center gap-2">
                   {APP_NAME}
+                  <span className="font-mono text-xs font-normal text-text-subtle">
+                    v{currentVersion}
+                  </span>
                 </span>
-                <span className="font-mono text-xs text-text-subtle">v{currentVersion}</span>
-              </div>
-              <p className="text-xs text-text-subtle">{APP_TAGLINE}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void openExternal(GITHUB_REPO_URL)}
-              className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-subtle transition-colors hover:bg-surface-elevated hover:text-text"
-              aria-label="Open GitHub repository"
+              }
+              description={APP_TAGLINE}
             >
-              <IconBrandGithub size={16} />
-            </button>
-          </div>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={() => void openExternal(GITHUB_REPO_URL)}
+                aria-label="Open GitHub repository"
+                title="Open GitHub repository"
+              >
+                <IconBrandGithub size={14} />
+              </Button>
+            </SettingRow>
+          </SettingsCard>
+        </Section>
+
+        <Section title="AI">
+          <AiSettings />
+        </Section>
+
+        <Section title="AI usage">
+          <UsageSettings />
         </Section>
 
         <Section title="Updates">
-          <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated/20">
+          <SettingsCard>
             <div className="p-4">
               {isChecking ? (
                 <div className="flex items-center gap-2.5 text-xs text-text-muted">
@@ -140,7 +155,7 @@ export function SettingsPage() {
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5">
+            <SettingFooter>
               <span className="text-xs text-text-subtle">
                 Last checked {formatRelative(lastCheckedAt)} · via{' '}
                 <span className="text-text-muted">GitHub Releases</span>
@@ -159,8 +174,8 @@ export function SettingsPage() {
                 )}
                 Check now
               </Button>
-            </div>
-          </div>
+            </SettingFooter>
+          </SettingsCard>
         </Section>
       </div>
     </div>
@@ -170,9 +185,7 @@ export function SettingsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-8 flex flex-col gap-3">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-text-subtle">
-        {title}
-      </h2>
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-text-subtle">{title}</h2>
       {children}
     </section>
   )
