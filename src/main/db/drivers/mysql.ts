@@ -28,9 +28,10 @@ import {
   type TableInfo,
   type TestConnectionResult
 } from '../../../shared/types'
-import { getConnection } from '../../store/connections-store'
+import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
 import { recordQuery } from '../query-log'
+import { detectCommand, isSchemaChanging } from '../sql-command'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
 const pools = new Map<string, Pool>()
@@ -66,8 +67,7 @@ function toPoolConfig(input: ConnectionInput): PoolOptions {
 function getPool(connectionId: string): Pool {
   const existing = pools.get(connectionId)
   if (existing) return existing
-  const saved = getConnection(connectionId)
-  if (!saved) throw new Error(`Connection ${connectionId} is not saved`)
+  const saved = requireConnection(connectionId)
   if (saved.engine !== 'mysql') throw new Error(`Wrong driver for connection ${connectionId}`)
   const pool = mysql.createPool(toPoolConfig(saved))
   instrumentMysqlPool(pool, connectionId)
@@ -549,11 +549,6 @@ async function executeDdl(opts: DdlRequest): Promise<void> {
   invalidateTableDetailsForConnection(opts.connectionId)
 }
 
-function detectCommand(sql: string): string | null {
-  const trimmed = sql.trim().split(/\s+/)[0]
-  return trimmed ? trimmed.toUpperCase() : null
-}
-
 interface MysqlInflight {
   threadId: number
   connectionId: string
@@ -563,6 +558,8 @@ const mysqlInflight = new Map<string, MysqlInflight>()
 async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   const pool = getPool(opts.connectionId)
   const started = Date.now()
+  // Runs on a dedicated connection (so the thread id is stable for KILL QUERY),
+  // which bypasses the instrumented pool.query — log it explicitly.
   const conn = await pool.getConnection()
   try {
     if (opts.queryId) {
@@ -574,37 +571,51 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
     try {
       const [result, fields] = await conn.query(opts.sql, opts.params)
       const command = detectCommand(opts.sql)
-      if (Array.isArray(result)) {
-        const allRows = result as unknown as Record<string, unknown>[]
-        const truncated = allRows.length > MAX_QUERY_RESULT_ROWS
-        const rows = truncated ? allRows.slice(0, MAX_QUERY_RESULT_ROWS) : allRows
-        return {
-          success: true,
-          rows,
-          fields: (fields ?? []).map((f) => ({
-            name: String(f.name),
-            dataTypeID: typeof f.columnType === 'number' ? f.columnType : 0
-          })),
-          rowCount: allRows.length,
-          command,
-          durationMs: Date.now() - started,
-          truncated
-        }
-      }
-      const header = result as ResultSetHeader
+      const isRowSet = Array.isArray(result)
+      const allRows = isRowSet ? (result as unknown as Record<string, unknown>[]) : []
+      const header = isRowSet ? null : (result as ResultSetHeader)
+      const rowCount = isRowSet ? allRows.length : (header?.affectedRows ?? null)
+      recordQuery({
+        connectionId: opts.connectionId,
+        engine: 'mysql',
+        sql: opts.sql,
+        params: opts.params ?? [],
+        durationMs: Date.now() - started,
+        rowCount,
+        success: true
+      })
+      if (isSchemaChanging(opts.sql)) invalidateTableDetailsForConnection(opts.connectionId)
+      const truncated = allRows.length > MAX_QUERY_RESULT_ROWS
       return {
         success: true,
-        rows: [],
-        fields: [],
-        rowCount: header.affectedRows ?? null,
+        rows: truncated ? allRows.slice(0, MAX_QUERY_RESULT_ROWS) : allRows,
+        fields: isRowSet
+          ? (fields ?? []).map((f) => ({
+              name: String(f.name),
+              dataTypeID: typeof f.columnType === 'number' ? f.columnType : 0
+            }))
+          : [],
+        rowCount,
         command,
         durationMs: Date.now() - started,
-        truncated: false
+        truncated
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      recordQuery({
+        connectionId: opts.connectionId,
+        engine: 'mysql',
+        sql: opts.sql,
+        params: opts.params ?? [],
+        durationMs: Date.now() - started,
+        success: false,
+        error: message
+      })
+      // A partially-applied DDL batch can still have changed the schema.
+      if (isSchemaChanging(opts.sql)) invalidateTableDetailsForConnection(opts.connectionId)
       return {
         success: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: message,
         rows: [],
         fields: [],
         rowCount: null,
@@ -631,6 +642,10 @@ async function cancelQuery(connectionId: string, queryId: string): Promise<void>
 }
 
 async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
+  const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
+  if (!details.columns.some((c) => c.name === opts.column)) {
+    throw new Error(`Column ${opts.column} does not exist on ${opts.schema}.${opts.table}`)
+  }
   const pool = getPool(opts.connectionId)
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500)
   const params: unknown[] = []

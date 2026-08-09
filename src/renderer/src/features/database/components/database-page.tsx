@@ -9,7 +9,7 @@ import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { TableDataView } from '@renderer/features/tables/components/table-data-view'
-import { tableRoute } from '@renderer/config/routes'
+import { ROUTES, tableRoute } from '@renderer/config/routes'
 import { pushRecent } from '@renderer/features/database/lib/table-prefs'
 import type { DdlOperation, DdlOperationKind, TableDetails } from '@renderer/types'
 import { SchemaTree } from './schema-tree'
@@ -18,6 +18,19 @@ import { TableStructure } from './table-structure'
 import { StructureAi } from './structure-ai'
 import { DdlDialog } from './ddl-dialog'
 import { ConnectionPicker } from './connection-picker'
+
+function readLastTable(connectionId: string): string | null {
+  try {
+    const raw = localStorage.getItem(`orbitdb:last-table:${connectionId}`)
+    if (!raw) return null
+    const saved = JSON.parse(raw) as { schema?: string; table?: string }
+    if (!saved.schema || !saved.table) return null
+    return tableRoute(saved.schema, saved.table)
+  } catch {
+    // ignore unreadable/quota-exceeded localStorage
+    return null
+  }
+}
 
 export function DatabasePage() {
   const navigate = useNavigate()
@@ -34,25 +47,18 @@ export function DatabasePage() {
     setActiveTab(view === 'structure' ? 'structure' : 'data')
   }, [schema, table, view])
 
-  const lastConnectionId = React.useRef<string | null>(null)
+  // Which connection the schema/table in the URL belongs to. Survives a
+  // disconnect so reconnecting elsewhere is still seen as a connection change —
+  // otherwise the previous connection's table leaks into the new one and its
+  // details lookup fails with "Table X not found".
+  const selectionOwner = React.useRef<string | null>(null)
   React.useEffect(() => {
-    if (!active) {
-      lastConnectionId.current = null
-      return
-    }
-    if (lastConnectionId.current === active.connectionId) return
-    lastConnectionId.current = active.connectionId
-    if (schema && table) return
-    try {
-      const raw = localStorage.getItem(`orbitdb:last-table:${active.connectionId}`)
-      if (!raw) return
-      const saved = JSON.parse(raw) as { schema?: string; table?: string }
-      if (saved.schema && saved.table) {
-        navigate(tableRoute(saved.schema, saved.table), { replace: true })
-      }
-    } catch {
-      // ignore unreadable/quota-exceeded localStorage
-    }
+    if (!active) return
+    if (selectionOwner.current === active.connectionId) return
+    const isForeignSelection = Boolean(schema && table) && selectionOwner.current !== null
+    selectionOwner.current = active.connectionId
+    if (schema && table && !isForeignSelection) return
+    navigate(readLastTable(active.connectionId) ?? ROUTES.database, { replace: true })
     // schema/table intentionally not in deps — only restore on connection change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, navigate])

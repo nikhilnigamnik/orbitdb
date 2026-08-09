@@ -23,8 +23,8 @@ import { seedTable } from '../ai/generate-seed'
 import {
   createConnection,
   deleteConnection,
-  getConnection,
   listConnections,
+  requireConnection,
   updateConnection
 } from '../store/connections-store'
 import {
@@ -93,8 +93,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'db:connect',
     wrap(async (connectionId: string) => {
-      const saved = getConnection(connectionId)
-      if (!saved) throw new Error(`Connection ${connectionId} not found`)
+      // requireConnection, not getConnection: it reports unreadable credentials
+      // up front instead of letting the engine fail with "auth failed".
+      const saved = requireConnection(connectionId)
       const meta = await describeActive(saved)
       return { connectionId, ...meta }
     })
@@ -209,7 +210,18 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'app:open-external',
     wrap(async (url: string) => {
-      await shell.openExternal(url)
+      // Handing an arbitrary string to the OS URL handler is a shell-launch
+      // primitive — only ever open web links.
+      let parsed: URL
+      try {
+        parsed = new URL(url)
+      } catch {
+        throw new Error(`Not a valid URL: ${url}`)
+      }
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new Error(`Refusing to open a ${parsed.protocol} URL`)
+      }
+      await shell.openExternal(parsed.toString())
     })
   )
 }

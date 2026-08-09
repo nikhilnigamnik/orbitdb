@@ -38,14 +38,20 @@ export function encryptString(plain: string): string {
   return ENC_PREFIX + buf.toString('base64')
 }
 
-export function decryptString(value: string): string {
+/**
+ * Unseal a stored secret. Returns `null` — never an empty string — when the
+ * ciphertext can't be read (no keychain, or it was sealed under a different OS
+ * user/keychain), so callers can tell "no password" apart from "lost password"
+ * and avoid writing the blank back over the ciphertext.
+ */
+export function decryptString(value: string): string | null {
   if (!isEncrypted(value)) return value
-  if (!checkAvailability()) return ''
+  if (!checkAvailability()) return null
   try {
     const buf = Buffer.from(value.slice(ENC_PREFIX.length), 'base64')
     return safeStorage.decryptString(buf)
-  } catch (err) {
-    console.error('[connections-store] decryption failed:', err)
-    return ''
+  } catch {
+    // The caller logs this with the connection it belongs to.
+    return null
   }
 }

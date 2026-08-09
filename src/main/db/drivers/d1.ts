@@ -22,9 +22,10 @@ import {
   type TableInfo,
   type TestConnectionResult
 } from '../../../shared/types'
-import { getConnection } from '../../store/connections-store'
+import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
 import { recordQuery } from '../query-log'
+import { detectCommand, isSchemaChanging } from '../sql-command'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
 const CF_API = 'https://api.cloudflare.com/client/v4'
@@ -112,6 +113,16 @@ async function callD1<TRow = Record<string, unknown>>(
   }
 }
 
+/** D1 is HTTP-only; without this a stalled request hangs the UI forever. */
+const D1_REQUEST_TIMEOUT_MS = 30_000
+
+class QueryCancelledError extends Error {
+  constructor() {
+    super('Query cancelled')
+    this.name = 'QueryCancelledError'
+  }
+}
+
 async function callD1Raw<TRow = Record<string, unknown>>(
   input: ConnectionInput,
   sql: string,
@@ -120,6 +131,9 @@ async function callD1Raw<TRow = Record<string, unknown>>(
 ): Promise<D1QueryResultEntry<TRow>> {
   const { accountId, databaseId, apiToken } = requireD1Credentials(input)
   const url = `${CF_API}/accounts/${accountId}/d1/database/${databaseId}/query`
+
+  const timeout = AbortSignal.timeout(D1_REQUEST_TIMEOUT_MS)
+  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout
 
   let res: Response
   try {
@@ -130,9 +144,14 @@ async function callD1Raw<TRow = Record<string, unknown>>(
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ sql, params }),
-      signal
+      signal: combined
     })
   } catch (err) {
+    // A user-initiated cancel is not a network failure — report it as itself.
+    if (signal?.aborted) throw new QueryCancelledError()
+    if (timeout.aborted) {
+      throw new Error(`Cloudflare API did not respond within ${D1_REQUEST_TIMEOUT_MS / 1000}s`)
+    }
     throw new Error(
       `Failed to reach Cloudflare API: ${err instanceof Error ? err.message : String(err)}`
     )
@@ -146,8 +165,8 @@ async function callD1Raw<TRow = Record<string, unknown>>(
   }
 
   if (!res.ok || !envelope.success) {
-    const message = envelope.errors?.[0]?.message || `Cloudflare API error (HTTP ${res.status})`
-    throw new Error(message)
+    const message = envelope.errors?.map((e) => e.message).join('; ')
+    throw new Error(message || `Cloudflare API error (HTTP ${res.status})`)
   }
 
   const entry = envelope.result?.[0]
@@ -155,17 +174,38 @@ async function callD1Raw<TRow = Record<string, unknown>>(
     return { results: [], success: true, meta: {} }
   }
   if (!entry.success) {
-    throw new Error('D1 query failed')
+    const message = envelope.errors?.map((e) => e.message).join('; ')
+    throw new Error(message || 'D1 query failed')
   }
-  return entry
+  // D1 omits `results` for some statements — normalize once so every caller can
+  // index it safely.
+  return { ...entry, results: entry.results ?? [], meta: entry.meta ?? {} }
+}
+
+/**
+ * Cloudflare rate-limits the D1 query API, so introspection that fans out over
+ * every table (or every index) runs a few at a time rather than all at once.
+ */
+const D1_MAX_CONCURRENT_REQUESTS = 6
+
+async function mapWithConcurrency<TItem, TResult>(
+  items: TItem[],
+  fn: (item: TItem) => Promise<TResult>,
+  limit = D1_MAX_CONCURRENT_REQUESTS
+): Promise<TResult[]> {
+  const results = new Array<TResult>(items.length)
+  let next = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (let i = next++; i < items.length; i = next++) {
+      results[i] = await fn(items[i])
+    }
+  })
+  await Promise.all(workers)
+  return results
 }
 
 function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`
-}
-
-function quoteLiteral(name: string): string {
-  return `'${name.replace(/'/g, "''")}'`
 }
 
 const ALLOWED_OPERATORS = new Set([
@@ -212,7 +252,7 @@ async function describeActive(saved: SavedConnection): Promise<ActiveMeta> {
   await callD1<{ ok: number }>(saved, 'select 1 as ok')
   return {
     serverVersion: 'Cloudflare D1',
-    currentDatabase: saved.databaseId ?? saved.name,
+    currentDatabase: saved.name || (saved.databaseId ?? ''),
     currentUser: 'D1'
   }
 }
@@ -227,8 +267,7 @@ async function disconnectAll(): Promise<void> {
 }
 
 function loadSaved(connectionId: string): SavedConnection {
-  const saved = getConnection(connectionId)
-  if (!saved) throw new Error(`Connection ${connectionId} is not saved`)
+  const saved = requireConnection(connectionId)
   if (saved.engine !== 'd1') throw new Error(`Wrong driver for connection ${connectionId}`)
   return saved
 }
@@ -281,14 +320,35 @@ async function tableDetails(
   // PRAGMAs don't accept bind params; embed quoted identifier literally.
   const tableIdent = quoteIdent(table)
 
-  const colEntry = await callD1<{
-    cid: number
-    name: string
-    type: string
-    notnull: number
-    dflt_value: string | null
-    pk: number
-  }>(saved, `pragma table_info(${tableIdent})`)
+  // Every pragma is a separate HTTP round-trip to Cloudflare — issue the
+  // independent ones together instead of paying the latency three times over.
+  const [colEntry, idxListEntry, fkEntry] = await Promise.all([
+    callD1<{
+      cid: number
+      name: string
+      type: string
+      notnull: number
+      dflt_value: string | null
+      pk: number
+    }>(saved, `pragma table_info(${tableIdent})`),
+    callD1<{
+      seq: number
+      name: string
+      unique: number
+      origin: string
+      partial: number
+    }>(saved, `pragma index_list(${tableIdent})`),
+    callD1<{
+      id: number
+      seq: number
+      table: string
+      from: string
+      to: string
+      on_update: string
+      on_delete: string
+      match: string
+    }>(saved, `pragma foreign_key_list(${tableIdent})`)
+  ])
 
   const columns: ColumnInfo[] = colEntry.results.map((r) => ({
     name: String(r.name),
@@ -307,22 +367,13 @@ async function tableDetails(
     .sort((a, b) => Number(a.pk) - Number(b.pk))
     .map((r) => String(r.name))
 
-  const idxListEntry = await callD1<{
-    seq: number
-    name: string
-    unique: number
-    origin: string
-    partial: number
-  }>(saved, `pragma index_list(${tableIdent})`)
-
-  const indexes: IndexInfo[] = []
-  for (const idx of idxListEntry.results) {
+  const indexes: IndexInfo[] = await mapWithConcurrency(idxListEntry.results, async (idx) => {
     const indexName = String(idx.name)
     const colsEntry = await callD1<{ seqno: number; cid: number; name: string }>(
       saved,
       `pragma index_info(${quoteIdent(indexName)})`
     )
-    indexes.push({
+    return {
       name: indexName,
       isUnique: Number(idx.unique) === 1,
       isPrimary: idx.origin === 'pk',
@@ -330,19 +381,8 @@ async function tableDetails(
         .sort((a, b) => Number(a.seqno) - Number(b.seqno))
         .map((c) => String(c.name)),
       definition: ''
-    })
-  }
-
-  const fkEntry = await callD1<{
-    id: number
-    seq: number
-    table: string
-    from: string
-    to: string
-    on_update: string
-    on_delete: string
-    match: string
-  }>(saved, `pragma foreign_key_list(${tableIdent})`)
+    }
+  })
 
   const fkGroups = new Map<
     number,
@@ -455,6 +495,24 @@ async function fetchByPk(
   return entry.results[0] ?? {}
 }
 
+async function fetchByRowid(
+  saved: SavedConnection,
+  table: string,
+  rowid: number
+): Promise<Record<string, unknown>> {
+  try {
+    const entry = await callD1(
+      saved,
+      `select * from ${quoteIdent(table)} where rowid = ? limit 1`,
+      [rowid]
+    )
+    return entry.results[0] ?? {}
+  } catch {
+    // WITHOUT ROWID tables have no rowid column — nothing to read back.
+    return {}
+  }
+}
+
 async function insertRow(opts: RowMutation): Promise<Record<string, unknown>> {
   const saved = loadSaved(opts.connectionId)
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
@@ -473,21 +531,18 @@ async function insertRow(opts: RowMutation): Promise<Record<string, unknown>> {
   const entry = await callD1(saved, sql, values)
 
   const pk: Record<string, unknown> = {}
-  if (details.primaryKey.length === 1) {
-    const pkCol = details.primaryKey[0]
-    if (opts.values[pkCol] != null) {
-      pk[pkCol] = opts.values[pkCol]
-    } else if (entry.meta.last_row_id != null) {
-      pk[pkCol] = entry.meta.last_row_id
-    }
-  } else {
-    for (const pkCol of details.primaryKey) {
-      if (opts.values[pkCol] != null) pk[pkCol] = opts.values[pkCol]
-    }
+  for (const pkCol of details.primaryKey) {
+    if (opts.values[pkCol] != null) pk[pkCol] = opts.values[pkCol]
   }
-
   if (details.primaryKey.length > 0 && Object.keys(pk).length === details.primaryKey.length) {
     return fetchByPk(saved, opts.table, pk)
+  }
+
+  // The PK was assigned by the database. last_row_id is the rowid, which only
+  // doubles as the PK for an INTEGER PRIMARY KEY alias — so read the row back by
+  // rowid instead of pretending the rowid is the key.
+  if (entry.meta.last_row_id != null) {
+    return fetchByRowid(saved, opts.table, entry.meta.last_row_id)
   }
   return {}
 }
@@ -565,11 +620,6 @@ async function executeDdl(opts: DdlRequest): Promise<void> {
   invalidateTableDetailsForConnection(opts.connectionId)
 }
 
-function detectCommand(sql: string): string | null {
-  const trimmed = sql.trim().split(/\s+/)[0]
-  return trimmed ? trimmed.toUpperCase() : null
-}
-
 const d1Inflight = new Map<string, { controller: AbortController; connectionId: string }>()
 
 async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
@@ -584,6 +634,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
     const fieldNames = entry.results[0] ? Object.keys(entry.results[0]) : []
     const truncated = entry.results.length > MAX_QUERY_RESULT_ROWS
     const rows = truncated ? entry.results.slice(0, MAX_QUERY_RESULT_ROWS) : entry.results
+    if (isSchemaChanging(opts.sql)) invalidateTableDetailsForConnection(opts.connectionId)
     return {
       success: true,
       rows,
@@ -594,6 +645,8 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
       truncated
     }
   } catch (err) {
+    // A partially-applied DDL batch can still have changed the schema.
+    if (isSchemaChanging(opts.sql)) invalidateTableDetailsForConnection(opts.connectionId)
     return {
       success: false,
       error: err instanceof Error ? err.message : String(err),
@@ -615,11 +668,12 @@ async function cancelQuery(connectionId: string, queryId: string): Promise<void>
   entry.controller.abort()
 }
 
-// quoteLiteral is reserved for future use (e.g., DDL helpers that can't bind).
-void quoteLiteral
-
 async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
   const saved = loadSaved(opts.connectionId)
+  const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
+  if (!details.columns.some((c) => c.name === opts.column)) {
+    throw new Error(`Column ${opts.column} does not exist on ${opts.table}`)
+  }
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500)
   const params: unknown[] = []
   let where = ''
@@ -645,8 +699,10 @@ async function getSchemaGraph(connectionId: string, schema: string): Promise<Sch
   )
   const tableNames = tableList.results.map((r) => String(r.name))
 
-  const perTable = await Promise.all(
-    tableNames.map(async (tableName) => {
+  // Halved: each item issues two requests, so this still caps in-flight at ~6.
+  const perTable = await mapWithConcurrency(
+    tableNames,
+    async (tableName) => {
       const ident = quoteIdent(tableName)
       const [colEntry, fkEntry] = await Promise.all([
         callD1<{ name: string; type: string; notnull: number; pk: number }>(
@@ -659,7 +715,8 @@ async function getSchemaGraph(connectionId: string, schema: string): Promise<Sch
         )
       ])
       return { tableName, colEntry, fkEntry }
-    })
+    },
+    D1_MAX_CONCURRENT_REQUESTS / 2
   )
 
   const tables: SchemaGraphTable[] = []
