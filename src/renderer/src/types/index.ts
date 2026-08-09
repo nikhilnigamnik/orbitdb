@@ -1,5 +1,9 @@
 export type {
   ActiveConnectionMeta,
+  AiModelId,
+  AiProviderId,
+  AiProviderView,
+  AiSettingsView,
   ColumnInfo,
   ConnectionEnvironment,
   ConnectionInput,
@@ -43,5 +47,8 @@ export type {
   TableDetails,
   TableInfo,
   TestConnectionResult,
-  UpdateCheckResult
+  UpdateCheckResult,
+  UsageBreakdown,
+  UsageSummary,
+  UsageWindow
 } from '../../../shared/types'
