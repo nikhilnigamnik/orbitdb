@@ -109,6 +109,17 @@ describe('the value box', () => {
   })
 })
 
+describe('the suggestions heading', () => {
+  it('sits at the smaller chip size, not body size', async () => {
+    setup()
+    await openEditorOn('status')
+
+    const heading = await screen.findByText('Suggestions')
+    expect(heading.className).toContain('text-[10px]')
+    expect(heading.className).not.toMatch(/\btext-xs\b/)
+  })
+})
+
 describe('pattern operators', () => {
   it('says what % does, and only for like and ilike', async () => {
     setup()

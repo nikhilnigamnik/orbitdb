@@ -314,7 +314,7 @@ export function FiltersBar({
                           <p className="text-xs text-danger">{valuesError}</p>
                         ) : values.length > 0 ? (
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs font-medium uppercase tracking-wider text-text-subtle">
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-text-subtle">
                               Suggestions
                             </span>
                             <div className="flex flex-wrap gap-1">
