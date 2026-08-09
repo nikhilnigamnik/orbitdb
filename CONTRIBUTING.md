@@ -11,7 +11,7 @@ pnpm dev
 
 You'll want a database to point it at. Anything reachable works: a local Postgres or MySQL, a Neon or Supabase instance, or a Cloudflare D1 database.
 
-The AI features are optional. To try them, copy `.env.example` to `.env` and add a Groq API key; everything else works without one.
+The AI features are optional. To try them, add an Anthropic, OpenAI or Google API key in **Settings → AI** — it is stored encrypted in `userData`, not in the repo. Everything else works without one.
 
 ## Before opening a pull request
 

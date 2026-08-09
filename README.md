@@ -28,7 +28,17 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 - **Natural language → filters** on the current table.
 - **Explain a table**, **suggest indexes**, and **generate seed data** — the model returns values, and the inserts are built in code with engine-correct quoting.
 
-Requires a Groq API key, or a proxy URL. Everything else works without it.
+Bring your own API key — **Anthropic**, **OpenAI** or **Google** — paste it in **Settings → AI**, and pick a model:
+
+| Provider  | Models                                               |
+| --------- | ---------------------------------------------------- |
+| Anthropic | Sonnet 5 · Haiku 4.5 · Opus 5                        |
+| OpenAI    | GPT-5.2 · GPT-5 mini · GPT-5.2 Pro                   |
+| Google    | Gemini 3.6 Flash · Gemini 2.5 Flash · Gemini 3.1 Pro |
+
+**Usage** — Settings shows tokens by provider, model and feature for today, the last 30 days, and all time. Counted from what the API reports, kept on your machine for 90 days, and clearable.
+
+Each provider keeps its own key and model, so switching between them costs nothing. Keys are encrypted on your machine with the OS keychain and sent only to the provider you chose. Everything else in the app works without one.
 
 ## Supported engines
 
@@ -58,9 +68,17 @@ Download the latest installer from the [Releases page](https://github.com/nikhil
 
 ## Where your credentials go
 
-Connection details are stored in a JSON file in Electron's `userData` directory. Passwords and API tokens are encrypted at rest with Electron `safeStorage`, which is backed by the OS keychain (Keychain on macOS, DPAPI on Windows, libsecret on Linux). If no keychain is available the app says so and falls back to plaintext.
+Connection details live in `connections.json`, and your Anthropic API key in `settings.json`, both in Electron's `userData` directory:
 
-Nothing is sent anywhere except to the databases you connect to — and, if you enable the AI features, your schema (table and column names, not row data) to the configured model provider.
+| Platform | Location                                 |
+| -------- | ---------------------------------------- |
+| macOS    | `~/Library/Application Support/OrbitDB/` |
+| Windows  | `%APPDATA%\OrbitDB\`                     |
+| Linux    | `~/.config/OrbitDB/`                     |
+
+Passwords, database API tokens and AI provider keys are encrypted at rest with Electron `safeStorage`, backed by the OS keychain (Keychain on macOS, DPAPI on Windows, libsecret on Linux). If no keychain is available the app says so and falls back to plaintext.
+
+Nothing is sent anywhere except to the databases you connect to — and, if you add an AI key, your schema (table and column names, not row data) to the provider you selected.
 
 ## Development
 
@@ -77,7 +95,7 @@ pnpm dev
 | `pnpm lint`      | ESLint                                         |
 | `pnpm build`     | typecheck and bundle, no installer             |
 
-To enable the AI features locally, copy `.env.example` to `.env` and add a Groq API key.
+The AI features need an API key from Anthropic, OpenAI or Google, added in **Settings → AI** at runtime — there is no `.env` to fill in.
 
 **Building installers**
 
@@ -113,7 +131,6 @@ src/
     │                  # command-palette, settings
     ├── hooks/  lib/  config/
 tests/                 # mirrors src/, run with pnpm test
-ai-proxy/              # optional Cloudflare Worker fronting the model provider
 ```
 
 `CLAUDE.md` holds the working notes for this codebase — conventions, gotchas, and the reasoning behind decisions that aren't obvious from the code.
@@ -126,7 +143,7 @@ Security issues should not go in a public issue — see [SECURITY.md](SECURITY.m
 
 ## Stack
 
-React 19 · Electron 41 · electron-vite · Tailwind CSS v4 · Radix UI · TanStack Table and Virtual · zod · Vitest · TypeScript 5
+React 19 · Electron 41 · electron-vite · Tailwind CSS v4 · Radix UI · TanStack Table and Virtual · Vercel AI SDK · zod · Vitest · TypeScript 5
 
 ## License
 
