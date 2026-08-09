@@ -6,10 +6,10 @@ import type { ColumnInfo } from '@renderer/types'
 
 afterEach(cleanup)
 
-function column(name: string, udtName = 'text'): ColumnInfo {
+function column(name: string, udtName = 'text', dataType?: string): ColumnInfo {
   return {
     name,
-    dataType: udtName,
+    dataType: dataType ?? udtName,
     udtName,
     isNullable: true,
     isPrimaryKey: false,
@@ -93,6 +93,13 @@ describe('the column header', () => {
     // rather than at a ragged offset that moves with every name.
     expect(screen.getByText('created_at').className).toContain('flex-1')
     expect(screen.getByText('timestamptz').className).toContain('shrink-0')
+  })
+
+  it('shows a short type label, not the verbose SQL spelling', () => {
+    // "timestamp with time zone" is long enough to crush the column name.
+    setup([column('updated_at', 'timestamptz', 'timestamp with time zone')], [])
+    const grid = screen.getByText('updated_at').closest('th')!
+    expect(grid.textContent).toContain('timestamptz')
   })
 
   it('lets the name truncate before the type, which is short and load-bearing', () => {

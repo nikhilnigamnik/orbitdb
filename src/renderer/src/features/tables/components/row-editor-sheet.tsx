@@ -7,6 +7,7 @@ import { Switch } from '@renderer/components/ui/switch'
 import { Select } from '@renderer/components/ui/select'
 import { FormField } from '@renderer/components/forms/form-field'
 import { SubmitButton } from '@renderer/components/forms/submit-button'
+import { formatColumnType } from '@renderer/lib/column-type'
 import type { ColumnInfo } from '@renderer/types'
 import { Chip } from '@renderer/components/ui/chip'
 import {
@@ -133,7 +134,7 @@ export function RowEditorSheet({
                   key={col.name}
                   label={col.name}
                   htmlFor={`row-${col.name}`}
-                  hint={`${col.dataType}${col.isNullable ? ' • nullable' : ''}${col.defaultValue ? ` • default ${col.defaultValue}` : ''}`}
+                  hint={`${formatColumnType(col.dataType, col.udtName)}${col.isNullable ? ' • nullable' : ''}${col.defaultValue ? ` • default ${col.defaultValue}` : ''}`}
                 >
                   <div className="flex items-start gap-2">
                     <div className="flex-1">
