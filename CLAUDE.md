@@ -27,10 +27,21 @@ Releases are tag-driven: `pnpm release:{patch,minor,major}` bumps `package.json`
 
 Tests run on Vitest (`vitest.config.ts`). Every spec lives under the top-level `tests/`
 folder, mirroring the `src/` layout — **not** colocated with the source file, so the
-electron-vite build never has to glob around them. Main-process modules that import
-`electron` are tested by mocking it (see `tests/main/store/connections-store.test.ts` for
-the `vi.hoisted` + `vi.mock('electron')` pattern, and `vi.resetModules()` to reset
-module-level caches between cases). New behaviour ships with a spec.
+electron-vite build never has to glob around them. New behaviour ships with a spec.
+
+Three testing shapes, cheapest first:
+- **Pure logic** — plain `.test.ts`. Prefer extracting decision-making out of a component
+  into `features/<x>/lib/` and testing it there (`filter-editor.ts` exists because the
+  NULL-vs-empty-string bug lived in a branch buried in JSX).
+- **Static render** — `renderToStaticMarkup` + `createElement` in a `.test.ts`, for
+  asserting what a component *renders* (classes, aria labels) without a DOM.
+- **Interaction** — `.test.tsx` with `// @vitest-environment jsdom` at the top and
+  `@testing-library/react`, for anything driven by state or effects. Stub the IPC bridge
+  with `Object.assign(window, { api: { db: { … } } })`.
+
+Main-process modules that import `electron` are tested by mocking it — see
+`tests/main/store/connections-store.test.ts` for the `vi.hoisted` + `vi.mock('electron')`
+pattern, and `vi.resetModules()` to reset module-level caches between cases.
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build on every push to
 `main`/`dev` and on every PR. Releases stay tag-driven in `release.yml`.

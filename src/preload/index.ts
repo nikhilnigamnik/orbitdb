@@ -13,6 +13,7 @@ import type {
   GenerateSeedResult,
   GenerateSqlOptions,
   GenerateSqlResult,
+  CountRowsOptions,
   GetRowsOptions,
   OperationResult,
   QueryLogEntry,
@@ -58,6 +59,7 @@ const api = {
     schemaGraph: (connectionId: string, schema: string) =>
       invoke<SchemaGraph>('db:schema-graph', connectionId, schema),
     getRows: (opts: GetRowsOptions) => invoke<RowsResult>('db:rows-get', opts),
+    countRows: (opts: CountRowsOptions) => invoke<number | null>('db:rows-count', opts),
     insertRow: (opts: RowMutation) => invoke<Record<string, unknown>>('db:row-insert', opts),
     updateRow: (opts: RowUpdate) => invoke<Record<string, unknown>>('db:row-update', opts),
     deleteRow: (opts: RowDelete) => invoke<{ deleted: number }>('db:row-delete', opts),

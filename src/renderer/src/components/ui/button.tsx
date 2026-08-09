@@ -16,6 +16,10 @@ const buttonVariants = cva(
           'border border-border-strong bg-surface-elevated text-text hover:border-text-muted/35 hover:bg-surface-elevated/70 aria-expanded:bg-surface-elevated',
         ghost:
           'rounded-md border border-border-strong bg-surface-elevated/40 px-3 text-text-muted hover:border-text-muted/35 hover:bg-surface-elevated hover:text-text aria-expanded:bg-surface-elevated',
+        // Kbd's hairline over a whisper — for controls that should sit quietly
+        // beside a field. Keep these two tokens in step with kbd.tsx.
+        subtle:
+          'rounded-md border-text-muted/15 bg-text-muted/8 text-text-muted hover:bg-text-muted/15 hover:text-text aria-expanded:bg-text-muted/15',
         destructive:
           'bg-danger/10 text-danger hover:bg-danger/20 focus-visible:border-danger/40 focus-visible:ring-danger/20',
         link: 'text-accent-text underline-offset-4 hover:underline'

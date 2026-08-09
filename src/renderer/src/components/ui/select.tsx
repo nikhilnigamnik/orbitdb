@@ -49,13 +49,14 @@ export function Select<T extends string = string>({
         data-size={size}
         aria-label={ariaLabel}
         className={cn(
-          'flex w-fit cursor-pointer items-center justify-between gap-1.5 rounded-md border border-border bg-surface-elevated/30 px-2 text-text outline-none transition-colors',
-          'hover:bg-surface-elevated hover:text-text',
-          'focus-visible:border-[var(--color-border-strong)]',
+          'flex w-fit cursor-pointer items-center justify-between gap-1.5 rounded-md border border-border-strong bg-input px-2 text-text outline-none transition-colors',
+          'hover:bg-surface-elevated/40 hover:text-text',
+          'focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40',
           'disabled:cursor-not-allowed disabled:opacity-50',
           'data-[state=open]:border-[var(--color-border-strong)] data-[state=open]:bg-surface-elevated',
           'data-placeholder:text-text-subtle',
-          'data-[size=default]:h-8 data-[size=default]:text-xs',
+          // h-7 to sit level with Input, which every form pairs it with.
+          'data-[size=default]:h-7 data-[size=default]:text-xs',
           'data-[size=sm]:h-7 data-[size=sm]:text-xs',
           className
         )}

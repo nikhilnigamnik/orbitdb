@@ -127,6 +127,20 @@ export interface GetRowsOptions {
   filters?: RowFilter[]
 }
 
+export interface CountRowsOptions {
+  connectionId: string
+  schema: string
+  table: string
+  filters?: RowFilter[]
+}
+
+/**
+ * Above this many rows, an unfiltered COUNT(*) costs more than the precision is
+ * worth and the estimate stands instead. A filtered count always runs — that is
+ * the case where the estimate is not merely imprecise but wrong.
+ */
+export const MAX_EXACT_COUNT_ROWS = 1_000_000
+
 export interface RowsResult {
   rows: Record<string, unknown>[]
   columns: ColumnInfo[]

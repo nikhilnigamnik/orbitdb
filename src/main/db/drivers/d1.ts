@@ -1,5 +1,6 @@
 import {
   MAX_QUERY_RESULT_ROWS,
+  type CountRowsOptions,
   type ColumnInfo,
   type ConnectionInput,
   type DdlRequest,
@@ -24,6 +25,7 @@ import {
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
+import { buildFilterSql, type FilterDialect } from '../filters'
 import { recordQuery } from '../query-log'
 import { detectCommand, isSchemaChanging } from '../sql-command'
 import type { ActiveMeta, DatabaseDriver } from './types'
@@ -208,18 +210,11 @@ function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`
 }
 
-const ALLOWED_OPERATORS = new Set([
-  '=',
-  '!=',
-  '>',
-  '<',
-  '>=',
-  '<=',
-  'like',
-  'ilike',
-  'is null',
-  'is not null'
-])
+const filterDialect: FilterDialect = {
+  quoteIdent,
+  placeholder: () => '?',
+  supportsIlike: false
+}
 
 function normalizeUdtName(declared: string): string {
   const t = declared.toLowerCase().trim()
@@ -439,23 +434,9 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
 
-  const params: unknown[] = []
-  const whereClauses: string[] = []
-  for (const filter of opts.filters ?? []) {
-    if (!validColumns.has(filter.column)) continue
-    if (!ALLOWED_OPERATORS.has(filter.operator)) continue
-    if (filter.operator === 'is null') {
-      whereClauses.push(`${quoteIdent(filter.column)} is null`)
-    } else if (filter.operator === 'is not null') {
-      whereClauses.push(`${quoteIdent(filter.column)} is not null`)
-    } else if (filter.value != null) {
-      // SQLite lacks ILIKE; map to LIKE (SQLite LIKE is case-insensitive for ASCII by default).
-      const op = filter.operator === 'ilike' ? 'like' : filter.operator
-      params.push(filter.value)
-      whereClauses.push(`${quoteIdent(filter.column)} ${op} ?`)
-    }
-  }
-  const whereSql = whereClauses.length > 0 ? `where ${whereClauses.join(' and ')}` : ''
+  // SQLite lacks ILIKE; the dialect folds it onto LIKE, which is already
+  // case-insensitive for ASCII by default.
+  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, filterDialect)
 
   let orderSql = ''
   if (opts.orderBy && validColumns.has(opts.orderBy)) {
@@ -493,6 +474,23 @@ async function fetchByPk(
     keys.map((k) => pk[k])
   )
   return entry.results[0] ?? {}
+}
+
+async function countRows(opts: CountRowsOptions): Promise<number | null> {
+  const saved = loadSaved(opts.connectionId)
+  const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
+  const validColumns = new Set(details.columns.map((c) => c.name))
+  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, filterDialect)
+
+  // SQLite keeps no row estimate, so there is no cheap total to fall back on —
+  // count unconditionally. D1 databases are small enough for that to be fine.
+  const entry = await callD1<{ total: number }>(
+    saved,
+    `select count(*) as total from ${quoteIdent(opts.table)} ${whereSql}`,
+    params
+  )
+  const total = Number(entry.results[0]?.total)
+  return Number.isFinite(total) ? total : null
 }
 
 async function fetchByRowid(
@@ -773,6 +771,7 @@ export const d1Driver: DatabaseDriver = {
   tableDetails,
   getSchemaGraph,
   getRows,
+  countRows,
   insertRow,
   updateRow,
   deleteRow,

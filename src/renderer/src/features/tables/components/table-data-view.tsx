@@ -52,6 +52,8 @@ export function TableDataView({
   const [rows, setRows] = React.useState<Record<string, unknown>[]>([])
   const [columns, setColumns] = React.useState<ColumnInfo[]>(details.columns)
   const [totalEstimate, setTotalEstimate] = React.useState<number | null>(details.estimatedRows)
+  /** Exact count for the current filters, once it lands. Null while unknown. */
+  const [totalExact, setTotalExact] = React.useState<number | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -239,6 +241,30 @@ export function TableDataView({
     void load()
   }, [load])
 
+  // The count runs alongside the page rather than gating it: the rows appear
+  // immediately and the total sharpens from estimate to exact when it arrives.
+  React.useEffect(() => {
+    let cancelled = false
+    setTotalExact(null)
+    void unwrap(
+      window.api.db.countRows({
+        connectionId,
+        schema: details.schema,
+        table: details.name,
+        filters
+      })
+    )
+      .then((total) => {
+        if (!cancelled) setTotalExact(total)
+      })
+      .catch(() => {
+        // A count is an enhancement — falling back to the estimate is fine.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [connectionId, details.schema, details.name, filters])
+
   // Signal the container once the first page lands, so it can reveal the header
   // and grid together — a single loader instead of loader-then-loader.
   const onReadyRef = React.useRef(onReady)
@@ -424,7 +450,7 @@ export function TableDataView({
             type="button"
             onClick={aiPrompt.open}
             aria-label="Filter this table with natural language"
-            className="group flex h-8 w-72 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-elevated focus-visible:border-accent-text focus-visible:outline-none"
+            className="group flex h-7 w-72 cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-input px-2.5 text-left transition-colors hover:bg-surface-elevated/40 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none"
           >
             <span className="flex-1 truncate text-xs text-text-subtle transition-colors group-hover:text-text-muted">
               Describe the rows you want…
@@ -447,10 +473,7 @@ export function TableDataView({
             </Button>
           )}
           {canMutate && (
-            <Button
-              size="sm"
-              onClick={insertModal.open}
-            >
+            <Button size="sm" onClick={insertModal.open}>
               Insert row
             </Button>
           )}
@@ -513,13 +536,18 @@ export function TableDataView({
           isInitialLoad={isLoading && !hasLoadedOnce}
           fkColumns={fkByColumn}
           onOpenForeignKey={openForeignKey}
+          hasFilters={filters.length > 0}
+          onClearFilters={() => {
+            setFilters([])
+            setOffset(0)
+          }}
         />
 
         {selectedCount > 0 && (
           <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
-            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-full border border-border-strong/70 bg-surface/95 py-1.5 pl-2 pr-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl">
+            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-lg border border-border-strong/70 bg-surface/95 py-1.5 pl-2 pr-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl">
               <span className="flex items-center gap-2 pl-1 pr-1.5 text-xs">
-                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-surface-elevated px-1.5 font-mono text-xs font-medium text-text ring-1 ring-inset ring-white/10">
+                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-md bg-surface-elevated px-1.5 font-mono text-xs font-medium text-text ring-1 ring-inset ring-white/10">
                   {selectedCount}
                 </span>
                 <span className="text-text-subtle">
@@ -532,7 +560,7 @@ export function TableDataView({
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 gap-1 rounded-full px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
+                className="h-7 gap-1 rounded-md px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
                 onClick={() => setRowSelection({})}
               >
                 <IconX size={12} />
@@ -548,7 +576,7 @@ export function TableDataView({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 gap-1 rounded-full px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
+                  className="h-7 gap-1 rounded-md px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
                 >
                   <IconDownload size={12} />
                   Export {selectedCount}
@@ -559,7 +587,7 @@ export function TableDataView({
                   <span className="mx-1 h-4 w-px bg-white/10" />
                   <Button
                     size="sm"
-                    className="h-7 gap-1 rounded-full bg-danger-fill px-3 text-white ring-1 ring-inset ring-white/15 shadow-md shadow-danger-fill/40 hover:bg-danger"
+                    className="h-7 gap-1 rounded-md bg-danger-fill px-3 text-white shadow-[inset_0_-2px_0_0_var(--color-danger-shade),0_1px_3px_0_rgba(0,0,0,0.4)] ring-1 ring-inset ring-white/15 hover:bg-danger hover:shadow-none active:shadow-none focus-visible:border-white/60 focus-visible:ring-2 focus-visible:ring-white/30"
                     onClick={bulkDeleteConfirm.open}
                   >
                     <IconTrash size={12} />
@@ -577,6 +605,7 @@ export function TableDataView({
         pageSize={pageSize}
         loadedCount={rows.length}
         totalEstimate={totalEstimate}
+        totalExact={totalExact}
         onChangePage={setOffset}
         onChangePageSize={(size) => {
           setPageSize(size)

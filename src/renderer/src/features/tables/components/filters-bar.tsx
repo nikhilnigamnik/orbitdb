@@ -10,6 +10,14 @@ import {
 import { Popover } from '@renderer/components/ui/popover'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { SlidingHoverList } from '@renderer/components/ui/sliding-hover-list'
+import { useDebounce } from '@renderer/hooks/use-debounce'
+import {
+  OPERATORS,
+  isUnaryOperator,
+  resolveFilter,
+  upsertFilter,
+  usesWildcards
+} from '@renderer/features/tables/lib/filter-editor'
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { formatCellValue } from '@renderer/lib/format'
@@ -27,18 +35,8 @@ interface FiltersBarProps {
   onApply: () => void
 }
 
-const OPERATORS: { value: RowFilter['operator']; label: string; unary?: boolean }[] = [
-  { value: '=', label: '=' },
-  { value: '!=', label: '≠' },
-  { value: '>', label: '>' },
-  { value: '<', label: '<' },
-  { value: '>=', label: '≥' },
-  { value: '<=', label: '≤' },
-  { value: 'like', label: 'like' },
-  { value: 'ilike', label: 'ilike' },
-  { value: 'is null', label: 'is null', unary: true },
-  { value: 'is not null', label: 'not null', unary: true }
-]
+/** Enough distinct values to be worth scrolling; the box below narrows them. */
+const SUGGESTION_LIMIT = 12
 
 export function FiltersBar({
   connectionId,
@@ -52,6 +50,8 @@ export function FiltersBar({
   const [isOpen, setIsOpen] = React.useState(false)
   const [columnSearch, setColumnSearch] = React.useState('')
   const [editingColumn, setEditingColumn] = React.useState<ColumnInfo | null>(null)
+  /** Index of the filter being rewritten, or null when building a new one. */
+  const [editingIndex, setEditingIndex] = React.useState<number | null>(null)
   const [operator, setOperator] = React.useState<RowFilter['operator']>('=')
   const [valueSearch, setValueSearch] = React.useState('')
   const [values, setValues] = React.useState<unknown[]>([])
@@ -62,6 +62,9 @@ export function FiltersBar({
   const [panelHeight, setPanelHeight] = React.useState<number | undefined>(undefined)
 
   const hasFilters = filters.length > 0
+  // The value box doubles as a search over the column's distinct values, so hold
+  // it back rather than querying the database on every keystroke.
+  const valueQuery = useDebounce(valueSearch.trim(), 200)
 
   const filteredColumns = React.useMemo(() => {
     const q = columnSearch.trim().toLowerCase()
@@ -85,7 +88,8 @@ export function FiltersBar({
         schema,
         table,
         column: editingColumn.name,
-        limit: 5
+        search: valueQuery || undefined,
+        limit: SUGGESTION_LIMIT
       })
     )
       .then((rows) => {
@@ -103,10 +107,11 @@ export function FiltersBar({
     return () => {
       cancelled = true
     }
-  }, [editingColumn, connectionId, schema, table])
+  }, [editingColumn, connectionId, schema, table, valueQuery])
 
   function resetEditor() {
     setEditingColumn(null)
+    setEditingIndex(null)
     setOperator('=')
     setValueSearch('')
     setValues([])
@@ -119,11 +124,23 @@ export function FiltersBar({
     setValueSearch('')
   }
 
+  /** Reopen the editor on an applied filter so it can be rewritten in place. */
+  function editFilter(index: number) {
+    const target = filters[index]
+    const column = columns.find((c) => c.name === target.column)
+    if (!column) return
+    setEditingIndex(index)
+    setEditingColumn(column)
+    setOperator(target.operator)
+    setValueSearch(target.value ?? '')
+    setColumnSearch('')
+    setIsOpen(true)
+  }
+
   function commitFilter(rawValue: unknown) {
     if (!editingColumn) return
-    const opMeta = OPERATORS.find((o) => o.value === operator)
-    const value = opMeta?.unary ? '' : rawValue == null ? '' : String(rawValue)
-    onChange([...filters, { column: editingColumn.name, operator, value }])
+    const next = resolveFilter(editingColumn.name, operator, rawValue)
+    onChange(upsertFilter(filters, next, editingIndex))
     resetEditor()
     setColumnSearch('')
     onApply()
@@ -136,8 +153,14 @@ export function FiltersBar({
     onApply()
   }
 
+  function clearFilters() {
+    onChange([])
+    onApply()
+  }
+
   const operatorMeta = OPERATORS.find((o) => o.value === operator)
-  const isUnary = !!operatorMeta?.unary
+  const isUnary = isUnaryOperator(operator)
+  const isPattern = usesWildcards(operator)
   const canCommitFreeText = isUnary || valueSearch.trim().length > 0
 
   return (
@@ -145,28 +168,37 @@ export function FiltersBar({
       <div className="flex flex-wrap items-center gap-1.5">
         {filters.map((f, i) => {
           const unary = f.operator === 'is null' || f.operator === 'is not null'
+          // h-7 stands the chip level with the trigger beside it and the fields
+          // above it; the segments stretch to fill rather than set their own height.
           return (
             <div
               key={i}
-              className="inline-flex items-stretch overflow-hidden rounded-md border border-border bg-surface-elevated/60 text-xs text-text"
+              className="inline-flex h-7 items-stretch overflow-hidden rounded-md border border-border bg-surface-elevated/60 text-xs text-text"
             >
-              <div className="flex items-center gap-1.5 px-2 py-1">
-                <IconDatabase size={11} className="text-text-subtle" />
-                <span>{f.column}</span>
-              </div>
-              <div className="flex items-center border-l border-border px-2 py-1 font-mono text-text-muted">
-                {f.operator}
-              </div>
-              {!unary && (
-                <div className="flex max-w-40 items-center truncate border-l border-border px-2 py-1 font-mono">
-                  {String(f.value ?? '')}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => editFilter(i)}
+                aria-label={`Edit filter on ${f.column}`}
+                className="group/edit flex cursor-pointer items-stretch transition-colors hover:bg-surface-elevated"
+              >
+                <span className="flex items-center gap-1.5 px-2">
+                  <IconDatabase size={11} className="text-text-subtle" />
+                  {f.column}
+                </span>
+                <span className="flex items-center border-l border-border px-2 font-mono text-text-muted group-hover/edit:text-text">
+                  {f.operator}
+                </span>
+                {!unary && (
+                  <span className="flex max-w-40 items-center truncate border-l border-border px-2 font-mono">
+                    {String(f.value ?? '')}
+                  </span>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={() => removeFilter(i)}
                 aria-label="Remove filter"
-                className="flex cursor-pointer items-center border-l border-border px-2 py-1 text-danger transition-colors hover:bg-danger/10"
+                className="flex cursor-pointer items-center border-l border-border px-2 text-danger transition-colors hover:bg-danger/10"
               >
                 <IconX size={11} />
               </button>
@@ -240,7 +272,8 @@ export function FiltersBar({
                           onClick={() => commitFilter('')}
                           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-accent px-2 py-2 text-xs font-medium text-white transition-colors hover:bg-accent/90"
                         >
-                          Apply &ldquo;{operatorMeta?.label}&rdquo;
+                          {editingIndex == null ? 'Apply' : 'Update'} &ldquo;{operatorMeta?.label}
+                          &rdquo;
                         </button>
                       </div>
                     ) : (
@@ -256,10 +289,22 @@ export function FiltersBar({
                                 commitFilter(valueSearch)
                               }
                             }}
-                            placeholder="Enter value…"
+                            placeholder={isPattern ? 'e.g. %term%' : 'Enter value…'}
                           />
-                          <Button onClick={() => commitFilter(valueSearch)}>Apply</Button>
+                          <Button
+                            onClick={() => commitFilter(valueSearch)}
+                            disabled={!canCommitFreeText}
+                          >
+                            {editingIndex == null ? 'Apply' : 'Update'}
+                          </Button>
                         </div>
+
+                        {isPattern && (
+                          <p className="text-xs text-text-subtle">
+                            <span className="font-mono text-text-muted">%</span> matches any run of
+                            characters — a bare term matches only an exact value.
+                          </p>
+                        )}
 
                         {valuesLoading ? (
                           <div className="flex items-center justify-center py-1 text-text-subtle">
@@ -269,7 +314,7 @@ export function FiltersBar({
                           <p className="text-xs text-danger">{valuesError}</p>
                         ) : values.length > 0 ? (
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs font-medium uppercase tracking-wider text-text-subtle">
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-text-subtle">
                               Suggestions
                             </span>
                             <div className="flex flex-wrap gap-1">
@@ -348,14 +393,28 @@ export function FiltersBar({
             </div>
           }
         >
-          <button
+          <Button
             type="button"
-            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-text-muted/12 text-text-muted ring-1 ring-inset ring-text-muted/25 transition-all hover:bg-text-muted/20 hover:text-text-muted"
+            variant="subtle"
+            size="icon-sm"
             aria-label={hasFilters ? 'Add filter' : 'Open filters'}
           >
             {hasFilters ? <IconPlus stroke={2} size={14} /> : <IconFilter2 stroke={2} size={14} />}
-          </button>
+          </Button>
         </Popover>
+
+        {filters.length > 1 && (
+          <Button
+            type="button"
+            variant="subtle"
+            size="sm"
+            onClick={clearFilters}
+            aria-label="Clear all filters"
+          >
+            <IconX size={12} />
+            Clear all
+          </Button>
+        )}
       </div>
     </div>
   )

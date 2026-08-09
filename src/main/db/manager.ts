@@ -1,5 +1,6 @@
 import type {
   ConnectionInput,
+  CountRowsOptions,
   DatabaseEngine,
   DdlRequest,
   DistinctValuesOptions,
@@ -79,6 +80,10 @@ export function getSchemaGraph(connectionId: string, schema: string): Promise<Sc
 
 export function getRows(opts: GetRowsOptions): Promise<RowsResult> {
   return driverForConnection(opts.connectionId).getRows(opts)
+}
+
+export function countRows(opts: CountRowsOptions): Promise<number | null> {
+  return driverForConnection(opts.connectionId).countRows(opts)
 }
 
 export function insertRow(opts: RowMutation): Promise<Record<string, unknown>> {

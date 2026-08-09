@@ -5,7 +5,9 @@ import mysql, {
   type ResultSetHeader
 } from 'mysql2/promise'
 import {
+  MAX_EXACT_COUNT_ROWS,
   MAX_QUERY_RESULT_ROWS,
+  type CountRowsOptions,
   type ColumnInfo,
   type ConnectionInput,
   type DdlRequest,
@@ -30,6 +32,7 @@ import {
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
+import { buildFilterSql, type FilterDialect } from '../filters'
 import { recordQuery } from '../query-log'
 import { detectCommand, isSchemaChanging } from '../sql-command'
 import type { ActiveMeta, DatabaseDriver } from './types'
@@ -365,39 +368,17 @@ function qualifiedTable(schema: string, table: string): string {
   return `${quoteIdent(schema)}.${quoteIdent(table)}`
 }
 
-const ALLOWED_OPERATORS = new Set([
-  '=',
-  '!=',
-  '>',
-  '<',
-  '>=',
-  '<=',
-  'like',
-  'ilike',
-  'is null',
-  'is not null'
-])
+const filterDialect: FilterDialect = {
+  quoteIdent,
+  placeholder: () => '?',
+  supportsIlike: false
+}
 
 async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
 
-  const params: unknown[] = []
-  const whereClauses: string[] = []
-  for (const filter of opts.filters ?? []) {
-    if (!validColumns.has(filter.column)) continue
-    if (!ALLOWED_OPERATORS.has(filter.operator)) continue
-    if (filter.operator === 'is null') {
-      whereClauses.push(`${quoteIdent(filter.column)} is null`)
-    } else if (filter.operator === 'is not null') {
-      whereClauses.push(`${quoteIdent(filter.column)} is not null`)
-    } else if (filter.value != null) {
-      const op = filter.operator === 'ilike' ? 'like' : filter.operator
-      params.push(filter.value)
-      whereClauses.push(`${quoteIdent(filter.column)} ${op} ?`)
-    }
-  }
-  const whereSql = whereClauses.length > 0 ? `where ${whereClauses.join(' and ')}` : ''
+  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, filterDialect)
 
   let orderSql = ''
   if (opts.orderBy && validColumns.has(opts.orderBy)) {
@@ -419,6 +400,24 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
     columns: details.columns,
     totalEstimate: details.estimatedRows
   }
+}
+
+async function countRows(opts: CountRowsOptions): Promise<number | null> {
+  const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
+  const validColumns = new Set(details.columns.map((c) => c.name))
+  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, filterDialect)
+
+  // Unfiltered counts on a huge table buy precision nobody asked for at a price
+  // the UI would feel; the estimate already covers that case.
+  if (!whereSql && (details.estimatedRows ?? 0) > MAX_EXACT_COUNT_ROWS) return null
+
+  const pool = getPool(opts.connectionId)
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `select count(*) as total from ${qualifiedTable(opts.schema, opts.table)} ${whereSql}`,
+    params
+  )
+  const total = Number(rows[0]?.total)
+  return Number.isFinite(total) ? total : null
 }
 
 async function fetchByPk(
@@ -758,6 +757,7 @@ export const mysqlDriver: DatabaseDriver = {
   tableDetails,
   getSchemaGraph,
   getRows,
+  countRows,
   insertRow,
   updateRow,
   deleteRow,

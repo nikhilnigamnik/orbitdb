@@ -13,7 +13,7 @@
   --color-bg: #0e1013; /* window chrome, behind the floating panels */
   --color-surface: #131519; /* panels, sidebars, popovers */
   --color-surface-elevated: #1c2026; /* hover / selected rows */
-  --color-input: #202429; /* text fields — sits above the panel */
+  --color-input: #15181c; /* text fields — reads as a well, not a raised chip */
   --color-surface-sunken: #0b0d10; /* code blocks, SQL editor, DDL preview */
 
   --color-border: #202429;

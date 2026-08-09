@@ -6,7 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@renderer/lib/utils'
 
 const checkboxVariants = cva(
-  'group relative flex cursor-pointer items-center justify-center rounded-md border border-border bg-surface-elevated outline-none transition-colors data-[state=checked]:border-0 data-[state=checked]:bg-accent focus-visible:border-accent-text focus-visible:ring-3 focus-visible:ring-accent-text/50 disabled:cursor-not-allowed disabled:opacity-50',
+  'group relative flex cursor-pointer items-center justify-center rounded-md border border-border-strong bg-input outline-none transition-colors data-[state=checked]:border-0 data-[state=checked]:bg-accent focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50',
   {
     variants: {
       size: {

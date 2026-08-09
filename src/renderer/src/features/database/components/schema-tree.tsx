@@ -160,8 +160,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
             <TooltipTrigger asChild>
               <Button
                 size="icon-xs"
-                variant="ghost"
-                tone="neutral"
+                variant="subtle"
                 onClick={() => {
                   setTablesBySchema({})
                   onRefresh()
@@ -182,7 +181,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
           type="button"
           onClick={openPalette}
           aria-label="Open command palette"
-          className="group flex h-8 w-full cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left text-xs text-text-subtle transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-muted"
+          className="group flex h-7 w-full cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-input px-2.5 text-left text-xs text-text-subtle transition-colors hover:bg-surface-elevated/40 hover:text-text-muted focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none"
         >
           <IconSearch size={12} className="shrink-0" />
           <span className="flex-1 truncate">Search tables…</span>
