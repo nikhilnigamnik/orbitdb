@@ -274,9 +274,7 @@ function IndexesSheet({
                       <p className="mt-0.5 font-mono text-xs text-text-muted">
                         ({s.columns.join(', ')})
                       </p>
-                      <p className="mt-1 text-xs leading-snug text-text-subtle">
-                        {s.rationale}
-                      </p>
+                      <p className="mt-1 text-xs leading-snug text-text-subtle">{s.rationale}</p>
                       {typeof state === 'string' && state !== 'applying' && state !== 'done' && (
                         <p className="mt-1 text-xs text-danger">{state}</p>
                       )}

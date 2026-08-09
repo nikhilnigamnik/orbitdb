@@ -18,6 +18,22 @@ import {
 
 type CommitTarget = 'close' | 'next' | 'prev'
 
+function ErrorBubble({ children }: { children: React.ReactNode }) {
+  return (
+    <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Content
+        side="bottom"
+        align="start"
+        sideOffset={6}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="animate-slide-up-fade z-50 max-w-72 rounded-md border border-danger/20 bg-surface px-2 py-1.5 text-xs leading-snug text-danger shadow-lg shadow-black/40"
+      >
+        {children}
+      </PopoverPrimitive.Content>
+    </PopoverPrimitive.Portal>
+  )
+}
+
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
 
 interface CellInlineEditorProps {
@@ -27,6 +43,8 @@ interface CellInlineEditorProps {
   onClose: () => void
   /** Commits (when dirty) and moves editing to the adjacent cell. */
   onNavigate?: (direction: 'next' | 'prev') => void
+  /** Reports whether the value differs from the one the cell held. */
+  onDirtyChange?: (isDirty: boolean) => void
 }
 
 /**
@@ -39,7 +57,8 @@ export function CellInlineEditor({
   value,
   onSave,
   onClose,
-  onNavigate
+  onNavigate,
+  onDirtyChange
 }: CellInlineEditorProps) {
   const isBool = isBoolType(column.udtName)
   const isJson = isJsonType(column.udtName)
@@ -54,6 +73,10 @@ export function CellInlineEditor({
   // Blur cancels the edit — except while a commit is in flight, where the
   // input may lose focus (unmount, select portal) without the user leaving.
   const isCommittingRef = React.useRef(false)
+  // Radix fires the select's close after a rejected save has already cleared
+  // isCommittingRef, which would dismiss the editor and the error with it. Once
+  // a commit has been attempted, only an explicit finish() closes this editor.
+  const hasAttemptedCommitRef = React.useRef(false)
 
   const useOverlay =
     selectOptions == null && (isJson || initial.length > 60 || initial.includes('\n'))
@@ -74,6 +97,14 @@ export function CellInlineEditor({
 
   const charLimit = !isJson && selectOptions == null ? column.characterMaximumLength : null
   const isOverLimit = charLimit != null && raw.length > charLimit
+
+  // Tab on an untouched cell skips the write entirely; without a signal there is
+  // no way to tell an edited cell from one merely opened.
+  const isDirty = raw !== initial
+  React.useEffect(() => {
+    onDirtyChange?.(isDirty)
+    return () => onDirtyChange?.(false)
+  }, [isDirty, onDirtyChange])
 
   const inputRef = React.useRef<HTMLInputElement>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
@@ -119,6 +150,7 @@ export function CellInlineEditor({
         return
       }
       isCommittingRef.current = true
+      hasAttemptedCommitRef.current = true
       setIsSaving(true)
       try {
         await onSave(coerced)
@@ -164,55 +196,71 @@ export function CellInlineEditor({
 
   if (selectOptions != null) {
     return (
-      <SelectPrimitive.Root
-        defaultOpen
-        defaultValue={initial === '' ? undefined : initial}
-        onValueChange={(v) => void commit('close', { raw: v })}
-        onOpenChange={(open) => {
-          if (!open && !isCommittingRef.current) onClose()
-        }}
-      >
-        <SelectPrimitive.Trigger
-          aria-label={column.name}
-          className="flex w-full cursor-pointer items-center justify-between gap-1 bg-transparent font-mono text-xs text-text outline-none data-placeholder:italic data-placeholder:text-text-subtle"
-        >
-          <SelectPrimitive.Value placeholder="NULL" />
-          <IconChevronDown size={11} className="shrink-0 text-text-subtle" />
-        </SelectPrimitive.Trigger>
-        <SelectPrimitive.Portal>
-          <SelectPrimitive.Content
-            position="popper"
-            side="bottom"
-            align="start"
-            sideOffset={6}
-            className="animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-none border border-border-strong bg-surface text-text shadow-2xl shadow-black/70"
-          >
-            <SelectPrimitive.Viewport className="p-1">
-              {selectOptions.map((option) => (
-                <SelectPrimitive.Item
-                  key={option}
-                  value={option}
-                  className="relative flex cursor-pointer items-center gap-2 rounded-none py-1.5 pr-7 pl-2 font-mono text-xs text-text-muted outline-none transition-colors select-none focus:bg-surface-elevated focus:text-text data-[state=checked]:text-text"
+      // Wrapped so a rejected write has somewhere to be shown — picking a value
+      // dismisses the select, and without this the error had no anchor and the
+      // save failed in silence.
+      <PopoverPrimitive.Root open={error != null}>
+        <PopoverPrimitive.Anchor asChild>
+          <div className="flex w-full items-center">
+            <SelectPrimitive.Root
+              defaultOpen
+              defaultValue={initial === '' ? undefined : initial}
+              onValueChange={(v) => void commit('close', { raw: v })}
+              onOpenChange={(open) => {
+                if (open) return
+                // The select reports its close before it reports the chosen value, so
+                // decide after both have landed — otherwise picking a value looks like
+                // dismissing the editor, and a rejected save closes with its error.
+                queueMicrotask(() => {
+                  if (!isCommittingRef.current && !hasAttemptedCommitRef.current) onClose()
+                })
+              }}
+            >
+              <SelectPrimitive.Trigger
+                aria-label={column.name}
+                className="flex w-full cursor-pointer items-center justify-between gap-1 bg-transparent font-mono text-xs text-text outline-none data-placeholder:italic data-placeholder:text-text-subtle"
+              >
+                <SelectPrimitive.Value placeholder="NULL" />
+                <IconChevronDown size={11} className="shrink-0 text-text-subtle" />
+              </SelectPrimitive.Trigger>
+              <SelectPrimitive.Portal>
+                <SelectPrimitive.Content
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  sideOffset={6}
+                  className="animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-none border border-border-strong bg-surface text-text shadow-2xl shadow-black/70"
                 >
-                  <SelectPrimitive.ItemText>{option}</SelectPrimitive.ItemText>
-                  <SelectPrimitive.ItemIndicator className="absolute right-2 flex items-center">
-                    <IconCheck size={12} className="text-text" />
-                  </SelectPrimitive.ItemIndicator>
-                </SelectPrimitive.Item>
-              ))}
-              {column.isNullable && (
-                <button
-                  type="button"
-                  onClick={() => void commit('close', { toNull: true })}
-                  className="flex w-full cursor-pointer items-center rounded-none border-t border-border/60 py-1.5 pl-2 font-mono text-xs text-text-subtle italic transition-colors hover:bg-surface-elevated hover:text-text"
-                >
-                  NULL
-                </button>
-              )}
-            </SelectPrimitive.Viewport>
-          </SelectPrimitive.Content>
-        </SelectPrimitive.Portal>
-      </SelectPrimitive.Root>
+                  <SelectPrimitive.Viewport className="p-1">
+                    {selectOptions.map((option) => (
+                      <SelectPrimitive.Item
+                        key={option}
+                        value={option}
+                        className="relative flex cursor-pointer items-center gap-2 rounded-none py-1.5 pr-7 pl-2 font-mono text-xs text-text-muted outline-none transition-colors select-none focus:bg-surface-elevated focus:text-text data-[state=checked]:text-text"
+                      >
+                        <SelectPrimitive.ItemText>{option}</SelectPrimitive.ItemText>
+                        <SelectPrimitive.ItemIndicator className="absolute right-2 flex items-center">
+                          <IconCheck size={12} className="text-text" />
+                        </SelectPrimitive.ItemIndicator>
+                      </SelectPrimitive.Item>
+                    ))}
+                    {column.isNullable && (
+                      <button
+                        type="button"
+                        onClick={() => void commit('close', { toNull: true })}
+                        className="flex w-full cursor-pointer items-center rounded-none border-t border-border/60 py-1.5 pl-2 font-mono text-xs text-text-subtle italic transition-colors hover:bg-surface-elevated hover:text-text"
+                      >
+                        NULL
+                      </button>
+                    )}
+                  </SelectPrimitive.Viewport>
+                </SelectPrimitive.Content>
+              </SelectPrimitive.Portal>
+            </SelectPrimitive.Root>
+          </div>
+        </PopoverPrimitive.Anchor>
+        {error != null && <ErrorBubble>{error}</ErrorBubble>}
+      </PopoverPrimitive.Root>
     )
   }
 
@@ -243,6 +291,7 @@ export function CellInlineEditor({
               onKeyDown={(e) => handleEditorKeyDown(e, true)}
               placeholder={value === null ? 'NULL' : ''}
               spellCheck={false}
+              disabled={isSaving}
               className={cn(
                 'block w-full resize-none bg-transparent px-3 py-2.5 font-mono text-xs leading-relaxed text-text outline-none placeholder:italic placeholder:text-text-subtle',
                 isJson ? 'min-h-44' : 'min-h-32'
@@ -319,19 +368,7 @@ export function CellInlineEditor({
           />
         </div>
       </PopoverPrimitive.Anchor>
-      {error != null && (
-        <PopoverPrimitive.Portal>
-          <PopoverPrimitive.Content
-            side="bottom"
-            align="start"
-            sideOffset={6}
-            onOpenAutoFocus={(e) => e.preventDefault()}
-            className="animate-slide-up-fade z-50 max-w-72 rounded-md border border-danger/20 bg-surface px-2 py-1.5 text-xs leading-snug text-danger shadow-lg shadow-black/40"
-          >
-            {error}
-          </PopoverPrimitive.Content>
-        </PopoverPrimitive.Portal>
-      )}
+      {error != null && <ErrorBubble>{error}</ErrorBubble>}
     </PopoverPrimitive.Root>
   )
 }

@@ -497,9 +497,7 @@ export function ConnectionFormSheet({
                   )}
                 </div>
                 {!testResult.success && testResult.error && (
-                  <p className="mt-2 break-all font-mono text-xs text-danger">
-                    {testResult.error}
-                  </p>
+                  <p className="mt-2 break-all font-mono text-xs text-danger">{testResult.error}</p>
                 )}
               </div>
             )}

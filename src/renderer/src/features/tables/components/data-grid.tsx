@@ -19,7 +19,7 @@ import {
   IconArrowUpRight
 } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
-import { formatCellValue } from '@renderer/lib/format'
+import { formatCellValue, isBlankString } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import { LoadingState } from '@renderer/components/common/loading-state'
@@ -103,6 +103,7 @@ export function DataGrid({
     setInternalRowSelection({})
   }, [rows, isControlled])
 
+  const [isEditorDirty, setIsEditorDirty] = React.useState(false)
   const [editingCell, setEditingCell] = React.useState<{
     rowIndex: number
     columnId: string
@@ -160,10 +161,9 @@ export function DataGrid({
         nextCol = dataColumnIds.length - 1
         nextRow -= 1
       }
-      if (nextRow < 0 || nextRow >= rows.length) {
-        setEditingCell(null)
-        return
-      }
+      // At the edge of the loaded rows, stay put rather than ending the session
+      // without a signal — the commit already happened either way.
+      if (nextRow < 0 || nextRow >= rows.length) return
       setEditingCell({ rowIndex: nextRow, columnId: dataColumnIds[nextCol] })
     },
     [dataColumnIds, rows.length]
@@ -271,9 +271,14 @@ export function DataGrid({
         },
         cell: (info) => {
           const value = info.getValue()
-          const display = formatCellValue(value)
+          const display = formatCellValue(value, col.udtName)
           if (value === null) {
             return <span className="italic text-text-subtle">NULL</span>
+          }
+          // '' and '   ' both render as an empty cell otherwise, with no way to
+          // tell which one is failing to match a comparison.
+          if (isBlankString(value)) {
+            return <span className="italic text-text-subtle">{`'${value}'`}</span>
           }
           const fkTarget = fkColumns?.get(col.name)
           if (fkTarget && onOpenForeignKey) {
@@ -288,7 +293,7 @@ export function DataGrid({
                   }}
                   onDoubleClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
-                  className="shrink-0 cursor-pointer rounded p-0.5 text-accent-text opacity-0 transition-opacity hover:bg-accent/15 group-hover:opacity-100"
+                  className="shrink-0 cursor-pointer rounded p-0.5 text-accent-text opacity-0 transition-opacity hover:bg-accent/15 focus-visible:opacity-100 group-hover:opacity-100"
                   title={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
                   aria-label={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
                 >
@@ -310,7 +315,7 @@ export function DataGrid({
           id: ACTIONS_COLUMN_ID,
           header: () => null,
           cell: ({ row }) => (
-            <div className="flex justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="flex justify-end gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
               <Button
                 size="icon-xs"
                 variant="ghost"
@@ -368,6 +373,11 @@ export function DataGrid({
   // an explicit width pinned. Double-clicking the handle clears it back to auto.
   // The drag is driven manually (not header.getResizeHandler()) because TanStack
   // starts from its 150px default size, which makes auto-sized columns jump.
+  const udtByColumn = React.useMemo(
+    () => new Map(columns.map((c) => [c.name, c.udtName])),
+    [columns]
+  )
+
   const columnSizing = table.getState().columnSizing
   const resizedWidth = React.useCallback(
     (columnId: string): number | undefined => columnSizing[columnId],
@@ -520,6 +530,7 @@ export function DataGrid({
                     const editColumn = isEditingThis
                       ? columns.find((c) => c.name === cell.column.id)
                       : undefined
+                    const udtName = isData ? udtByColumn.get(cell.column.id) : undefined
                     const cellValue = row.original[cell.column.id]
                     const isSavedFlash =
                       isData &&
@@ -542,10 +553,13 @@ export function DataGrid({
                           isActions && 'sticky right-0 bg-surface px-2 py-1 group-hover:bg-surface',
                           isData && 'max-w-xs truncate font-mono text-xs',
                           isData && canEditCells && 'cursor-text',
-                          isEditingThis && 'bg-accent/10 ring-1 ring-inset ring-accent-text/50',
+                          isEditingThis && 'bg-accent/10 ring-1 ring-inset',
+                          isEditingThis && (isEditorDirty ? 'ring-accent' : 'ring-accent-text/50'),
                           isSavedFlash && 'animate-cell-saved'
                         )}
-                        title={isData && !isEditingThis ? formatCellValue(cellValue) : undefined}
+                        title={
+                          isData && !isEditingThis ? formatCellValue(cellValue, udtName) : undefined
+                        }
                         onMouseDown={
                           // While the editor popover is open its portal events bubble
                           // through this td in the React tree — skip the handler so
@@ -583,6 +597,7 @@ export function DataGrid({
                             onNavigate={(direction) =>
                               moveEditing(row.index, cell.column.id, direction)
                             }
+                            onDirtyChange={setIsEditorDirty}
                           />
                         ) : (
                           flexRender(cell.column.columnDef.cell, cell.getContext())

@@ -1,11 +1,9 @@
 import {
   MAX_QUERY_RESULT_ROWS,
   type CountRowsOptions,
-  type ColumnInfo,
   type ConnectionInput,
   type DdlRequest,
   type DistinctValuesOptions,
-  type ForeignKeyInfo,
   type GetRowsOptions,
   type IndexInfo,
   type QueryResult,
@@ -24,8 +22,24 @@ import {
   type TestConnectionResult
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
-import { buildDdl, type DdlDialect } from '../ddl'
-import { buildFilterSql, type FilterDialect } from '../filters'
+import { buildDdl } from '../ddl'
+import { buildFilterSql } from '../filters'
+import {
+  LIST_BASE_TABLES_SQL,
+  LIST_TABLES_SQL,
+  SQLITE_SCHEMA,
+  quoteIdent,
+  sqliteDdlDialect,
+  sqliteFilterDialect,
+  toColumns,
+  toForeignKeys,
+  toIndex,
+  toPrimaryKey,
+  type ForeignKeyRow,
+  type IndexInfoRow,
+  type IndexListRow,
+  type TableInfoRow
+} from '../sqlite-shared'
 import { recordQuery } from '../query-log'
 import { detectCommand, isSchemaChanging } from '../sql-command'
 import type { ActiveMeta, DatabaseDriver } from './types'
@@ -206,34 +220,6 @@ async function mapWithConcurrency<TItem, TResult>(
   return results
 }
 
-function quoteIdent(name: string): string {
-  return `"${name.replace(/"/g, '""')}"`
-}
-
-const filterDialect: FilterDialect = {
-  quoteIdent,
-  placeholder: () => '?',
-  supportsIlike: false
-}
-
-function normalizeUdtName(declared: string): string {
-  const t = declared.toLowerCase().trim()
-  if (!t) return 'text'
-  if (t.includes('json')) return 'json'
-  if (t.includes('bool')) return 'bool'
-  if (
-    t.includes('int') ||
-    t.includes('real') ||
-    t.includes('floa') ||
-    t.includes('doub') ||
-    t.includes('numeric') ||
-    t.includes('decimal')
-  ) {
-    return t.includes('int') ? 'int4' : 'float8'
-  }
-  return 'text'
-}
-
 async function test(input: ConnectionInput): Promise<TestConnectionResult> {
   try {
     await callD1<{ ok: number }>(input, 'select 1 as ok')
@@ -269,22 +255,15 @@ function loadSaved(connectionId: string): SavedConnection {
 
 async function listSchemas(connectionId: string): Promise<SchemaInfo[]> {
   void connectionId
-  return [{ name: 'main' }]
+  return [{ name: SQLITE_SCHEMA }]
 }
 
 async function listTables(connectionId: string, schema: string): Promise<TableInfo[]> {
   void schema
   const saved = loadSaved(connectionId)
-  const entry = await callD1<{ name: string; type: string }>(
-    saved,
-    `select name, type from sqlite_master
-      where type in ('table', 'view')
-        and name not like 'sqlite_%'
-        and name not like '_cf_%'
-      order by name`
-  )
+  const entry = await callD1<{ name: string; type: string }>(saved, LIST_TABLES_SQL)
   return entry.results.map((r) => ({
-    schema: 'main',
+    schema: SQLITE_SCHEMA,
     name: String(r.name),
     type: r.type === 'view' ? 'view' : 'table',
     estimatedRows: null
@@ -318,102 +297,23 @@ async function tableDetails(
   // Every pragma is a separate HTTP round-trip to Cloudflare — issue the
   // independent ones together instead of paying the latency three times over.
   const [colEntry, idxListEntry, fkEntry] = await Promise.all([
-    callD1<{
-      cid: number
-      name: string
-      type: string
-      notnull: number
-      dflt_value: string | null
-      pk: number
-    }>(saved, `pragma table_info(${tableIdent})`),
-    callD1<{
-      seq: number
-      name: string
-      unique: number
-      origin: string
-      partial: number
-    }>(saved, `pragma index_list(${tableIdent})`),
-    callD1<{
-      id: number
-      seq: number
-      table: string
-      from: string
-      to: string
-      on_update: string
-      on_delete: string
-      match: string
-    }>(saved, `pragma foreign_key_list(${tableIdent})`)
+    callD1<TableInfoRow>(saved, `pragma table_info(${tableIdent})`),
+    callD1<IndexListRow>(saved, `pragma index_list(${tableIdent})`),
+    callD1<ForeignKeyRow>(saved, `pragma foreign_key_list(${tableIdent})`)
   ])
 
-  const columns: ColumnInfo[] = colEntry.results.map((r) => ({
-    name: String(r.name),
-    dataType: String(r.type || 'TEXT'),
-    udtName: normalizeUdtName(String(r.type)),
-    isNullable: Number(r.notnull) === 0,
-    isPrimaryKey: Number(r.pk) > 0,
-    defaultValue: r.dflt_value == null ? null : String(r.dflt_value),
-    ordinalPosition: Number(r.cid) + 1,
-    characterMaximumLength: null,
-    enumValues: null
-  }))
-
-  const primaryKey = colEntry.results
-    .filter((r) => Number(r.pk) > 0)
-    .sort((a, b) => Number(a.pk) - Number(b.pk))
-    .map((r) => String(r.name))
+  const columns = toColumns(colEntry.results)
+  const primaryKey = toPrimaryKey(colEntry.results)
 
   const indexes: IndexInfo[] = await mapWithConcurrency(idxListEntry.results, async (idx) => {
-    const indexName = String(idx.name)
-    const colsEntry = await callD1<{ seqno: number; cid: number; name: string }>(
+    const colsEntry = await callD1<IndexInfoRow>(
       saved,
-      `pragma index_info(${quoteIdent(indexName)})`
+      `pragma index_info(${quoteIdent(String(idx.name))})`
     )
-    return {
-      name: indexName,
-      isUnique: Number(idx.unique) === 1,
-      isPrimary: idx.origin === 'pk',
-      columns: colsEntry.results
-        .sort((a, b) => Number(a.seqno) - Number(b.seqno))
-        .map((c) => String(c.name)),
-      definition: ''
-    }
+    return toIndex(idx, colsEntry.results)
   })
 
-  const fkGroups = new Map<
-    number,
-    {
-      table: string
-      onUpdate: string
-      onDelete: string
-      pairs: { from: string; to: string; seq: number }[]
-    }
-  >()
-  for (const fk of fkEntry.results) {
-    const id = Number(fk.id)
-    const existing = fkGroups.get(id)
-    if (existing) {
-      existing.pairs.push({ from: String(fk.from), to: String(fk.to), seq: Number(fk.seq) })
-    } else {
-      fkGroups.set(id, {
-        table: String(fk.table),
-        onUpdate: String(fk.on_update ?? 'NO ACTION'),
-        onDelete: String(fk.on_delete ?? 'NO ACTION'),
-        pairs: [{ from: String(fk.from), to: String(fk.to), seq: Number(fk.seq) }]
-      })
-    }
-  }
-  const foreignKeys: ForeignKeyInfo[] = [...fkGroups.entries()].map(([id, g]) => {
-    const sorted = g.pairs.sort((a, b) => a.seq - b.seq)
-    return {
-      name: `fk_${id}`,
-      columns: sorted.map((p) => p.from),
-      referencedSchema: 'main',
-      referencedTable: g.table,
-      referencedColumns: sorted.map((p) => p.to),
-      onDelete: g.onDelete,
-      onUpdate: g.onUpdate
-    }
-  })
+  const foreignKeys = toForeignKeys(fkEntry.results)
 
   const result: TableDetails = {
     schema,
@@ -436,7 +336,7 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
 
   // SQLite lacks ILIKE; the dialect folds it onto LIKE, which is already
   // case-insensitive for ASCII by default.
-  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, filterDialect)
+  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, sqliteFilterDialect)
 
   let orderSql = ''
   if (opts.orderBy && validColumns.has(opts.orderBy)) {
@@ -480,7 +380,7 @@ async function countRows(opts: CountRowsOptions): Promise<number | null> {
   const saved = loadSaved(opts.connectionId)
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
-  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, filterDialect)
+  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, sqliteFilterDialect)
 
   // SQLite keeps no row estimate, so there is no cheap total to fall back on —
   // count unconditionally. D1 databases are small enough for that to be fine.
@@ -598,22 +498,13 @@ async function deleteRow(opts: RowDelete): Promise<{ deleted: number }> {
   return { deleted: entry.meta.changes ?? 0 }
 }
 
-// D1/SQLite has no schemas — identifiers are table-only and indexes are global.
-const ddlDialect: DdlDialect = {
-  quoteIdent,
-  qualifiedTable: (_schema, table) => quoteIdent(table),
-  dropIndex: (_schema, _table, name) => `DROP INDEX ${quoteIdent(name)}`,
-  // SQLite/D1 has no TRUNCATE — DELETE FROM clears every row.
-  truncate: (_schema, table) => `DELETE FROM ${quoteIdent(table)}`
-}
-
 async function generateDdl(opts: DdlRequest): Promise<string> {
-  return buildDdl(opts.operation, opts.schema, opts.table, ddlDialect)
+  return buildDdl(opts.operation, opts.schema, opts.table, sqliteDdlDialect)
 }
 
 async function executeDdl(opts: DdlRequest): Promise<void> {
   const saved = loadSaved(opts.connectionId)
-  const sql = buildDdl(opts.operation, opts.schema, opts.table, ddlDialect)
+  const sql = buildDdl(opts.operation, opts.schema, opts.table, sqliteDdlDialect)
   await callD1(saved, sql)
   invalidateTableDetailsForConnection(opts.connectionId)
 }
@@ -687,14 +578,7 @@ async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]
 async function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
   const saved = loadSaved(connectionId)
 
-  const tableList = await callD1<{ name: string }>(
-    saved,
-    `select name from sqlite_master
-      where type = 'table'
-        and name not like 'sqlite_%'
-        and name not like '_cf_%'
-      order by name`
-  )
+  const tableList = await callD1<{ name: string }>(saved, LIST_BASE_TABLES_SQL)
   const tableNames = tableList.results.map((r) => String(r.name))
 
   // Halved: each item issues two requests, so this still caps in-flight at ~6.

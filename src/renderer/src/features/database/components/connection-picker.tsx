@@ -88,10 +88,7 @@ export function ConnectionPicker() {
         title="No connections yet"
         description="Add a Postgres, MySQL, or D1 connection to start browsing schemas and tables."
         action={
-          <Button
-            size="sm"
-            onClick={() => navigate(ROUTES.connections)}
-          >
+          <Button size="sm" onClick={() => navigate(ROUTES.connections)}>
             Add a connection
           </Button>
         }

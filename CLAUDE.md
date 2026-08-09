@@ -29,12 +29,22 @@ Tests run on Vitest (`vitest.config.ts`). Every spec lives under the top-level `
 folder, mirroring the `src/` layout — **not** colocated with the source file, so the
 electron-vite build never has to glob around them. New behaviour ships with a spec.
 
+`vitest.config.ts` pins `TZ` to `Asia/Kolkata`. Date rendering is timezone-sensitive, so
+without it a spec that passes locally fails on a UTC runner — and a zero offset renders as
+`Z`, which never exercises the offset-carrying path. Assert exact offsets, not a loose
+pattern.
+
+`tests/setup/jsdom-polyfills.ts` fills in the DOM APIs Radix calls unconditionally
+(pointer capture, `scrollIntoView`, `ResizeObserver`). Without them a Select or Popover
+throws inside the component instead of failing an assertion.
+
 Three testing shapes, cheapest first:
+
 - **Pure logic** — plain `.test.ts`. Prefer extracting decision-making out of a component
   into `features/<x>/lib/` and testing it there (`filter-editor.ts` exists because the
   NULL-vs-empty-string bug lived in a branch buried in JSX).
 - **Static render** — `renderToStaticMarkup` + `createElement` in a `.test.ts`, for
-  asserting what a component *renders* (classes, aria labels) without a DOM.
+  asserting what a component _renders_ (classes, aria labels) without a DOM.
 - **Interaction** — `.test.tsx` with `// @vitest-environment jsdom` at the top and
   `@testing-library/react`, for anything driven by state or effects. Stub the IPC bridge
   with `Object.assign(window, { api: { db: { … } } })`.
@@ -64,11 +74,13 @@ main (full Node)
 Every IPC handler in `src/main/ipc/index.ts` is wrapped by `wrap()`, which catches throws and returns `OperationResult<T> = { success, data?, error? }`. Preload methods return `Promise<OperationResult<T>>`. The renderer never calls these raw — it goes through `unwrap()` in `src/renderer/src/lib/ipc.ts`, which throws on `success: false`.
 
 So the renderer-side pattern is always:
+
 ```ts
 const tables = await unwrap(window.api.db.listTables(connectionId, schema))
 ```
 
 To add a new IPC endpoint, you touch **three** files:
+
 1. `src/main/ipc/index.ts` — `ipcMain.handle('namespace:action', wrap(async (...args) => ...))`
 2. `src/preload/index.ts` — add to the `api.db` (or new namespace) object with `invoke<T>(...)`
 3. `src/shared/types.ts` — if new request/response shapes are needed
@@ -79,20 +91,23 @@ To add a new IPC endpoint, you touch **three** files:
 
 D1 is special: it has no schemas (returns `[]`), uses the Cloudflare REST API instead of a socket connection, and has no concept of enums or PK introspection beyond what `pragma table_info` exposes.
 
+D1's SQLite-dialect pieces — pragma row mapping, identifier quoting, type normalisation and the DDL/filter dialects — live in `src/main/db/sqlite-shared.ts` rather than inline, so they can be unit tested without a live database (`tests/main/db/sqlite-shared.test.ts`).
+
 ### DDL / structure editing
 
-Structure edits (add/drop/rename column, rename table, create/drop index) go through `generateDdl`/`executeDdl` on the driver. Both build SQL from a `DdlOperation` discriminated union (`src/shared/types.ts`) via the shared `buildDdl()` in `src/main/db/ddl.ts` — each driver supplies a `DdlDialect` (identifier quoting + the engine-specific `DROP INDEX` grammar). `generateDdl` is preview-only (returns the SQL string, no DB call); `executeDdl` runs it and invalidates that connection's `tableDetailsCache`. Exposed as `db:ddl-preview` / `db:ddl-execute` → `window.api.db.ddlPreview` / `ddlExecute`. The renderer dialog (`features/database/components/ddl-dialog.tsx`) live-previews the generated SQL before the user confirms; `dataType` and `defaultValue` are passed through as raw SQL expressions (the preview shows exactly what runs). The dialog is hosted once in `database-page.tsx`'s `TableViewContainer` and shared by two triggers: the rename pencil in `table-header.tsx` (next to the table name) and the per-section/row actions in the presentational `table-structure.tsx` (which just calls `onEdit(kind, target?)`). DDL controls only render for `type === 'table'` (not views); on `rename-table` success the container navigates to the new table route.
+Structure edits (add/drop/rename column, rename table, create/drop index) go through `generateDdl`/`executeDdl` on the driver. Both build SQL from a `DdlOperation` discriminated union (`src/shared/types.ts`) via the shared `buildDdl()` in `src/main/db/ddl.ts` — each driver supplies a `DdlDialect` (identifier quoting + the engine-specific `DROP INDEX` grammar). `generateDdl` is preview-only (returns the SQL string, no DB call); `executeDdl` runs it and invalidates that connection's `tableDetailsCache`. Exposed as `db:ddl-preview` / `db:ddl-execute` → `window.api.db.ddlPreview` / `ddlExecute`. The renderer dialog (`features/database/components/ddl-dialog.tsx`) live-previews the generated SQL before the user confirms; `dataType` and `defaultValue` are passed through as raw SQL expressions (the preview shows exactly what runs). The dialog is hosted once in `database-page.tsx`'s `TableViewContainer` and shared by two triggers: the rename action surfaced by `table-data-view.tsx` and the per-section/row actions in the presentational `table-structure.tsx` (which just calls `onEdit(kind, target?)`). DDL controls only render for `type === 'table'` (not views); on `rename-table` success the container navigates to the new table route.
 
 ### AI layer (Groq via Vercel AI SDK)
 
 The main process has an `src/main/ai/` layer behind the same IPC envelope. It uses the Vercel AI SDK (`ai`) with the Groq provider (`@ai-sdk/groq`); the model is `openai/gpt-oss-120b` (`ai/config.ts`). The key is read from `MAIN_VITE_GROQ_API_KEY` in a **gitignored `.env`** (electron-vite injects `MAIN_VITE_*` into the main process via `import.meta.env`; falls back to `process.env.GROQ_API_KEY`). Copy `.env.example` to `.env` to enable AI features locally.
 
 Five endpoints under the `ai:` IPC namespace → `window.api.ai.*`:
+
 - `ai:generate-sql` (`generate-sql.ts`) — natural language → SQL, grounded in the whole-DB schema map. Query page auto-runs the result.
 - `ai:filter-table` (`filter-table.ts`) — natural language → a WHERE clause feeding the existing data grid.
 - `ai:explain-table` (`explain-table.ts`) — returns markdown describing a table.
 - `ai:suggest-indexes` (`suggest-indexes.ts`) — index suggestions for a table.
-- `ai:generate-seed` (`generate-seed.ts`) — the model returns row *values*; code builds the inserts deterministically (engine-correct quoting/escaping, code-gen UUIDs for UUID/string-PK columns, FK sampling from parent tables, type coercion, per-row execution, batched at `SEED_BATCH_SIZE` for large counts). Never trust the model to emit raw SQL for seeds.
+- `ai:generate-seed` (`generate-seed.ts`) — the model returns row _values_; code builds the inserts deterministically (engine-correct quoting/escaping, code-gen UUIDs for UUID/string-PK columns, FK sampling from parent tables, type coercion, per-row execution, batched at `SEED_BATCH_SIZE` for large counts). Never trust the model to emit raw SQL for seeds.
 
 `ai/client.ts` exposes `generateJson()` — structured output with two layers of defense: the provider's native `json_schema` mode first, then a fallback to plain text + defensive JSON extraction (`stripFences`/`extractJson`) + zod validation. `ai/context.ts` builds schema context: `buildSchemaContext()` (compact whole-DB map, capped at `MAX_SCHEMA_TABLES`, skips system schemas) for free-form SQL, and `buildTableContext()` (detailed single-table) for table-scoped features. `QUOTE_HINT`/`ENGINE_DIALECT` give the model engine-correct identifier quoting.
 

@@ -283,9 +283,7 @@ export function DdlDialog({
                             onCheckedChange={(v) => toggleIndexColumn(col.name, !!v)}
                           />
                           <span className="font-medium text-text">{col.name}</span>
-                          <span className="font-mono text-xs text-text-subtle">
-                            {col.dataType}
-                          </span>
+                          <span className="font-mono text-xs text-text-subtle">{col.dataType}</span>
                         </label>
                       )
                     })}
