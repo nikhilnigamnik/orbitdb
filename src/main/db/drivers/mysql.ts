@@ -32,6 +32,7 @@ import {
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
+import { buildOrderBySql } from '../order-by'
 import { buildFilterSql, type FilterDialect } from '../filters'
 import { recordQuery } from '../query-log'
 import { detectCommand, isSchemaChanging } from '../sql-command'
@@ -378,15 +379,16 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
 
-  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, filterDialect)
+  const { whereSql, params } = buildFilterSql(
+    opts.filters,
+    validColumns,
+    filterDialect,
+    opts.filterJoin
+  )
 
-  let orderSql = ''
-  if (opts.orderBy && validColumns.has(opts.orderBy)) {
-    const dir = opts.orderDir === 'desc' ? 'desc' : 'asc'
-    orderSql = `order by ${quoteIdent(opts.orderBy)} ${dir}`
-  } else if (details.primaryKey.length > 0) {
-    orderSql = `order by ${details.primaryKey.map(quoteIdent).join(', ')}`
-  }
+  const orderSql = buildOrderBySql(opts.orderBy, opts.orderDir, details.primaryKey, validColumns, {
+    quoteIdent
+  })
 
   const limit = Math.max(1, Math.min(opts.limit ?? 100, 1000))
   const offset = Math.max(0, opts.offset ?? 0)
@@ -405,7 +407,12 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
 async function countRows(opts: CountRowsOptions): Promise<number | null> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
-  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, filterDialect)
+  const { whereSql, params } = buildFilterSql(
+    opts.filters,
+    validColumns,
+    filterDialect,
+    opts.filterJoin
+  )
 
   // Unfiltered counts on a huge table buy precision nobody asked for at a price
   // the UI would feel; the estimate already covers that case.
@@ -575,6 +582,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
       const header = isRowSet ? null : (result as ResultSetHeader)
       const rowCount = isRowSet ? allRows.length : (header?.affectedRows ?? null)
       recordQuery({
+        origin: 'user',
         connectionId: opts.connectionId,
         engine: 'mysql',
         sql: opts.sql,
@@ -602,6 +610,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       recordQuery({
+        origin: 'user',
         connectionId: opts.connectionId,
         engine: 'mysql',
         sql: opts.sql,

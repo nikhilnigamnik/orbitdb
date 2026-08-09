@@ -11,7 +11,7 @@ import { useConnection } from '@renderer/features/connections/store/connection-s
 import { TableDataView } from '@renderer/features/tables/components/table-data-view'
 import { ROUTES, tableRoute } from '@renderer/config/routes'
 import { pushRecent } from '@renderer/features/database/lib/table-prefs'
-import type { DdlOperation, DdlOperationKind, TableDetails } from '@renderer/types'
+import type { DdlOperation, DdlFormKind, TableDetails } from '@renderer/types'
 import { SchemaTree } from './schema-tree'
 import { TableHeader } from './table-header'
 import { TableStructure } from './table-structure'
@@ -177,7 +177,7 @@ function TableViewContainer({
 
   const ddlDialog = useDisclosure(false)
   const [ddlState, setDdlState] = React.useState<{
-    kind: DdlOperationKind
+    kind: DdlFormKind
     target?: string
   } | null>(null)
   // Hold the header until the first page of rows lands so the whole view reveals
@@ -188,7 +188,7 @@ function TableViewContainer({
     if (activeTab !== 'data') setHeaderShown(true)
   }, [activeTab])
 
-  function openDdl(kind: DdlOperationKind, target?: string) {
+  function openDdl(kind: DdlFormKind, target?: string) {
     setDdlState({ kind, target })
     ddlDialog.open()
   }

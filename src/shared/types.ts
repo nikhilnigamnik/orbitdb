@@ -116,6 +116,12 @@ export interface RowFilter {
   value?: string
 }
 
+/**
+ * How several filters combine. A single top-level connector rather than
+ * arbitrary nesting: it covers "any of these" without a query-builder UI.
+ */
+export type FilterJoin = 'and' | 'or'
+
 export interface GetRowsOptions {
   connectionId: string
   schema: string
@@ -125,6 +131,7 @@ export interface GetRowsOptions {
   orderBy?: string
   orderDir?: SortDirection
   filters?: RowFilter[]
+  filterJoin?: FilterJoin
 }
 
 export interface CountRowsOptions {
@@ -132,6 +139,7 @@ export interface CountRowsOptions {
   schema: string
   table: string
   filters?: RowFilter[]
+  filterJoin?: FilterJoin
 }
 
 /**
@@ -182,6 +190,13 @@ export type DdlOperation =
   | { kind: 'drop-table' }
 
 export type DdlOperationKind = DdlOperation['kind']
+
+/**
+ * The operations the DDL form can build. Truncate and drop are table-wide and
+ * take no form input — they go through their own confirm flow, which shows the
+ * SQL and names the consequence.
+ */
+export type DdlFormKind = Exclude<DdlOperationKind, 'truncate-table' | 'drop-table'>
 
 export interface DdlRequest {
   connectionId: string
@@ -309,7 +324,14 @@ export interface ActiveConnectionMeta {
   currentUser: string
 }
 
+/**
+ * Who asked for a query: something the user typed or triggered, or the app's own
+ * introspection. Without the distinction the log is mostly pragmas.
+ */
+export type QueryOrigin = 'user' | 'internal'
+
 export interface QueryLogEntry {
+  origin: QueryOrigin
   id: string
   connectionId: string
   engine: DatabaseEngine

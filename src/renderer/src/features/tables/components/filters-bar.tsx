@@ -21,7 +21,7 @@ import {
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { formatCellValue } from '@renderer/lib/format'
-import type { ColumnInfo, RowFilter } from '@renderer/types'
+import type { ColumnInfo, FilterJoin, RowFilter } from '@renderer/types'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 
@@ -32,6 +32,9 @@ interface FiltersBarProps {
   columns: ColumnInfo[]
   filters: RowFilter[]
   onChange: (filters: RowFilter[]) => void
+  /** How the filters combine. Only meaningful once there are two. */
+  join?: FilterJoin
+  onChangeJoin?: (join: FilterJoin) => void
   onApply: () => void
 }
 
@@ -45,6 +48,8 @@ export function FiltersBar({
   columns,
   filters,
   onChange,
+  join = 'and',
+  onChangeJoin,
   onApply
 }: FiltersBarProps) {
   const [isOpen, setIsOpen] = React.useState(false)
@@ -168,41 +173,53 @@ export function FiltersBar({
       <div className="flex flex-wrap items-center gap-1.5">
         {filters.map((f, i) => {
           const unary = f.operator === 'is null' || f.operator === 'is not null'
+          const connector =
+            i === 0 || !onChangeJoin ? null : (
+              <button
+                key={`join-${i}`}
+                type="button"
+                onClick={() => onChangeJoin(join === 'and' ? 'or' : 'and')}
+                title="Switch between matching all filters and any of them"
+                className="cursor-pointer rounded px-1 font-mono text-xs uppercase text-text-subtle transition-colors hover:bg-surface-elevated hover:text-text"
+              >
+                {join}
+              </button>
+            )
           // h-7 stands the chip level with the trigger beside it and the fields
           // above it; the segments stretch to fill rather than set their own height.
           return (
-            <div
-              key={i}
-              className="inline-flex h-7 items-stretch overflow-hidden rounded-md border border-border bg-surface-elevated/60 text-xs text-text"
-            >
-              <button
-                type="button"
-                onClick={() => editFilter(i)}
-                aria-label={`Edit filter on ${f.column}`}
-                className="group/edit flex cursor-pointer items-stretch transition-colors hover:bg-surface-elevated"
-              >
-                <span className="flex items-center gap-1.5 px-2">
-                  <IconDatabase size={11} className="text-text-subtle" />
-                  {f.column}
-                </span>
-                <span className="flex items-center border-l border-border px-2 font-mono text-text-muted group-hover/edit:text-text">
-                  {f.operator}
-                </span>
-                {!unary && (
-                  <span className="flex max-w-40 items-center truncate border-l border-border px-2 font-mono">
-                    {String(f.value ?? '')}
+            <React.Fragment key={i}>
+              {connector}
+              <div className="inline-flex h-7 items-stretch overflow-hidden rounded-md border border-border bg-surface-elevated/60 text-xs text-text">
+                <button
+                  type="button"
+                  onClick={() => editFilter(i)}
+                  aria-label={`Edit filter on ${f.column}`}
+                  className="group/edit flex cursor-pointer items-stretch transition-colors hover:bg-surface-elevated"
+                >
+                  <span className="flex items-center gap-1.5 px-2">
+                    <IconDatabase size={11} className="text-text-subtle" />
+                    {f.column}
                   </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => removeFilter(i)}
-                aria-label="Remove filter"
-                className="flex cursor-pointer items-center border-l border-border px-2 text-danger transition-colors hover:bg-danger/10"
-              >
-                <IconX size={11} />
-              </button>
-            </div>
+                  <span className="flex items-center border-l border-border px-2 font-mono text-text-muted group-hover/edit:text-text">
+                    {f.operator}
+                  </span>
+                  {!unary && (
+                    <span className="flex max-w-40 items-center truncate border-l border-border px-2 font-mono">
+                      {String(f.value ?? '')}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeFilter(i)}
+                  aria-label="Remove filter"
+                  className="flex cursor-pointer items-center border-l border-border px-2 text-danger transition-colors hover:bg-danger/10"
+                >
+                  <IconX size={11} />
+                </button>
+              </div>
+            </React.Fragment>
           )
         })}
 

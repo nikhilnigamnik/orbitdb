@@ -5,8 +5,9 @@ import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Switch } from '@renderer/components/ui/switch'
 import { Checkbox } from '@renderer/components/ui/checkbox'
+import { useDebounce } from '@renderer/hooks/use-debounce'
 import { unwrap } from '@renderer/lib/ipc'
-import type { ColumnInfo, DdlOperation, DdlOperationKind } from '@renderer/types'
+import type { ColumnInfo, DdlFormKind, DdlOperation } from '@renderer/types'
 
 interface DdlDialogProps {
   isOpen: boolean
@@ -15,29 +16,23 @@ interface DdlDialogProps {
   schema: string
   table: string
   columns: ColumnInfo[]
-  kind: DdlOperationKind
+  kind: DdlFormKind
   /** Preselected column or index name for drop/rename operations. */
   target?: string
   onSuccess: (operation: DdlOperation) => void
 }
 
-const TITLES: Record<DdlOperationKind, string> = {
+const TITLES: Record<DdlFormKind, string> = {
   'add-column': 'Add column',
   'drop-column': 'Drop column',
   'rename-column': 'Rename column',
   'rename-table': 'Rename table',
   'create-index': 'Create index',
-  'drop-index': 'Drop index',
-  'truncate-table': 'Truncate table',
-  'drop-table': 'Drop table'
+  'drop-index': 'Drop index'
 }
 
-const DESTRUCTIVE = new Set<DdlOperationKind>([
-  'drop-column',
-  'drop-index',
-  'truncate-table',
-  'drop-table'
-])
+// Both take a target, which the warning copy below relies on.
+const DESTRUCTIVE = new Set<DdlFormKind>(['drop-column', 'drop-index'])
 
 export function DdlDialog({
   isOpen,
@@ -128,9 +123,11 @@ export function DdlDialog({
   ])
 
   // Live-preview the generated SQL from the main process so the user always
-  // sees exactly what will run, with engine-correct quoting.
+  // sees exactly what will run, with engine-correct quoting. Held back so
+  // typing a column name is not one IPC round-trip per keystroke.
+  const previewOperation = useDebounce(operation, 150)
   React.useEffect(() => {
-    if (!isOpen || !operation) {
+    if (!isOpen || !previewOperation) {
       setSql('')
       setPreviewError(null)
       return
@@ -139,7 +136,7 @@ export function DdlDialog({
     void (async () => {
       try {
         const generated = await unwrap(
-          window.api.db.ddlPreview({ connectionId, schema, table, operation })
+          window.api.db.ddlPreview({ connectionId, schema, table, operation: previewOperation })
         )
         if (!cancelled) {
           setSql(generated)
@@ -155,7 +152,7 @@ export function DdlDialog({
     return () => {
       cancelled = true
     }
-  }, [isOpen, operation, connectionId, schema, table])
+  }, [isOpen, previewOperation, connectionId, schema, table])
 
   async function handleConfirm() {
     if (!operation) return
@@ -173,6 +170,12 @@ export function DdlDialog({
   }
 
   const isDestructive = DESTRUCTIVE.has(kind)
+
+  // Every engine rejects adding a NOT NULL column with no default to a table
+  // that already has rows. The form knows both facts; the database finding out
+  // first means the attempt fails after the fact.
+  const needsDefault =
+    kind === 'add-column' && !isNullable && defaultValue.trim() === '' && colName.trim() !== ''
 
   function toggleIndexColumn(name: string, checked: boolean) {
     setIndexColumns((prev) => (checked ? [...prev, name] : prev.filter((c) => c !== name)))
@@ -328,6 +331,16 @@ export function DdlDialog({
               )}
             </div>
 
+            {needsDefault && (
+              <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/5 px-3 py-2.5 text-xs text-warning">
+                <IconAlertTriangle size={15} className="mt-px shrink-0" stroke={2} />
+                <span>
+                  A NOT NULL column needs a default before it can be added to a table that already
+                  has rows.
+                </span>
+              </div>
+            )}
+
             {execError && (
               <p className="rounded-lg border border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger">
                 {execError}
@@ -353,7 +366,7 @@ export function DdlDialog({
                   : ''
               }
               onClick={handleConfirm}
-              disabled={!operation || !sql || isExecuting}
+              disabled={!operation || !sql || isExecuting || needsDefault}
             >
               {isExecuting ? 'Running…' : isDestructive ? 'Run & drop' : 'Run statement'}
             </Button>

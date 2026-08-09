@@ -17,6 +17,8 @@ const FK_SAMPLE_LIMIT = 200
 // Generate rows in batches so a large request can't blow past the model's output
 // token limit and come back as truncated, unparseable JSON.
 const SEED_BATCH_SIZE = 20
+// Past this many failures in a row the cause is systemic, not per-row.
+const MAX_CONSECUTIVE_SEED_FAILURES = 5
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
@@ -279,15 +281,21 @@ export async function seedTable(opts: GenerateSeedOptions): Promise<GenerateSeed
   // model couldn't know about) is skipped instead of aborting the whole seed.
   let inserted = 0
   let failed = 0
+  let consecutiveFailures = 0
   let firstError: string | undefined
   for (const sql of statements) {
     const result = await runQuery({ connectionId: opts.connectionId, sql })
     if (result.success) {
       inserted += result.rowCount ?? 0
-    } else {
-      failed += 1
-      firstError ??= result.error
+      consecutiveFailures = 0
+      continue
     }
+    failed += 1
+    firstError ??= result.error
+    consecutiveFailures += 1
+    // A constraint the model could not know about fails every row the same way.
+    // Stop rather than spend a hundred round-trips collecting one error.
+    if (consecutiveFailures >= MAX_CONSECUTIVE_SEED_FAILURES) break
   }
 
   return { inserted, attempted: statements.length, failed, firstError }

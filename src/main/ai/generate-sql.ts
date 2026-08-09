@@ -2,6 +2,7 @@ import { generateText } from 'ai'
 import type { GenerateSqlOptions, GenerateSqlResult } from '../../shared/types'
 import { getConnection } from '../store/connections-store'
 import { aiModel, stripFences } from './client'
+import { AI_REQUEST_TIMEOUT_MS } from './config'
 import { buildSchemaContext, ENGINE_DIALECT, QUOTE_HINT } from './context'
 
 export async function generateSql(opts: GenerateSqlOptions): Promise<GenerateSqlResult> {
@@ -24,7 +25,8 @@ export async function generateSql(opts: GenerateSqlOptions): Promise<GenerateSql
       (schemaContext
         ? `Database schema:\n${schemaContext}\n\n`
         : 'No schema information is available; infer reasonable table and column names.\n\n') +
-      `Request: ${opts.prompt}`
+      `Request: ${opts.prompt}`,
+    abortSignal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
   })
 
   return { sql: stripFences(text), explanation: '' }

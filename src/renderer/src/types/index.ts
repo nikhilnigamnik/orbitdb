@@ -4,6 +4,8 @@ export type {
   ConnectionEnvironment,
   ConnectionInput,
   DatabaseEngine,
+  DdlFormKind,
+  FilterJoin,
   DdlOperation,
   DdlOperationKind,
   DdlRequest,

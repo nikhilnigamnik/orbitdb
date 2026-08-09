@@ -6,6 +6,7 @@ import {
   type DistinctValuesOptions,
   type GetRowsOptions,
   type IndexInfo,
+  type QueryOrigin,
   type QueryResult,
   type RowDelete,
   type RowMutation,
@@ -23,6 +24,7 @@ import {
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl } from '../ddl'
+import { buildOrderBySql } from '../order-by'
 import { buildFilterSql } from '../filters'
 import {
   LIST_BASE_TABLES_SQL,
@@ -99,7 +101,8 @@ async function callD1<TRow = Record<string, unknown>>(
   input: ConnectionInput,
   sql: string,
   params: unknown[] = [],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  origin: QueryOrigin = 'internal'
 ): Promise<D1QueryResultEntry<TRow>> {
   const connectionId = 'id' in input ? (input as SavedConnection).id : '<test>'
   const t0 = Date.now()
@@ -112,7 +115,8 @@ async function callD1<TRow = Record<string, unknown>>(
       params,
       durationMs: Date.now() - t0,
       rowCount: entry.results?.length ?? null,
-      success: true
+      success: true,
+      origin
     })
     return entry
   } catch (err) {
@@ -123,7 +127,8 @@ async function callD1<TRow = Record<string, unknown>>(
       params,
       durationMs: Date.now() - t0,
       success: false,
-      error: err instanceof Error ? err.message : String(err)
+      error: err instanceof Error ? err.message : String(err),
+      origin
     })
     throw err
   }
@@ -336,15 +341,16 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
 
   // SQLite lacks ILIKE; the dialect folds it onto LIKE, which is already
   // case-insensitive for ASCII by default.
-  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, sqliteFilterDialect)
+  const { whereSql, params } = buildFilterSql(
+    opts.filters,
+    validColumns,
+    sqliteFilterDialect,
+    opts.filterJoin
+  )
 
-  let orderSql = ''
-  if (opts.orderBy && validColumns.has(opts.orderBy)) {
-    const dir = opts.orderDir === 'desc' ? 'desc' : 'asc'
-    orderSql = `order by ${quoteIdent(opts.orderBy)} ${dir}`
-  } else if (details.primaryKey.length > 0) {
-    orderSql = `order by ${details.primaryKey.map(quoteIdent).join(', ')}`
-  }
+  const orderSql = buildOrderBySql(opts.orderBy, opts.orderDir, details.primaryKey, validColumns, {
+    quoteIdent
+  })
 
   const limit = Math.max(1, Math.min(opts.limit ?? 100, 1000))
   const offset = Math.max(0, opts.offset ?? 0)
@@ -380,7 +386,12 @@ async function countRows(opts: CountRowsOptions): Promise<number | null> {
   const saved = loadSaved(opts.connectionId)
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
-  const { whereSql, params } = buildFilterSql(opts.filters, validColumns, sqliteFilterDialect)
+  const { whereSql, params } = buildFilterSql(
+    opts.filters,
+    validColumns,
+    sqliteFilterDialect,
+    opts.filterJoin
+  )
 
   // SQLite keeps no row estimate, so there is no cheap total to fall back on —
   // count unconditionally. D1 databases are small enough for that to be fine.
@@ -519,7 +530,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
     d1Inflight.set(opts.queryId, { controller, connectionId: opts.connectionId })
   }
   try {
-    const entry = await callD1(saved, opts.sql, opts.params ?? [], controller.signal)
+    const entry = await callD1(saved, opts.sql, opts.params ?? [], controller.signal, 'user')
     const fieldNames = entry.results[0] ? Object.keys(entry.results[0]) : []
     const truncated = entry.results.length > MAX_QUERY_RESULT_ROWS
     const rows = truncated ? entry.results.slice(0, MAX_QUERY_RESULT_ROWS) : entry.results
