@@ -1,5 +1,6 @@
 import { IconKey, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { formatColumnType } from '@renderer/lib/column-type'
 import type { DdlFormKind, TableDetails } from '@renderer/types'
 
 interface TableStructureProps {
@@ -119,7 +120,7 @@ export function TableStructure({ details, onEdit, header }: TableStructureProps)
                   </span>
                 </td>
                 <td className={`${TD} font-mono text-xs text-text-muted`}>
-                  {col.dataType}
+                  {formatColumnType(col.dataType, col.udtName)}
                   {col.characterMaximumLength ? `(${col.characterMaximumLength})` : ''}
                 </td>
                 <td className={`${TD} text-text-subtle`}>{col.isNullable ? 'YES' : 'NO'}</td>

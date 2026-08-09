@@ -19,6 +19,7 @@ import {
   IconArrowUpRight
 } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
+import { formatColumnType } from '@renderer/lib/column-type'
 import { formatCellValue, isBlankString } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
@@ -239,8 +240,13 @@ export function DataGrid({
                   {col.name}
                 </span>
                 {col.dataType && (
-                  <span className="shrink-0 pl-2 font-mono text-[10px] font-normal text-text-subtle">
-                    {col.dataType}
+                  // max-w so a long type can never crush the name, which is what
+                  // identifies the column.
+                  <span
+                    className="max-w-[55%] shrink-0 truncate pl-2 font-mono text-[10px] font-normal text-text-subtle"
+                    title={col.dataType}
+                  >
+                    {formatColumnType(col.dataType, col.udtName)}
                   </span>
                 )}
               </div>
