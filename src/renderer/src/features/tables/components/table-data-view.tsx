@@ -424,7 +424,7 @@ export function TableDataView({
             type="button"
             onClick={aiPrompt.open}
             aria-label="Filter this table with natural language"
-            className="group flex h-8 w-72 cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-input px-2.5 text-left transition-colors hover:bg-surface-elevated/40 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none"
+            className="group flex h-7 w-72 cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-input px-2.5 text-left transition-colors hover:bg-surface-elevated/40 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none"
           >
             <span className="flex-1 truncate text-xs text-text-subtle transition-colors group-hover:text-text-muted">
               Describe the rows you want…
