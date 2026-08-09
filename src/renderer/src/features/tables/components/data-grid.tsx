@@ -227,7 +227,9 @@ export function DataGrid({
             >
               <div className="flex min-w-0 items-center gap-1.5">
                 {col.isPrimaryKey && <IconKey size={10} className="shrink-0 text-text-subtle" />}
-                <div className="flex min-w-0 flex-col leading-tight">
+                {/* One line: the name truncates first, since the type is short
+                    and is what tells you how the column behaves. */}
+                <div className="flex min-w-0 items-baseline gap-1.5 leading-tight">
                   <span
                     className={cn(
                       'truncate text-xs',
@@ -237,7 +239,7 @@ export function DataGrid({
                     {col.name}
                   </span>
                   {col.dataType && (
-                    <span className="truncate font-mono text-xs font-normal text-text-subtle">
+                    <span className="shrink-0 font-mono text-[10px] font-normal text-text-subtle">
                       {col.dataType}
                     </span>
                   )}
