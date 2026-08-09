@@ -34,6 +34,16 @@ export const DEFAULT_DATABASES: Record<DatabaseEngine, string> = {
   d1: ''
 }
 
+/**
+ * Opening query for a fresh editor. `now()` does not exist in SQLite, so a
+ * single default would fail on D1 the first time you press Run.
+ */
+export const DEFAULT_QUERY: Record<DatabaseEngine, string> = {
+  postgres: 'select now();',
+  mysql: 'select now();',
+  d1: "select datetime('now');"
+}
+
 export const ENVIRONMENTS: ConnectionEnvironment[] = ['dev', 'stage', 'prod']
 
 export const ENVIRONMENT_LABEL: Record<ConnectionEnvironment, string> = {

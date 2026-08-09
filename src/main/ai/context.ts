@@ -34,13 +34,20 @@ export async function buildSchemaContext(
 
   const lines: string[] = []
   let tableCount = 0
+  let wasTruncated = false
 
   for (const schema of schemas) {
-    if (tableCount >= MAX_SCHEMA_TABLES) break
+    if (tableCount >= MAX_SCHEMA_TABLES) {
+      wasTruncated = true
+      break
+    }
     const graph = await getSchemaGraph(connectionId, schema.name)
 
     for (const table of graph.tables) {
-      if (tableCount >= MAX_SCHEMA_TABLES) break
+      if (tableCount >= MAX_SCHEMA_TABLES) {
+        wasTruncated = true
+        break
+      }
       const cols = table.columns
         .map((c) => {
           const flags = [c.isPrimaryKey ? 'PK' : '', c.isNullable ? '' : 'NOT NULL']
@@ -59,6 +66,15 @@ export async function buildSchemaContext(
           `${edge.to.table}(${edge.to.columns.join(', ')})`
       )
     }
+  }
+
+  // Say so rather than letting the model treat a partial map as the whole
+  // database and confidently reference tables it was never shown.
+  if (wasTruncated) {
+    lines.push(
+      `-- NOTE: only the first ${MAX_SCHEMA_TABLES} tables are listed; this database has more. ` +
+        `If the request needs a table that is not above, say so instead of guessing its shape.`
+    )
   }
 
   return lines.join('\n')
