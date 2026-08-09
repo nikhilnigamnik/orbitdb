@@ -3,12 +3,9 @@ import type { DdlDialect } from './ddl'
 import type { FilterDialect } from './filters'
 
 /**
- * Everything two SQLite engines agree on regardless of how they are reached.
- *
- * Cloudflare D1 and a local file speak the same dialect and answer the same
- * pragmas — only the transport differs. These take the raw pragma rows and
- * produce the shared shapes, so the drivers are left with fetching and
- * orchestration.
+ * The SQLite dialect pieces D1 is built on, kept out of the driver so they can
+ * be tested without a live database: pragma row mapping, identifier quoting,
+ * type normalisation, and the DDL and filter dialects.
  */
 
 /** SQLite has no schemas; everything lives in `main`. */

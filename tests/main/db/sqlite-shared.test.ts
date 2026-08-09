@@ -13,9 +13,8 @@ import {
   type TableInfoRow
 } from '../../../src/main/db/sqlite-shared'
 
-// The driver itself cannot be imported here: better-sqlite3's binary is built
-// against Electron's ABI and segfaults plain node. Everything worth testing is
-// in this module, which is why it exists.
+// These back the D1 driver, which cannot be exercised in a unit test without a
+// Cloudflare account — so the logic lives here, where it can be.
 
 function column(overrides: Partial<TableInfoRow>): TableInfoRow {
   return { cid: 0, name: 'id', type: 'INTEGER', notnull: 0, dflt_value: null, pk: 0, ...overrides }

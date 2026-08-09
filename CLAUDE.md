@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-OrbitDB is an Electron desktop DB client for PostgreSQL, MySQL/MariaDB, local SQLite files, and Cloudflare D1. React 19 + TypeScript renderer, Node main process, electron-vite build.
+OrbitDB is an Electron desktop DB client for PostgreSQL, MySQL/MariaDB, and Cloudflare D1. React 19 + TypeScript renderer, Node main process, electron-vite build.
 
 ## Commands
 
@@ -30,11 +30,12 @@ folder, mirroring the `src/` layout — **not** colocated with the source file, 
 electron-vite build never has to glob around them. New behaviour ships with a spec.
 
 Three testing shapes, cheapest first:
+
 - **Pure logic** — plain `.test.ts`. Prefer extracting decision-making out of a component
   into `features/<x>/lib/` and testing it there (`filter-editor.ts` exists because the
   NULL-vs-empty-string bug lived in a branch buried in JSX).
 - **Static render** — `renderToStaticMarkup` + `createElement` in a `.test.ts`, for
-  asserting what a component *renders* (classes, aria labels) without a DOM.
+  asserting what a component _renders_ (classes, aria labels) without a DOM.
 - **Interaction** — `.test.tsx` with `// @vitest-environment jsdom` at the top and
   `@testing-library/react`, for anything driven by state or effects. Stub the IPC bridge
   with `Object.assign(window, { api: { db: { … } } })`.
@@ -64,24 +65,24 @@ main (full Node)
 Every IPC handler in `src/main/ipc/index.ts` is wrapped by `wrap()`, which catches throws and returns `OperationResult<T> = { success, data?, error? }`. Preload methods return `Promise<OperationResult<T>>`. The renderer never calls these raw — it goes through `unwrap()` in `src/renderer/src/lib/ipc.ts`, which throws on `success: false`.
 
 So the renderer-side pattern is always:
+
 ```ts
 const tables = await unwrap(window.api.db.listTables(connectionId, schema))
 ```
 
 To add a new IPC endpoint, you touch **three** files:
+
 1. `src/main/ipc/index.ts` — `ipcMain.handle('namespace:action', wrap(async (...args) => ...))`
 2. `src/preload/index.ts` — add to the `api.db` (or new namespace) object with `invoke<T>(...)`
 3. `src/shared/types.ts` — if new request/response shapes are needed
 
 ### Database driver abstraction
 
-`DatabaseDriver` (`src/main/db/drivers/types.ts`) is implemented four times: `postgres.ts`, `mysql.ts`, `sqlite.ts`, `d1.ts`. `src/main/db/manager.ts` looks up the saved connection's `engine` field and dispatches to the right driver. To add a new engine: implement the interface, register it in `manager.ts:driverFor()`. The renderer is engine-agnostic — it just passes `connectionId` around.
+`DatabaseDriver` (`src/main/db/drivers/types.ts`) is implemented three times: `postgres.ts`, `mysql.ts`, `d1.ts`. `src/main/db/manager.ts` looks up the saved connection's `engine` field and dispatches to the right driver. To add a new engine: implement the interface, register it in `manager.ts:driverFor()`. The renderer is engine-agnostic — it just passes `connectionId` around.
 
 D1 is special: it has no schemas (returns `[]`), uses the Cloudflare REST API instead of a socket connection, and has no concept of enums or PK introspection beyond what `pragma table_info` exposes.
 
-`sqlite.ts` and `d1.ts` are the same dialect over different transports — a local file via `better-sqlite3` and Cloudflare's REST API. The pragma row mapping, quoting, type normalisation and DDL/filter dialects they share live in `src/main/db/sqlite-shared.ts`; each driver keeps only its own fetching and orchestration.
-
-**better-sqlite3 cannot be imported from vitest.** `electron-builder install-app-deps` rebuilds it against Electron's ABI, so requiring it in plain node segfaults the runner (exit 139). That is why the shared module exists and is where the logic lives. The driver itself is exercised by `pnpm verify:sqlite`, which bundles a harness and runs it under Electron against a throwaway database — not part of CI, so run it after touching either SQLite driver.
+D1's SQLite-dialect pieces — pragma row mapping, identifier quoting, type normalisation and the DDL/filter dialects — live in `src/main/db/sqlite-shared.ts` rather than inline, so they can be unit tested without a live database (`tests/main/db/sqlite-shared.test.ts`).
 
 ### DDL / structure editing
 
@@ -92,11 +93,12 @@ Structure edits (add/drop/rename column, rename table, create/drop index) go thr
 The main process has an `src/main/ai/` layer behind the same IPC envelope. It uses the Vercel AI SDK (`ai`) with the Groq provider (`@ai-sdk/groq`); the model is `openai/gpt-oss-120b` (`ai/config.ts`). The key is read from `MAIN_VITE_GROQ_API_KEY` in a **gitignored `.env`** (electron-vite injects `MAIN_VITE_*` into the main process via `import.meta.env`; falls back to `process.env.GROQ_API_KEY`). Copy `.env.example` to `.env` to enable AI features locally.
 
 Five endpoints under the `ai:` IPC namespace → `window.api.ai.*`:
+
 - `ai:generate-sql` (`generate-sql.ts`) — natural language → SQL, grounded in the whole-DB schema map. Query page auto-runs the result.
 - `ai:filter-table` (`filter-table.ts`) — natural language → a WHERE clause feeding the existing data grid.
 - `ai:explain-table` (`explain-table.ts`) — returns markdown describing a table.
 - `ai:suggest-indexes` (`suggest-indexes.ts`) — index suggestions for a table.
-- `ai:generate-seed` (`generate-seed.ts`) — the model returns row *values*; code builds the inserts deterministically (engine-correct quoting/escaping, code-gen UUIDs for UUID/string-PK columns, FK sampling from parent tables, type coercion, per-row execution, batched at `SEED_BATCH_SIZE` for large counts). Never trust the model to emit raw SQL for seeds.
+- `ai:generate-seed` (`generate-seed.ts`) — the model returns row _values_; code builds the inserts deterministically (engine-correct quoting/escaping, code-gen UUIDs for UUID/string-PK columns, FK sampling from parent tables, type coercion, per-row execution, batched at `SEED_BATCH_SIZE` for large counts). Never trust the model to emit raw SQL for seeds.
 
 `ai/client.ts` exposes `generateJson()` — structured output with two layers of defense: the provider's native `json_schema` mode first, then a fallback to plain text + defensive JSON extraction (`stripFences`/`extractJson`) + zod validation. `ai/context.ts` builds schema context: `buildSchemaContext()` (compact whole-DB map, capped at `MAX_SCHEMA_TABLES`, skips system schemas) for free-form SQL, and `buildTableContext()` (detailed single-table) for table-scoped features. `QUOTE_HINT`/`ENGINE_DIALECT` give the model engine-correct identifier quoting.
 

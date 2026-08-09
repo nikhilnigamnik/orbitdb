@@ -31,15 +31,13 @@ type ChipTone = React.ComponentProps<typeof Chip>['tone']
 const ENGINE_TONE: Record<QueryLogEntry['engine'], ChipTone> = {
   postgres: 'sky',
   mysql: 'orange',
-  d1: 'amber',
-  sqlite: 'emerald'
+  d1: 'amber'
 }
 
 const ENGINE_LABEL: Record<QueryLogEntry['engine'], string> = {
   postgres: 'pg',
   mysql: 'mysql',
-  d1: 'd1',
-  sqlite: 'sqlite'
+  d1: 'd1'
 }
 
 export function LogsPage() {
