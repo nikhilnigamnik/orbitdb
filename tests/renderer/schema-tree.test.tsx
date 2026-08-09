@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SchemaTree } from '@renderer/features/database/components/schema-tree'
@@ -98,6 +98,38 @@ describe('row counts', () => {
     // Prove the pin actually took, or this passes without testing anything.
     expect(await screen.findAllByLabelText('Unpin table')).not.toHaveLength(0)
     expect(await screen.findAllByText('~99')).not.toHaveLength(0)
+  })
+})
+
+describe('a schema with a great many tables', () => {
+  const many = (count: number) =>
+    Array.from({ length: count }, (_, i) => table(`t${String(i).padStart(4, '0')}`))
+
+  it('renders a bounded number rather than all of them', async () => {
+    listTables.mockResolvedValue({ success: true, data: many(500) })
+    setup(['public'])
+
+    await screen.findByText('t0000')
+    // The cap is what keeps an unbounded list from becoming an unbounded render.
+    expect(screen.queryByText('t0499')).toBeNull()
+    expect(await screen.findByText(/Show 300 more/)).toBeTruthy()
+  })
+
+  it('reveals the rest on request', async () => {
+    listTables.mockResolvedValue({ success: true, data: many(500) })
+    setup(['public'])
+
+    fireEvent.click(await screen.findByText(/Show 300 more/))
+    expect(await screen.findByText('t0499')).toBeTruthy()
+    expect(screen.queryByText(/Show .* more/)).toBeNull()
+  })
+
+  it('does not interrupt a schema that fits', async () => {
+    listTables.mockResolvedValue({ success: true, data: many(10) })
+    setup(['public'])
+
+    await screen.findByText('t0009')
+    expect(screen.queryByText(/Show .* more/)).toBeNull()
   })
 })
 
