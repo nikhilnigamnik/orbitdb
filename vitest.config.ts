@@ -15,6 +15,9 @@ export default defineConfig({
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     environment: 'node',
     setupFiles: ['tests/setup/jsdom-polyfills.ts'],
+    // Headroom over the Testing Library query timeout above, so a slow render
+    // retries rather than failing the test outright.
+    testTimeout: 20_000,
     // Date formatting is timezone-sensitive, so pin one — otherwise a spec that
     // passes in +05:30 fails on a UTC runner. Deliberately not UTC: an offset of
     // zero renders as 'Z' and never exercises the offset path.
