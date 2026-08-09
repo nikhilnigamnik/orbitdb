@@ -1,8 +1,12 @@
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import { Input } from '@renderer/components/ui/input'
+import { Kbd } from '@renderer/components/ui/kbd'
 import { Select } from '@renderer/components/ui/select'
 import { Switch } from '@renderer/components/ui/switch'
 import { Textarea } from '@renderer/components/ui/textarea'
@@ -90,6 +94,41 @@ describe('Select', () => {
       )
       expect(classes).toContain(`data-[size=${size}]:${inputHeight}`)
     }
+  })
+})
+
+describe('control heights', () => {
+  const CONTROL_HEIGHT = 'h-7'
+
+  it('stands buttons at the same height as fields, so a toolbar row lines up', () => {
+    for (const size of ['default', 'sm'] as const) {
+      const classes = classesOf(markupOf(createElement(Button, { size }, 'Go')))
+      expect(classes.split(/\s+/)).toContain(CONTROL_HEIGHT)
+    }
+  })
+
+  it('keeps the AI filter field level with the buttons beside it', () => {
+    // A bespoke field-shaped button rather than a primitive, so it is checked at
+    // the source. Keyed on the aria-label so it survives moving around the file.
+    const source = readFileSync(
+      resolve('src/renderer/src/features/tables/components/table-data-view.tsx'),
+      'utf8'
+    )
+    const trigger =
+      /aria-label="Filter this table with natural language"[\s\S]{0,400}?className="([^"]*)"/.exec(
+        source
+      )
+    expect(trigger, 'the AI filter trigger moved or lost its aria-label').not.toBeNull()
+    expect(trigger![1].split(/\s+/)).toContain(CONTROL_HEIGHT)
+  })
+})
+
+describe('Kbd', () => {
+  it('stays small enough to sit inside a control without crowding it', () => {
+    const classes = classesOf(markupOf(createElement(Kbd, null, '⌘'))).split(/\s+/)
+    expect(classes).toContain('h-4')
+    expect(classes).toContain('min-w-4')
+    expect(classes).toContain('text-[10px]')
   })
 })
 
