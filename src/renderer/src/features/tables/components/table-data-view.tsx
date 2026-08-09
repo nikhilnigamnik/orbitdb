@@ -675,22 +675,23 @@ export function TableDataView({
           // Sits where the selection bar sits, and only when that is absent —
           // two stacked floating bars would fight for the same corner.
           <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
-            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-2 rounded-lg border border-border-strong/70 bg-surface/95 py-1.5 pl-3 pr-1.5 text-xs shadow-2xl shadow-black/60 backdrop-blur-xl">
+            {/* One row, one control: a bordered button inside a bordered bar
+                inside a Kbd chip was three boxes for a single action. The action
+                only takes chrome once it is hovered. */}
+            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-lg border border-border-strong/70 bg-surface/95 py-1 pl-3 pr-1 text-xs shadow-2xl shadow-black/60 backdrop-blur-xl">
               <span className="text-text-subtle">
                 Updated <span className="font-mono text-text">{lastEdit.column}</span>
               </span>
-              <span className="mx-1 h-4 w-px bg-white/10" />
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 gap-1.5 rounded-md px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
+              <button
+                type="button"
                 onClick={() => void undoLastEdit()}
                 disabled={isUndoing}
+                className="ml-1 flex h-6 cursor-pointer items-center gap-1.5 rounded-md px-2 text-text-muted transition-colors hover:bg-surface-elevated hover:text-text focus-visible:bg-surface-elevated focus-visible:text-text focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <IconArrowBackUp size={12} />
+                <IconArrowBackUp size={12} className="shrink-0" />
                 {isUndoing ? 'Undoing…' : 'Undo'}
-                <Kbd>{isMac ? '⌘' : 'Ctrl'} Z</Kbd>
-              </Button>
+                <Kbd className="ml-0.5">{isMac ? '⌘' : 'Ctrl'}Z</Kbd>
+              </button>
             </div>
           </div>
         )}
