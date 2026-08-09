@@ -2,6 +2,7 @@ import { ipcMain, app, shell } from 'electron'
 import { checkForUpdate } from '../app/update-check'
 import type {
   ConnectionInput,
+  CountRowsOptions,
   DdlRequest,
   DistinctValuesOptions,
   ExplainTableOptions,
@@ -29,6 +30,7 @@ import {
 } from '../store/connections-store'
 import {
   cancelQuery,
+  countRows,
   describeActive,
   deleteRow,
   disconnectPool,
@@ -128,6 +130,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'db:rows-get',
     wrap(async (opts: GetRowsOptions) => getRows(opts))
+  )
+  ipcMain.handle(
+    'db:rows-count',
+    wrap(async (opts: CountRowsOptions) => countRows(opts))
   )
   ipcMain.handle(
     'db:row-insert',

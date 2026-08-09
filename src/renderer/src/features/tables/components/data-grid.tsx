@@ -51,6 +51,9 @@ interface DataGridProps {
   isInitialLoad?: boolean
   fkColumns?: Map<string, ForeignKeyTarget>
   onOpenForeignKey?: (column: string, value: unknown) => void
+  /** Set when filters are narrowing the result, so empty can say why. */
+  hasFilters?: boolean
+  onClearFilters?: () => void
 }
 
 const SELECT_COLUMN_ID = '__select__'
@@ -73,7 +76,9 @@ export function DataGrid({
   isLoading = false,
   isInitialLoad = false,
   fkColumns,
-  onOpenForeignKey
+  onOpenForeignKey,
+  hasFilters = false,
+  onClearFilters
 }: DataGridProps) {
   const [internalRowSelection, setInternalRowSelection] = React.useState<RowSelectionState>({})
   const isControlled = controlledRowSelection !== undefined
@@ -469,7 +474,22 @@ export function DataGrid({
                 colSpan={visibleColCount}
                 className="px-3 py-10 text-center text-xs text-text-subtle"
               >
-                No rows.
+                {hasFilters ? (
+                  <span className="inline-flex items-center gap-2">
+                    No rows match the current filters.
+                    {onClearFilters && (
+                      <button
+                        type="button"
+                        onClick={onClearFilters}
+                        className="cursor-pointer rounded-md border border-text-muted/15 bg-text-muted/8 px-2 py-0.5 text-text-muted transition-colors hover:bg-text-muted/15 hover:text-text"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </span>
+                ) : (
+                  'This table is empty.'
+                )}
               </td>
             </tr>
           ) : (

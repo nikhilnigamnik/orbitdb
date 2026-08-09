@@ -52,6 +52,8 @@ export function TableDataView({
   const [rows, setRows] = React.useState<Record<string, unknown>[]>([])
   const [columns, setColumns] = React.useState<ColumnInfo[]>(details.columns)
   const [totalEstimate, setTotalEstimate] = React.useState<number | null>(details.estimatedRows)
+  /** Exact count for the current filters, once it lands. Null while unknown. */
+  const [totalExact, setTotalExact] = React.useState<number | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -238,6 +240,30 @@ export function TableDataView({
   React.useEffect(() => {
     void load()
   }, [load])
+
+  // The count runs alongside the page rather than gating it: the rows appear
+  // immediately and the total sharpens from estimate to exact when it arrives.
+  React.useEffect(() => {
+    let cancelled = false
+    setTotalExact(null)
+    void unwrap(
+      window.api.db.countRows({
+        connectionId,
+        schema: details.schema,
+        table: details.name,
+        filters
+      })
+    )
+      .then((total) => {
+        if (!cancelled) setTotalExact(total)
+      })
+      .catch(() => {
+        // A count is an enhancement — falling back to the estimate is fine.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [connectionId, details.schema, details.name, filters])
 
   // Signal the container once the first page lands, so it can reveal the header
   // and grid together — a single loader instead of loader-then-loader.
@@ -510,6 +536,11 @@ export function TableDataView({
           isInitialLoad={isLoading && !hasLoadedOnce}
           fkColumns={fkByColumn}
           onOpenForeignKey={openForeignKey}
+          hasFilters={filters.length > 0}
+          onClearFilters={() => {
+            setFilters([])
+            setOffset(0)
+          }}
         />
 
         {selectedCount > 0 && (
@@ -574,6 +605,7 @@ export function TableDataView({
         pageSize={pageSize}
         loadedCount={rows.length}
         totalEstimate={totalEstimate}
+        totalExact={totalExact}
         onChangePage={setOffset}
         onChangePageSize={(size) => {
           setPageSize(size)
