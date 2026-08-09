@@ -34,6 +34,10 @@ without it a spec that passes locally fails on a UTC runner — and a zero offse
 `Z`, which never exercises the offset-carrying path. Assert exact offsets, not a loose
 pattern.
 
+`tests/setup/jsdom-polyfills.ts` fills in the DOM APIs Radix calls unconditionally
+(pointer capture, `scrollIntoView`, `ResizeObserver`). Without them a Select or Popover
+throws inside the component instead of failing an assertion.
+
 Three testing shapes, cheapest first:
 
 - **Pure logic** — plain `.test.ts`. Prefer extracting decision-making out of a component

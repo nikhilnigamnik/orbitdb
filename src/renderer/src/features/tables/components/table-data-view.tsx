@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { RowSelectionState } from '@tanstack/react-table'
-import { IconDownload, IconSeeding, IconTrash, IconX } from '@tabler/icons-react'
+import { IconArrowBackUp, IconDownload, IconSeeding, IconTrash, IconX } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Kbd } from '@renderer/components/ui/kbd'
 import { AiPrompt } from '@renderer/features/query/components/ai-prompt'
@@ -340,9 +340,31 @@ export function TableDataView({
     await load()
   }
 
-  async function handleEditCell(row: Record<string, unknown>, column: string, value: unknown) {
-    const pk: Record<string, unknown> = {}
-    for (const key of details.primaryKey) pk[key] = row[key]
+  /**
+   * The last committed cell edit, kept so it can be put back. A cell edit writes
+   * the moment you leave the cell, with no confirmation — this is the only way
+   * back from a mistyped value.
+   */
+  const [lastEdit, setLastEdit] = React.useState<{
+    pk: Record<string, unknown>
+    column: string
+    previousValue: unknown
+  } | null>(null)
+  const [isUndoing, setIsUndoing] = React.useState(false)
+
+  // The offer expires so it can't be mistaken for undoing something more recent.
+  React.useEffect(() => {
+    if (!lastEdit) return
+    const timer = setTimeout(() => setLastEdit(null), 12_000)
+    return () => clearTimeout(timer)
+  }, [lastEdit])
+
+  async function writeCell(
+    pk: Record<string, unknown>,
+    column: string,
+    value: unknown,
+    matchRow?: Record<string, unknown>
+  ) {
     const updated = await unwrap(
       window.api.db.updateRow({
         connectionId,
@@ -352,16 +374,56 @@ export function TableDataView({
         values: { [column]: value }
       })
     )
-    // The prefetched next page was fetched before this mutation — drop it so
-    // paging forward can't render stale pre-edit rows.
     prefetchCacheRef.current = null
-    // mysql/d1 re-fetch by PK can miss (e.g. concurrent delete) and return {};
-    // fall back to a local merge rather than blanking the row.
-    const patched = Object.keys(updated).length > 0 ? updated : { ...row, [column]: value }
-    // Patch the saved row in place with what the DB returned (covers
+    setRows((prev) =>
+      prev.map((r) => {
+        const isTarget = matchRow
+          ? r === matchRow
+          : details.primaryKey.every((key) => r[key] === pk[key])
+        if (!isTarget) return r
+        // mysql/d1 re-fetch by PK can miss (e.g. concurrent delete) and return
+        // {}; fall back to a local merge rather than blanking the row.
+        return Object.keys(updated).length > 0 ? updated : { ...r, [column]: value }
+      })
+    )
+  }
+
+  async function undoLastEdit() {
+    if (!lastEdit || isUndoing) return
+    setIsUndoing(true)
+    try {
+      await writeCell(lastEdit.pk, lastEdit.column, lastEdit.previousValue)
+      setLastEdit(null)
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setIsUndoing(false)
+    }
+  }
+
+  React.useEffect(() => {
+    if (!lastEdit) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'z' || !(e.metaKey || e.ctrlKey) || e.shiftKey) return
+      const target = e.target as HTMLElement | null
+      // Inside a field, cmd-Z is the browser's own text undo.
+      if (target?.closest('input, textarea, [contenteditable="true"]')) return
+      e.preventDefault()
+      void undoLastEdit()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
+
+  async function handleEditCell(row: Record<string, unknown>, column: string, value: unknown) {
+    const pk: Record<string, unknown> = {}
+    for (const key of details.primaryKey) pk[key] = row[key]
+    const previousValue = row[column]
+    // Patches the saved row in place with what the DB returned (covers
     // triggers/defaults) instead of reloading — no grid flash, and the
     // cell-editing session survives for Tab navigation.
-    setRows((prev) => prev.map((r) => (r === row ? patched : r)))
+    await writeCell(pk, column, value, row)
+    setLastEdit({ pk, column, previousValue })
   }
 
   async function handleDelete() {
@@ -542,6 +604,30 @@ export function TableDataView({
             setOffset(0)
           }}
         />
+
+        {lastEdit && selectedCount === 0 && (
+          // Sits where the selection bar sits, and only when that is absent —
+          // two stacked floating bars would fight for the same corner.
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
+            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-2 rounded-lg border border-border-strong/70 bg-surface/95 py-1.5 pl-3 pr-1.5 text-xs shadow-2xl shadow-black/60 backdrop-blur-xl">
+              <span className="text-text-subtle">
+                Updated <span className="font-mono text-text">{lastEdit.column}</span>
+              </span>
+              <span className="mx-1 h-4 w-px bg-white/10" />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 gap-1.5 rounded-md px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
+                onClick={() => void undoLastEdit()}
+                disabled={isUndoing}
+              >
+                <IconArrowBackUp size={12} />
+                {isUndoing ? 'Undoing…' : 'Undo'}
+                <Kbd>{isMac ? '⌘' : 'Ctrl'} Z</Kbd>
+              </Button>
+            </div>
+          </div>
+        )}
 
         {selectedCount > 0 && (
           <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
