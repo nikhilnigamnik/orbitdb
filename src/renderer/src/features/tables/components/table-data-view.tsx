@@ -9,6 +9,7 @@ import { SeedDataDialog } from '@renderer/features/database/components/seed-data
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { LoadingState } from '@renderer/components/common/loading-state'
+import { formatCellValue } from '@renderer/lib/format'
 import { unwrap } from '@renderer/lib/ipc'
 import {
   FILTERS_PARAM,
@@ -452,6 +453,14 @@ export function TableDataView({
     )
   }
 
+  /** Which row the pending undo belongs to, as `pk=value` for a simple key. */
+  const undoRowLabel = React.useMemo(() => {
+    if (!lastEdit) return null
+    const entries = Object.entries(lastEdit.pk)
+    if (entries.length === 0) return null
+    return entries.map(([key, value]) => `${key}=${formatCellValue(value)}`).join(', ')
+  }, [lastEdit])
+
   async function undoLastEdit() {
     if (!lastEdit || isUndoing) return
     setIsUndoing(true)
@@ -679,8 +688,24 @@ export function TableDataView({
                 inside a Kbd chip was three boxes for a single action. The action
                 only takes chrome once it is hovered. */}
             <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-lg border border-border-strong/70 bg-surface/95 py-1 pl-3 pr-1 text-xs shadow-2xl shadow-black/60 backdrop-blur-xl">
-              <span className="text-text-subtle">
-                Updated <span className="font-mono text-text">{lastEdit.column}</span>
+              {/* Names the row as well as the column: editing the same column in
+                  several rows produced an identical label each time, so there
+                  was no way to tell what Undo would revert. Mono sits at 11px
+                  because Geist Mono reads larger than the sans at the same size. */}
+              <span className="flex min-w-0 items-center gap-1 text-text-subtle">
+                Updated
+                <span className="font-mono text-[11px] text-text">{lastEdit.column}</span>
+                {undoRowLabel && (
+                  <>
+                    <span className="text-text-subtle/50">in</span>
+                    <span
+                      className="max-w-40 truncate font-mono text-[11px] text-text-muted"
+                      title={undoRowLabel}
+                    >
+                      {undoRowLabel}
+                    </span>
+                  </>
+                )}
               </span>
               <button
                 type="button"
