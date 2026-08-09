@@ -3,12 +3,30 @@
   "productName": "OrbitDB",
   "version": "0.2.2",
   "description": "OrbitDB — a database client for Postgres, MySQL, and Cloudflare D1",
+  "license": "MIT",
+  "keywords": [
+    "database",
+    "client",
+    "gui",
+    "postgres",
+    "postgresql",
+    "mysql",
+    "mariadb",
+    "cloudflare-d1",
+    "sqlite",
+    "electron",
+    "sql",
+    "db-client"
+  ],
   "main": "./out/main/index.js",
   "author": "OrbitDB",
   "homepage": "https://orbitdb.app",
   "repository": {
     "type": "git",
     "url": "https://github.com/nikhilnigamnik/orbitdb.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nikhilnigamnik/orbitdb/issues"
   },
   "scripts": {
     "format": "prettier --write .",
