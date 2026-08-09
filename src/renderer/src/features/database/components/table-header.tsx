@@ -14,10 +14,10 @@ export function TableHeader({ details, activeTab, onChangeTab }: TableHeaderProp
     <div className="group/header shrink-0 border-b border-border px-5 py-3">
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 flex-1 flex-col">
-          <h2 className="truncate text-[18px] font-semibold leading-tight tracking-tight text-text">
+          <h2 className="truncate text-xs font-semibold leading-tight tracking-tight text-text">
             {details.name}
           </h2>
-          <div className="flex min-w-0 items-center gap-1.5 text-[11.5px] leading-tight text-text-subtle">
+          <div className="flex min-w-0 items-center gap-1.5 text-xs leading-tight text-text-subtle">
             <span className="font-mono text-text-muted">{details.schema}</span>
             <span className="text-text-subtle/50">·</span>
             <span>

@@ -1,6 +1,15 @@
+import { format as formatDate } from 'date-fns'
+
 export function formatCellValue(value: unknown): string {
   if (value === null) return 'NULL'
   if (value === undefined) return ''
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return String(value)
+    return formatDate(
+      value,
+      value.getMilliseconds() === 0 ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd HH:mm:ss.SSS'
+    )
+  }
   if (typeof value === 'object') {
     try {
       return JSON.stringify(value)

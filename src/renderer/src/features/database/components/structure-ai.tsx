@@ -1,12 +1,7 @@
 import * as React from 'react'
-import {
-  IconSparkles,
-  IconBulb,
-  IconLoader2,
-  IconCheck,
-  IconAlertTriangle
-} from '@tabler/icons-react'
+import { IconSparkles, IconBulb, IconCheck, IconAlertTriangle } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { MarkdownView } from '@renderer/components/common/markdown'
 import { unwrap } from '@renderer/lib/ipc'
@@ -71,7 +66,7 @@ function AiBarButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] font-medium text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
+      className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
     >
       {icon}
       {children}
@@ -83,7 +78,7 @@ function PanelHeader({ icon, title }: { icon: React.ReactNode; title: string }) 
   return (
     <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3 pr-12">
       <span className="shrink-0 ">{icon}</span>
-      <h2 className="truncate text-[13px] font-semibold text-text">{title}</h2>
+      <h2 className="truncate text-xs font-semibold text-text">{title}</h2>
     </div>
   )
 }
@@ -98,7 +93,7 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 function ErrorLine({ message }: { message: string }) {
   return (
-    <div className="flex shrink-0 items-start gap-2 px-4 py-3 text-[12px] text-red-300">
+    <div className="flex shrink-0 items-start gap-2 px-4 py-3 text-xs text-danger">
       <IconAlertTriangle size={14} className="mt-0.5 shrink-0" />
       <span>{message}</span>
     </div>
@@ -154,8 +149,8 @@ function ExplainSheet({
           <PanelHeader icon={<IconSparkles size={15} />} title={`Explain ${table}`} />
           {isLoading ? (
             <Centered>
-              <IconLoader2 size={15} className="animate-spin" />
-              <span className="text-[12px]">Analyzing table…</span>
+              <Spinner size={15} className="text-current" />
+              <span className="text-xs">Analyzing table…</span>
             </Centered>
           ) : error ? (
             <ErrorLine message={error} />
@@ -249,15 +244,15 @@ function IndexesSheet({
           <PanelHeader icon={<IconBulb size={15} />} title={`Index suggestions for ${table}`} />
           {isLoading ? (
             <Centered>
-              <IconLoader2 size={15} className="animate-spin" />
-              <span className="text-[12px]">Analyzing structure…</span>
+              <Spinner size={15} className="text-current" />
+              <span className="text-xs">Analyzing structure…</span>
             </Centered>
           ) : error ? (
             <ErrorLine message={error} />
           ) : suggestions.length === 0 ? (
             <Centered>
-              <IconCheck size={15} className="text-emerald-400" />
-              <span className="text-[12px]">No useful indexes are missing.</span>
+              <IconCheck size={15} className="text-success" />
+              <span className="text-xs">No useful indexes are missing.</span>
             </Centered>
           ) : (
             <div className="min-h-0 flex-1 divide-y divide-border/60 overflow-auto">
@@ -267,23 +262,23 @@ function IndexesSheet({
                   <div key={s.name} className="flex items-start gap-3 px-4 py-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="truncate font-mono text-[12px] font-medium text-text">
+                        <span className="truncate font-mono text-xs font-medium text-text">
                           {s.name}
                         </span>
                         {s.isUnique && (
-                          <span className="rounded bg-surface-elevated px-1 py-0 text-[9px] font-semibold uppercase tracking-wider text-text-subtle">
+                          <span className="rounded bg-surface-elevated px-1 py-0 text-xs font-semibold uppercase tracking-wider text-text-subtle">
                             Unique
                           </span>
                         )}
                       </div>
-                      <p className="mt-0.5 font-mono text-[11px] text-text-muted">
+                      <p className="mt-0.5 font-mono text-xs text-text-muted">
                         ({s.columns.join(', ')})
                       </p>
-                      <p className="mt-1 text-[11.5px] leading-snug text-text-subtle">
+                      <p className="mt-1 text-xs leading-snug text-text-subtle">
                         {s.rationale}
                       </p>
                       {typeof state === 'string' && state !== 'applying' && state !== 'done' && (
-                        <p className="mt-1 text-[11px] text-red-300">{state}</p>
+                        <p className="mt-1 text-xs text-danger">{state}</p>
                       )}
                     </div>
                     <Button
@@ -293,13 +288,13 @@ function IndexesSheet({
                       className={cn(
                         'shrink-0',
                         state === 'done'
-                          ? 'text-emerald-400'
+                          ? 'text-success'
                           : 'text-text-muted hover:bg-surface-elevated hover:text-text'
                       )}
                       onClick={() => apply(s)}
                     >
                       {state === 'applying' ? (
-                        <IconLoader2 size={12} className="animate-spin" />
+                        <Spinner size={12} className="text-current" />
                       ) : state === 'done' ? (
                         <IconCheck size={12} />
                       ) : null}

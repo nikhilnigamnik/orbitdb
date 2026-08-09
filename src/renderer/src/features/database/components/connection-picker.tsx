@@ -17,12 +17,12 @@ import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 type ChipTone = React.ComponentProps<typeof Chip>['tone']
 
 const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; iconClass: string }> = {
-  postgres: { bg: 'bg-sky-500/8', iconClass: 'text-sky-300/80' },
-  mysql: { bg: 'bg-orange-500/8', iconClass: 'text-orange-300/80' },
-  d1: { bg: 'bg-amber-500/8', iconClass: 'text-amber-300/80' }
+  postgres: { bg: 'bg-info/8', iconClass: 'text-info' },
+  mysql: { bg: 'bg-orange/8', iconClass: 'text-orange' },
+  d1: { bg: 'bg-warning/8', iconClass: 'text-warning' }
 }
 
-const ENGINE_FALLBACK = { bg: 'bg-neutral-500/8', iconClass: 'text-neutral-300/80' }
+const ENGINE_FALLBACK = { bg: 'bg-text-muted/8', iconClass: 'text-text-muted' }
 
 const ENVIRONMENT_TONE: Record<ConnectionEnvironment, ChipTone> = {
   dev: 'emerald',
@@ -90,7 +90,6 @@ export function ConnectionPicker() {
         action={
           <Button
             size="sm"
-            className="bg-accent text-white hover:bg-accent/90"
             onClick={() => navigate(ROUTES.connections)}
           >
             Add a connection
@@ -107,8 +106,8 @@ export function ConnectionPicker() {
           <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-border text-text-subtle">
             <IconPlug size={22} />
           </div>
-          <p className="text-[15px] font-semibold text-text">Pick a connection</p>
-          <p className="mt-1 text-[12.5px] text-text-subtle">
+          <p className="text-xs font-semibold text-text">Pick a connection</p>
+          <p className="mt-1 text-xs text-text-subtle">
             Connect to start browsing schemas and tables.
           </p>
         </div>
@@ -151,14 +150,14 @@ export function ConnectionPicker() {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-[13.5px] font-medium leading-tight text-text">
+                      <span className="truncate text-xs font-medium leading-tight text-text">
                         {connection.name}
                       </span>
                       <Chip tone={ENVIRONMENT_TONE[environment]}>
                         {ENVIRONMENT_LABEL[environment]}
                       </Chip>
                     </div>
-                    <div className="mt-1 truncate font-mono text-[11px] leading-tight text-text-subtle">
+                    <div className="mt-1 truncate font-mono text-xs leading-tight text-text-subtle">
                       {subtitle(connection)}
                     </div>
                   </div>

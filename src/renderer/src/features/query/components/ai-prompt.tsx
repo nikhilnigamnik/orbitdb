@@ -1,12 +1,7 @@
 import * as React from 'react'
-import {
-  IconSparkles,
-  IconX,
-  IconArrowRight,
-  IconArrowUpRight,
-  IconLoader2
-} from '@tabler/icons-react'
+import { IconSparkles, IconX, IconArrowRight, IconArrowUpRight } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { Dialog } from '@renderer/components/ui/dialog'
 import { Kbd } from '@renderer/components/ui/kbd'
 
@@ -57,13 +52,13 @@ export function AiPrompt({
       setOpen={onOpenChange}
       content={
         <>
-          <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-accent/60 to-transparent" />
+          <div className="absolute inset-x-0 top-0 h-px bg-accent/40" />
 
           <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-3">
             {isGenerating ? (
-              <IconLoader2 size={16} className="shrink-0 animate-spin text-accent" />
+              <Spinner size={16} className="text-accent-text" />
             ) : (
-              <IconSparkles size={16} className="shrink-0 text-accent" />
+              <IconSparkles size={16} className="shrink-0 text-accent-text" />
             )}
             <input
               autoFocus
@@ -77,9 +72,9 @@ export function AiPrompt({
                 }
               }}
               placeholder={isGenerating ? 'Generating…' : placeholder}
-              className="min-w-0 flex-1 bg-transparent text-[13.5px] text-text placeholder:text-text-subtle focus:outline-none disabled:opacity-60"
+              className="min-w-0 flex-1 bg-transparent text-xs text-text placeholder:text-text-subtle focus:outline-none disabled:opacity-60"
             />
-            <span className="shrink-0 rounded bg-surface-elevated px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-text-subtle">
+            <span className="shrink-0 rounded bg-surface-elevated px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-text-subtle">
               Beta
             </span>
             <Button
@@ -94,7 +89,7 @@ export function AiPrompt({
           </div>
 
           <div className="flex flex-col gap-1 p-2">
-            <p className="px-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-subtle">
+            <p className="px-1.5 pb-1 text-xs font-semibold uppercase tracking-wider text-text-subtle">
               Try
             </p>
             {suggestions.map((s) => (
@@ -102,11 +97,11 @@ export function AiPrompt({
                 key={s}
                 type="button"
                 onClick={() => submit(s)}
-                className="group/sug flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-[12.5px] text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
+                className="group/sug flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
               >
                 <IconSparkles
                   size={12}
-                  className="shrink-0 text-text-subtle transition-colors group-hover/sug:text-accent"
+                  className="shrink-0 text-text-subtle transition-colors group-hover/sug:text-accent-text"
                 />
                 <span className="truncate">{s}</span>
                 <IconArrowUpRight
@@ -118,7 +113,7 @@ export function AiPrompt({
           </div>
 
           <div className="flex items-center justify-between gap-3 border-t border-border bg-surface-elevated/30 px-3.5 py-2">
-            <span className="flex items-center gap-1.5 text-[10.5px] text-text-subtle">
+            <span className="flex items-center gap-1.5 text-xs text-text-subtle">
               <Kbd>↵</Kbd>
               <span>Generate</span>
               <span className="text-text-subtle/40">·</span>
@@ -127,12 +122,11 @@ export function AiPrompt({
             </span>
             <Button
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={() => submit()}
               disabled={!prompt.trim() || isGenerating}
             >
               {isGenerating ? (
-                <IconLoader2 size={12} className="animate-spin" />
+                <Spinner size={12} className="text-current" />
               ) : (
                 <IconArrowRight size={12} />
               )}

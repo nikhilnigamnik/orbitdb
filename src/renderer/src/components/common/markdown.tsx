@@ -10,14 +10,14 @@ interface MarkdownViewProps {
 /** Renders model/markdown text with Tailwind-styled elements (no prose plugin). */
 export function MarkdownView({ children, className }: MarkdownViewProps) {
   return (
-    <div className={cn('text-[12.5px] leading-relaxed text-text-muted', className)}>
+    <div className={cn('text-xs leading-relaxed text-text-muted', className)}>
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
-          h1: (p) => <h1 className="mb-1.5 mt-3 text-[14px] font-semibold text-text first:mt-0" {...p} />,
-          h2: (p) => <h2 className="mb-1.5 mt-3 text-[13px] font-semibold text-text first:mt-0" {...p} />,
+          h1: (p) => <h1 className="mb-1.5 mt-3 text-xs font-semibold text-text first:mt-0" {...p} />,
+          h2: (p) => <h2 className="mb-1.5 mt-3 text-xs font-semibold text-text first:mt-0" {...p} />,
           h3: (p) => (
-            <h3 className="mb-1 mt-2.5 text-[12.5px] font-semibold text-text first:mt-0" {...p} />
+            <h3 className="mb-1 mt-2.5 text-xs font-semibold text-text first:mt-0" {...p} />
           ),
           p: (p) => <p className="my-1.5 first:mt-0 last:mb-0" {...p} />,
           ul: (p) => <ul className="my-1.5 list-disc space-y-0.5 pl-5" {...p} />,
@@ -26,7 +26,7 @@ export function MarkdownView({ children, className }: MarkdownViewProps) {
           strong: (p) => <strong className="font-semibold text-text" {...p} />,
           em: (p) => <em className="italic" {...p} />,
           a: (p) => (
-            <a className="text-accent underline underline-offset-2" target="_blank" rel="noreferrer" {...p} />
+            <a className="text-accent-text underline underline-offset-2" target="_blank" rel="noreferrer" {...p} />
           ),
           hr: (p) => <hr className="my-3 border-border" {...p} />,
           blockquote: (p) => (
@@ -34,7 +34,7 @@ export function MarkdownView({ children, className }: MarkdownViewProps) {
           ),
           pre: (p) => (
             <pre
-              className="my-2 overflow-auto rounded-md border border-border bg-surface-elevated/50 p-3 font-mono text-[11px] leading-relaxed"
+              className="my-2 overflow-auto rounded-md border border-border bg-surface-sunken p-3 font-mono text-xs leading-relaxed"
               {...p}
             />
           ),
@@ -49,7 +49,7 @@ export function MarkdownView({ children, className }: MarkdownViewProps) {
             }
             return (
               <code
-                className="rounded bg-surface-elevated px-1 py-0.5 font-mono text-[11px] text-text"
+                className="rounded bg-surface-sunken px-1 py-0.5 font-mono text-xs text-text"
                 {...rest}
               >
                 {children}
@@ -58,7 +58,7 @@ export function MarkdownView({ children, className }: MarkdownViewProps) {
           },
           table: (p) => (
             <div className="my-2 overflow-x-auto">
-              <table className="w-full border-collapse text-[11.5px]" {...p} />
+              <table className="w-full border-collapse text-xs" {...p} />
             </div>
           ),
           th: (p) => (

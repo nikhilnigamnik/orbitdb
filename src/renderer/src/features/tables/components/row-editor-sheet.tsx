@@ -11,6 +11,7 @@ import type { ColumnInfo } from '@renderer/types'
 import { Chip } from '@renderer/components/ui/chip'
 import {
   coerceCellValue,
+  editableEnumValues,
   isBoolType,
   isJsonType,
   isNumericType,
@@ -42,7 +43,7 @@ function buildInitialFields(
   for (const col of columns) {
     const current = values?.[col.name]
     out[col.name] = {
-      raw: current == null ? '' : stringifyValue(current),
+      raw: current == null ? '' : stringifyValue(current, col.udtName),
       isNull: current === null && values != null,
       touched: false
     }
@@ -111,10 +112,10 @@ export function RowEditorSheet({
       content={
         <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
           <div className="flex shrink-0 flex-col gap-0.5 border-b border-border px-4 py-3 pr-12">
-            <h2 className="text-[13px] font-semibold text-text">
+            <h2 className="text-xs font-semibold text-text">
               {mode === 'insert' ? 'Insert row' : 'Edit row'}
             </h2>
-            <p className="text-[11px] text-text-subtle">
+            <p className="text-xs text-text-subtle">
               {mode === 'insert'
                 ? 'Untouched columns will use their default values.'
                 : 'Edit the values and save changes.'}
@@ -126,6 +127,7 @@ export function RowEditorSheet({
               const field = fields[col.name]
               const useTextarea = isJsonType(col.udtName)
               const inputType = isNumericType(col.udtName) ? 'number' : 'text'
+              const enumValues = editableEnumValues(col)
               return (
                 <FormField
                   key={col.name}
@@ -153,6 +155,19 @@ export function RowEditorSheet({
                             { value: 'false', label: 'false' }
                           ]}
                           placeholder="—"
+                          disabled={field.isNull}
+                          ariaLabel={col.name}
+                          className="h-9 w-full"
+                        />
+                      ) : enumValues != null ? (
+                        <Select
+                          value={field.raw}
+                          onChange={(value) => update(col.name, { raw: value, isNull: false })}
+                          options={enumValues.map((option) => ({
+                            value: option,
+                            label: option
+                          }))}
+                          placeholder={field.isNull ? 'NULL' : '—'}
                           disabled={field.isNull}
                           ariaLabel={col.name}
                           className="h-9 w-full"
@@ -186,7 +201,7 @@ export function RowEditorSheet({
             })}
 
             {error && (
-              <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 font-mono text-xs text-red-300/80">
+              <p className="rounded-lg border border-danger/30 bg-danger/10 p-2 font-mono text-xs text-danger">
                 {error}
               </p>
             )}
@@ -205,7 +220,6 @@ export function RowEditorSheet({
             </Button>
             <SubmitButton
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={handleSubmit}
               isSubmitting={isSubmitting}
               loadingText={mode === 'insert' ? 'Inserting…' : 'Updating…'}

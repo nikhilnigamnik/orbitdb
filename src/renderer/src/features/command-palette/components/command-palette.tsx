@@ -36,22 +36,22 @@ const OVERLAY_CLASSES = 'fixed inset-0 z-40 bg-black/20 backdrop-blur-sm animate
 const CONTENT_CLASSES = [
   'fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(600px,calc(100vw-2rem))]',
   'overflow-hidden rounded-2xl border border-border bg-surface',
-  'shadow-2xl shadow-black/60',
+  'shadow-2xl shadow-black/70',
   'animate-scale-in'
 ].join(' ')
 
 const COMMAND_CLASSES = [
   'flex flex-col',
   '[&_[cmdk-input]]:h-12 [&_[cmdk-input]]:w-full [&_[cmdk-input]]:bg-transparent [&_[cmdk-input]]:px-4 [&_[cmdk-input]]:pl-11',
-  '[&_[cmdk-input]]:text-[13.5px] [&_[cmdk-input]]:text-text [&_[cmdk-input]]:outline-none',
+  '[&_[cmdk-input]]:text-xs [&_[cmdk-input]]:text-text [&_[cmdk-input]]:outline-none',
   '[&_[cmdk-input]]:placeholder:text-text-subtle',
   '[&_[cmdk-list]]:max-h-[56vh] [&_[cmdk-list]]:overflow-y-auto [&_[cmdk-list]]:scroll-py-1 [&_[cmdk-list]]:p-2',
   '[&_[cmdk-group]]:mb-1 [&_[cmdk-group]:last-child]:mb-0',
   '[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2',
-  '[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider',
+  '[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider',
   '[&_[cmdk-group-heading]]:text-text-subtle',
   '[&_[cmdk-empty]]:flex [&_[cmdk-empty]]:flex-col [&_[cmdk-empty]]:items-center [&_[cmdk-empty]]:justify-center [&_[cmdk-empty]]:gap-1 [&_[cmdk-empty]]:py-10',
-  '[&_[cmdk-empty]]:text-[12px] [&_[cmdk-empty]]:text-text-subtle'
+  '[&_[cmdk-empty]]:text-xs [&_[cmdk-empty]]:text-text-subtle'
 ].join(' ')
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
@@ -222,13 +222,13 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         )}
 
         {active && tables.length === 0 && fetchedFor.current === active.connectionId && (
-          <p className="px-3 py-3 text-[11px] text-text-subtle">
+          <p className="px-3 py-3 text-xs text-text-subtle">
             {tablesError ? `Couldn't load tables: ${tablesError}` : 'No tables in this database.'}
           </p>
         )}
       </Command.List>
 
-      <div className="flex items-center justify-between gap-3 border-t border-border bg-surface-elevated/30 px-3 py-2 text-[10.5px] text-text-subtle">
+      <div className="flex items-center justify-between gap-3 border-t border-border bg-surface-elevated/30 px-3 py-2 text-xs text-text-subtle">
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1">
             <Kbd>↑</Kbd>
@@ -283,7 +283,7 @@ function PaletteItem({
 }: PaletteItemProps) {
   const toneText =
     tone === 'danger'
-      ? 'text-red-400/80 aria-selected:text-red-300 aria-selected:bg-red-500/10'
+      ? 'text-danger aria-selected:text-danger aria-selected:bg-danger/10'
       : 'text-text-muted aria-selected:bg-surface-elevated aria-selected:text-text'
 
   return (
@@ -291,12 +291,12 @@ function PaletteItem({
       onSelect={onSelect}
       disabled={disabled}
       value={[label, ...(keywords ?? [])].join(' ')}
-      className={`group flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-[12.5px] transition-colors aria-selected:[&_.kbd-shortcut]:opacity-100 data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 ${toneText}`}
+      className={`group flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-xs transition-colors aria-selected:[&_.kbd-shortcut]:opacity-100 data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 ${toneText}`}
     >
       <span
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
           tone === 'danger'
-            ? 'border-red-500/20 bg-red-500/10 text-red-400 group-aria-selected:border-red-500/30 group-aria-selected:bg-red-500/15'
+            ? 'border-danger/20 bg-danger/10 text-danger group-aria-selected:border-danger/30 group-aria-selected:bg-danger/15'
             : 'border-border bg-surface-elevated text-text-muted group-aria-selected:border-border-strong group-aria-selected:bg-surface group-aria-selected:text-text'
         }`}
       >
@@ -305,7 +305,7 @@ function PaletteItem({
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
         <span className="truncate font-medium">{label}</span>
         {secondary && (
-          <span className="truncate font-mono text-[10.5px] text-text-subtle">{secondary}</span>
+          <span className="truncate font-mono text-xs text-text-subtle">{secondary}</span>
         )}
       </span>
       {tag && <Chip tone={tagTone === 'success' ? 'emerald' : 'neutral'}>{tag}</Chip>}

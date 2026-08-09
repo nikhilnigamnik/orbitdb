@@ -101,7 +101,7 @@ export function Sidebar() {
               <IconSettings size={16} stroke={1.75} />
               {hasUpdate && (
                 <span
-                  className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-2 ring-surface"
+                  className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-success ring-2 ring-surface"
                   aria-hidden
                 />
               )}
@@ -119,7 +119,7 @@ export function Sidebar() {
                 className="flex h-7 w-7 items-center justify-center rounded-md"
                 aria-label={`Connected to ${current.name}`}
               >
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                <span className="h-2 w-2 rounded-full bg-success" />
               </span>
             </TooltipTrigger>
             <TooltipContent side="right">Connected to {current.name}</TooltipContent>
@@ -131,7 +131,7 @@ export function Sidebar() {
                 className="flex h-7 w-7 items-center justify-center rounded-md"
                 aria-label="No active connection"
               >
-                <span className="h-2 w-2 rounded-full bg-neutral-700" />
+                <span className="h-2 w-2 rounded-full bg-text-subtle/50" />
               </span>
             </TooltipTrigger>
             <TooltipContent side="right">No connection</TooltipContent>

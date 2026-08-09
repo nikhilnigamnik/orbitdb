@@ -23,7 +23,7 @@ import { formatCellValue } from '@renderer/lib/format'
 import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import { LoadingState } from '@renderer/components/common/loading-state'
-import { CellEditPopover } from './cell-edit-popover'
+import { CellInlineEditor } from './cell-inline-editor'
 import type { ColumnInfo, SortDirection } from '@renderer/types'
 
 type Row = Record<string, unknown>
@@ -103,9 +103,66 @@ export function DataGrid({
     columnId: string
   } | null>(null)
   const canEditCells = canMutate && !!onEditCell
+  // Cell saves patch `rows` in place; this flag keeps the editing session
+  // alive across that change so Tab-to-next-cell works.
+  const keepEditingOnRowsChange = React.useRef(false)
   React.useEffect(() => {
+    if (keepEditingOnRowsChange.current) {
+      keepEditingOnRowsChange.current = false
+      return
+    }
     setEditingCell(null)
+    // The flash is keyed by row index; a new row set (sort/page/reload) would
+    // make it light up an unrelated cell.
+    setSavedCell(null)
   }, [rows])
+
+  const [savedCell, setSavedCell] = React.useState<{ rowIndex: number; columnId: string } | null>(
+    null
+  )
+  const savedFlashTimer = React.useRef<number | null>(null)
+  const markSaved = React.useCallback((rowIndex: number, columnId: string) => {
+    if (savedFlashTimer.current) window.clearTimeout(savedFlashTimer.current)
+    // Drop the class for a frame so re-saving the same cell within the flash
+    // window restarts the CSS animation instead of silently continuing it.
+    setSavedCell(null)
+    requestAnimationFrame(() => {
+      setSavedCell({ rowIndex, columnId })
+      savedFlashTimer.current = window.setTimeout(() => setSavedCell(null), 900)
+    })
+  }, [])
+  React.useEffect(
+    () => () => {
+      if (savedFlashTimer.current) window.clearTimeout(savedFlashTimer.current)
+    },
+    []
+  )
+
+  const dataColumnIds = React.useMemo(() => columns.map((c) => c.name), [columns])
+  const moveEditing = React.useCallback(
+    (rowIndex: number, columnId: string, direction: 'next' | 'prev') => {
+      const colIndex = dataColumnIds.indexOf(columnId)
+      if (colIndex === -1) {
+        setEditingCell(null)
+        return
+      }
+      let nextCol = colIndex + (direction === 'next' ? 1 : -1)
+      let nextRow = rowIndex
+      if (nextCol >= dataColumnIds.length) {
+        nextCol = 0
+        nextRow += 1
+      } else if (nextCol < 0) {
+        nextCol = dataColumnIds.length - 1
+        nextRow -= 1
+      }
+      if (nextRow < 0 || nextRow >= rows.length) {
+        setEditingCell(null)
+        return
+      }
+      setEditingCell({ rowIndex: nextRow, columnId: dataColumnIds[nextCol] })
+    },
+    [dataColumnIds, rows.length]
+  )
 
   const sorting: SortingState = React.useMemo(
     () => (orderBy ? [{ id: orderBy, desc: orderDir === 'desc' }] : []),
@@ -168,14 +225,14 @@ export function DataGrid({
                 <div className="flex min-w-0 flex-col leading-tight">
                   <span
                     className={cn(
-                      'truncate text-[11.5px]',
+                      'truncate text-xs',
                       isActive ? 'font-semibold text-text' : 'font-medium text-text-muted'
                     )}
                   >
                     {col.name}
                   </span>
                   {col.dataType && (
-                    <span className="truncate font-mono text-[10px] font-normal text-text-subtle">
+                    <span className="truncate font-mono text-xs font-normal text-text-subtle">
                       {col.dataType}
                     </span>
                   )}
@@ -216,21 +273,23 @@ export function DataGrid({
           const fkTarget = fkColumns?.get(col.name)
           if (fkTarget && onOpenForeignKey) {
             return (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenForeignKey(col.name, value)
-                }}
-                className="group/fk inline-flex max-w-full cursor-pointer items-center gap-1 truncate rounded text-accent transition-colors hover:text-accent/80 hover:underline"
-                title={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
-              >
-                <span className="truncate">{display}</span>
-                <IconArrowUpRight
-                  size={10}
-                  className="shrink-0 opacity-0 transition-opacity group-hover/fk:opacity-100"
-                />
-              </button>
+              <span className="flex max-w-full items-center gap-1">
+                <span className="truncate text-accent-text">{display}</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenForeignKey(col.name, value)
+                  }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="shrink-0 cursor-pointer rounded p-0.5 text-accent-text opacity-0 transition-opacity hover:bg-accent/15 group-hover:opacity-100"
+                  title={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
+                  aria-label={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
+                >
+                  <IconArrowUpRight size={11} />
+                </button>
+              </span>
             )
           }
           return <span className="text-text">{display}</span>
@@ -250,7 +309,7 @@ export function DataGrid({
               <Button
                 size="icon-xs"
                 variant="ghost"
-                className="text-text-muted hover:border-transparent hover:bg-linear-to-b hover:from-neutral-500/25 hover:to-neutral-500/5 hover:text-neutral-200 hover:ring-1 hover:ring-inset hover:ring-neutral-500/25 hover:shadow-[inset_0_1px_0_rgba(229,229,229,0.25)]"
+                className="text-text-muted hover:border-transparent hover:bg-text-muted/15 hover:text-text-muted hover:ring-1 hover:ring-inset hover:ring-text-muted/25"
                 onClick={(e) => {
                   e.stopPropagation()
                   onEditRow(row.original)
@@ -262,7 +321,7 @@ export function DataGrid({
               <Button
                 size="icon-xs"
                 variant="ghost"
-                className="text-text-muted hover:border-transparent hover:bg-linear-to-b hover:from-rose-500/25 hover:to-rose-500/5 hover:text-rose-200 hover:ring-1 hover:ring-inset hover:ring-rose-500/25 hover:shadow-[inset_0_1px_0_rgba(253,164,175,0.35)]"
+                className="text-text-muted hover:border-transparent hover:bg-danger/15 hover:text-danger hover:ring-1 hover:ring-inset hover:ring-danger/25"
                 onClick={(e) => {
                   e.stopPropagation()
                   onDeleteRow(row.original)
@@ -300,6 +359,49 @@ export function DataGrid({
     getCoreRowModel: getCoreRowModel()
   })
 
+  // Columns stay auto-sized until the user drags a header edge; only then is
+  // an explicit width pinned. Double-clicking the handle clears it back to auto.
+  // The drag is driven manually (not header.getResizeHandler()) because TanStack
+  // starts from its 150px default size, which makes auto-sized columns jump.
+  const columnSizing = table.getState().columnSizing
+  const resizedWidth = React.useCallback(
+    (columnId: string): number | undefined => columnSizing[columnId],
+    [columnSizing]
+  )
+  const [resizingColumn, setResizingColumn] = React.useState<string | null>(null)
+  const startResize = React.useCallback(
+    (e: React.MouseEvent<HTMLDivElement>, columnId: string) => {
+      e.preventDefault()
+      const th = e.currentTarget.closest('th')
+      if (!th) return
+      const startWidth = th.getBoundingClientRect().width
+      const startX = e.clientX
+      setResizingColumn(columnId)
+      const onMove = (ev: MouseEvent): void => {
+        const width = Math.min(1200, Math.max(64, startWidth + ev.clientX - startX))
+        table.setColumnSizing((prev) => ({ ...prev, [columnId]: width }))
+      }
+      const onUp = (): void => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+        setResizingColumn(null)
+      }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [table]
+  )
+  const resetColumnSize = React.useCallback(
+    (columnId: string) => {
+      table.setColumnSizing((prev) => {
+        const next = { ...prev }
+        delete next[columnId]
+        return next
+      })
+    },
+    [table]
+  )
+
   const visibleColCount = tableColumns.length
 
   if (isInitialLoad) {
@@ -310,10 +412,11 @@ export function DataGrid({
     <div
       className={cn(
         'min-h-0 flex-1 overflow-auto transition-opacity duration-150',
-        isLoading && 'pointer-events-none opacity-50'
+        isLoading && 'pointer-events-none opacity-50',
+        resizingColumn && 'cursor-col-resize select-none'
       )}
     >
-      <table className="min-w-full border-separate border-spacing-0 text-[12.5px]">
+      <table className="min-w-full border-separate border-spacing-0 text-xs">
         <thead className="sticky top-0 z-10">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
@@ -322,20 +425,37 @@ export function DataGrid({
                 const isIndex = header.column.id === INDEX_COLUMN_ID
                 const isActions = header.column.id === ACTIONS_COLUMN_ID
                 const isDataColumn = !isSelect && !isIndex && !isActions
+                const width = isDataColumn ? resizedWidth(header.column.id) : undefined
                 return (
                   <th
                     key={header.id}
+                    style={
+                      width !== undefined ? { width, minWidth: width, maxWidth: width } : undefined
+                    }
                     className={cn(
                       'border-b border-border bg-surface text-left font-medium',
                       isSelect && 'w-9 px-2 py-2',
-                      isIndex && 'w-10 px-3 py-2 text-[10.5px] text-text-subtle',
+                      isIndex &&
+                        'w-10 border-r border-r-border/40 px-3 py-2 text-xs text-text-subtle',
                       isActions && 'sticky right-0 w-20 px-3 py-2',
-                      isDataColumn && 'p-0 text-[11.5px] text-text-muted'
+                      isDataColumn && 'relative p-0 text-xs text-text-muted'
                     )}
                   >
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
+                    {isDataColumn && (
+                      <div
+                        onMouseDown={(e) => startResize(e, header.column.id)}
+                        onDoubleClick={() => resetColumnSize(header.column.id)}
+                        title="Drag to resize, double-click to reset"
+                        className="absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize touch-none select-none"
+                      >
+                        {/* right-0.5 puts the line on the exact pixel the td
+                            border-r occupies, so header and body dividers align */}
+                        <div className="absolute inset-y-0 right-0.5 w-px bg-border/40" />
+                      </div>
+                    )}
                   </th>
                 )
               })}
@@ -347,7 +467,7 @@ export function DataGrid({
             <tr>
               <td
                 colSpan={visibleColCount}
-                className="px-3 py-10 text-center text-[12.5px] text-text-subtle"
+                className="px-3 py-10 text-center text-xs text-text-subtle"
               >
                 No rows.
               </td>
@@ -359,8 +479,13 @@ export function DataGrid({
                 <tr
                   key={row.id}
                   className={cn(
-                    'group cursor-default transition-colors',
-                    isSelected ? 'bg-surface-elevated/70' : 'hover:bg-surface-elevated/40'
+                    // transition-colors would animate outline-color from currentColor
+                    // (white) on select — only transition the background
+                    'group cursor-default transition-[background-color]',
+                    isSelected
+                      ? // tr can't render Tailwind ring (box-shadow); outline works in Chromium
+                        'bg-surface-elevated/70 outline outline-border-strong -outline-offset-1'
+                      : 'hover:bg-surface-elevated/40'
                   )}
                 >
                   {row.getVisibleCells().map((cell) => {
@@ -376,21 +501,36 @@ export function DataGrid({
                       ? columns.find((c) => c.name === cell.column.id)
                       : undefined
                     const cellValue = row.original[cell.column.id]
+                    const isSavedFlash =
+                      isData &&
+                      savedCell?.rowIndex === row.index &&
+                      savedCell?.columnId === cell.column.id
+                    const width = isData ? resizedWidth(cell.column.id) : undefined
                     return (
                       <td
                         key={cell.id}
+                        style={
+                          width !== undefined
+                            ? { width, minWidth: width, maxWidth: width }
+                            : undefined
+                        }
                         className={cn(
                           'border-b border-border/60 px-3 py-1.5',
                           isSelect && 'px-2',
-                          isIndex && 'text-[10.5px] text-text-subtle',
+                          (isIndex || isData) && 'border-r border-r-border/40',
+                          isIndex && 'text-xs text-text-subtle',
                           isActions && 'sticky right-0 bg-surface px-2 py-1 group-hover:bg-surface',
-                          isData && 'max-w-xs truncate font-mono text-[11.5px]',
+                          isData && 'max-w-xs truncate font-mono text-xs',
                           isData && canEditCells && 'cursor-text',
-                          isEditingThis && 'bg-surface-elevated'
+                          isEditingThis && 'bg-accent/10 ring-1 ring-inset ring-accent-text/50',
+                          isSavedFlash && 'animate-cell-saved'
                         )}
                         title={isData && !isEditingThis ? formatCellValue(cellValue) : undefined}
                         onMouseDown={
-                          isData && canEditCells
+                          // While the editor popover is open its portal events bubble
+                          // through this td in the React tree — skip the handler so
+                          // double-click text selection inside the editor still works.
+                          isData && canEditCells && !isEditingThis
                             ? (e) => {
                                 // Stop the browser's double-click word-selection (the
                                 // highlight) while keeping single-click selection intact.
@@ -399,30 +539,31 @@ export function DataGrid({
                             : undefined
                         }
                         onDoubleClick={
-                          isData && canEditCells
+                          isData && canEditCells && !isEditingThis
                             ? () =>
                                 setEditingCell({ rowIndex: row.index, columnId: cell.column.id })
                             : undefined
                         }
                       >
                         {isEditingThis && editColumn && onEditCell ? (
-                          <CellEditPopover
+                          <CellInlineEditor
                             column={editColumn}
                             value={cellValue}
                             onSave={async (newValue) => {
-                              await onEditCell(row.original, cell.column.id, newValue)
-                              setEditingCell(null)
+                              keepEditingOnRowsChange.current = true
+                              try {
+                                await onEditCell(row.original, cell.column.id, newValue)
+                              } catch (err) {
+                                keepEditingOnRowsChange.current = false
+                                throw err
+                              }
+                              markSaved(row.index, cell.column.id)
                             }}
-                            onCancel={() => setEditingCell(null)}
-                          >
-                            <span className="block max-w-full truncate">
-                              {cellValue === null ? (
-                                <span className="italic text-text-subtle">NULL</span>
-                              ) : (
-                                formatCellValue(cellValue)
-                              )}
-                            </span>
-                          </CellEditPopover>
+                            onClose={() => setEditingCell(null)}
+                            onNavigate={(direction) =>
+                              moveEditing(row.index, cell.column.id, direction)
+                            }
+                          />
                         ) : (
                           flexRender(cell.column.columnDef.cell, cell.getContext())
                         )}

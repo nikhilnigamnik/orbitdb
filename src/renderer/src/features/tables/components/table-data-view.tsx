@@ -124,10 +124,6 @@ export function TableDataView({
   )
   const selectedCount = selectedRows.length
 
-  React.useEffect(() => {
-    setRowSelection({})
-  }, [rows])
-
   const canMutate = details.type === 'table' && details.primaryKey.length > 0
 
   const requestIdRef = React.useRef(0)
@@ -154,6 +150,7 @@ export function TableDataView({
       setRows(data.rows)
       setColumns(data.columns)
       setTotalEstimate(data.totalEstimate)
+      setRowSelection({})
       setHasLoadedOnce(true)
       setIsLoading(false)
       setError(null)
@@ -178,6 +175,7 @@ export function TableDataView({
         setRows(data.rows)
         setColumns(data.columns)
         setTotalEstimate(data.totalEstimate)
+        setRowSelection({})
         setHasLoadedOnce(true)
       } catch (err) {
         if (requestId !== requestIdRef.current) return
@@ -232,6 +230,7 @@ export function TableDataView({
     setOrderDir('asc')
     setFilters([])
     setRows([])
+    setRowSelection({})
     setHasLoadedOnce(false)
     prefetchCacheRef.current = null
   }, [details.schema, details.name])
@@ -318,7 +317,7 @@ export function TableDataView({
   async function handleEditCell(row: Record<string, unknown>, column: string, value: unknown) {
     const pk: Record<string, unknown> = {}
     for (const key of details.primaryKey) pk[key] = row[key]
-    await unwrap(
+    const updated = await unwrap(
       window.api.db.updateRow({
         connectionId,
         schema: details.schema,
@@ -327,7 +326,16 @@ export function TableDataView({
         values: { [column]: value }
       })
     )
-    await load()
+    // The prefetched next page was fetched before this mutation — drop it so
+    // paging forward can't render stale pre-edit rows.
+    prefetchCacheRef.current = null
+    // mysql/d1 re-fetch by PK can miss (e.g. concurrent delete) and return {};
+    // fall back to a local merge rather than blanking the row.
+    const patched = Object.keys(updated).length > 0 ? updated : { ...row, [column]: value }
+    // Patch the saved row in place with what the DB returned (covers
+    // triggers/defaults) instead of reloading — no grid flash, and the
+    // cell-editing session survives for Tab navigation.
+    setRows((prev) => prev.map((r) => (r === row ? patched : r)))
   }
 
   async function handleDelete() {
@@ -416,9 +424,9 @@ export function TableDataView({
             type="button"
             onClick={aiPrompt.open}
             aria-label="Filter this table with natural language"
-            className="group flex h-8 w-72 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-elevated focus-visible:border-accent focus-visible:outline-none"
+            className="group flex h-8 w-72 cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-elevated/40 px-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-elevated focus-visible:border-accent-text focus-visible:outline-none"
           >
-            <span className="flex-1 truncate text-[12px] text-text-subtle transition-colors group-hover:text-text-muted">
+            <span className="flex-1 truncate text-xs text-text-subtle transition-colors group-hover:text-text-muted">
               Describe the rows you want…
             </span>
             <span className="flex shrink-0 items-center gap-0.5">
@@ -441,7 +449,6 @@ export function TableDataView({
           {canMutate && (
             <Button
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={insertModal.open}
             >
               Insert row
@@ -477,7 +484,7 @@ export function TableDataView({
       )}
 
       {!canMutate && details.type === 'table' && (
-        <div className="border-b border-yellow-500/20 bg-yellow-500/5 px-3 py-2 text-xs text-yellow-400">
+        <div className="border-b border-warning/20 bg-warning/5 px-3 py-2 text-xs text-warning">
           This table has no primary key — rows cannot be edited or deleted from the UI.
         </div>
       )}
@@ -510,9 +517,9 @@ export function TableDataView({
 
         {selectedCount > 0 && (
           <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
-            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1.5 rounded-lg border border-border bg-surface/90 px-1.5 py-1.5 shadow-xl shadow-black/40 ring-1 ring-white/5 backdrop-blur-md">
-              <span className="flex items-center gap-1.5 pl-1.5 pr-0.5 text-[12px]">
-                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-md bg-surface-elevated px-1 font-mono text-[11px] font-medium text-text ring-1 ring-white/5">
+            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-full border border-border-strong/70 bg-surface/95 py-1.5 pl-2 pr-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl">
+              <span className="flex items-center gap-2 pl-1 pr-1.5 text-xs">
+                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-surface-elevated px-1.5 font-mono text-xs font-medium text-text ring-1 ring-inset ring-white/10">
                   {selectedCount}
                 </span>
                 <span className="text-text-subtle">
@@ -520,12 +527,12 @@ export function TableDataView({
                 </span>
               </span>
 
-              <span className="mx-0.5 h-5 w-px bg-border" />
+              <span className="mx-1 h-4 w-px bg-white/10" />
 
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 gap-1 rounded-md px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+                className="h-7 gap-1 rounded-full px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
                 onClick={() => setRowSelection({})}
               >
                 <IconX size={12} />
@@ -541,7 +548,7 @@ export function TableDataView({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 gap-1 rounded-md px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
+                  className="h-7 gap-1 rounded-full px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
                 >
                   <IconDownload size={12} />
                   Export {selectedCount}
@@ -549,10 +556,10 @@ export function TableDataView({
               </ExportMenu>
               {canMutate && (
                 <>
-                  <span className="mx-0.5 h-5 w-px bg-border" />
+                  <span className="mx-1 h-4 w-px bg-white/10" />
                   <Button
                     size="sm"
-                    className="h-7 gap-1 rounded-md bg-red-500/90 px-2.5 text-white shadow-sm shadow-red-950/40 hover:bg-red-500"
+                    className="h-7 gap-1 rounded-full bg-danger-fill px-3 text-white ring-1 ring-inset ring-white/15 shadow-md shadow-danger-fill/40 hover:bg-danger"
                     onClick={bulkDeleteConfirm.open}
                   >
                     <IconTrash size={12} />

@@ -7,6 +7,7 @@ import {
   IconAlertTriangle
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { unwrap } from '@renderer/lib/ipc'
 import { useUpdateCheck } from '@renderer/features/settings/store'
 import { APP_NAME, APP_TAGLINE, GITHUB_REPO_URL } from '@renderer/config/site'
@@ -55,7 +56,7 @@ export function SettingsPage() {
       <div className="mx-auto w-full max-w-2xl px-6 py-8">
         <div className="mb-8">
           <h1 className="text-xl font-semibold text-text">Settings</h1>
-          <p className="mt-1 text-[12.5px] text-text-subtle">
+          <p className="mt-1 text-xs text-text-subtle">
             Configure how {APP_NAME} runs on this machine.
           </p>
         </div>
@@ -64,12 +65,12 @@ export function SettingsPage() {
           <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface-elevated/20 p-4">
             <div className="flex min-w-0 flex-col gap-0.5">
               <div className="flex items-center gap-2">
-                <span className="text-[14px] font-semibold tracking-tight text-text">
+                <span className="text-xs font-semibold tracking-tight text-text">
                   {APP_NAME}
                 </span>
-                <span className="font-mono text-[11px] text-text-subtle">v{currentVersion}</span>
+                <span className="font-mono text-xs text-text-subtle">v{currentVersion}</span>
               </div>
-              <p className="text-[12px] text-text-subtle">{APP_TAGLINE}</p>
+              <p className="text-xs text-text-subtle">{APP_TAGLINE}</p>
             </div>
             <button
               type="button"
@@ -86,28 +87,28 @@ export function SettingsPage() {
           <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated/20">
             <div className="p-4">
               {isChecking ? (
-                <div className="flex items-center gap-2.5 text-[13px] text-text-muted">
-                  <IconRefresh size={15} className="animate-spin text-text-subtle" />
+                <div className="flex items-center gap-2.5 text-xs text-text-muted">
+                  <Spinner size={15} className="text-text-subtle" />
                   Checking for updates…
                 </div>
               ) : error ? (
                 <div className="flex items-start gap-2.5">
                   <IconAlertTriangle size={15} className="mt-0.5 shrink-0 text-text-subtle" />
                   <div className="flex flex-col gap-0.5">
-                    <p className="text-[13px] font-medium text-text">
+                    <p className="text-xs font-medium text-text">
                       Couldn&rsquo;t check for updates
                     </p>
-                    <p className="text-[11.5px] text-text-subtle">{error}</p>
+                    <p className="text-xs text-text-subtle">{error}</p>
                   </div>
                 </div>
               ) : hasUpdate && result ? (
                 <div className="flex flex-col gap-3">
                   <div className="flex items-start gap-2.5">
                     <div className="flex min-w-0 flex-col gap-0.5">
-                      <p className="text-[13px] font-medium text-text">
+                      <p className="text-xs font-medium text-text">
                         Version {result.latestVersion} is available
                       </p>
-                      <p className="text-[11.5px] text-text-subtle">
+                      <p className="text-xs text-text-subtle">
                         You&rsquo;re on v{result.currentVersion}
                         {result.publishedAt &&
                           ` · Released ${formatPublishedAt(result.publishedAt)}`}
@@ -130,8 +131,8 @@ export function SettingsPage() {
                 <div className="flex items-start gap-2.5">
                   <IconCircleCheck size={15} className="mt-0.5 shrink-0 text-text-subtle" />
                   <div className="flex flex-col gap-0.5">
-                    <p className="text-[13px] font-medium text-text">You&rsquo;re up to date</p>
-                    <p className="text-[11.5px] text-text-subtle">
+                    <p className="text-xs font-medium text-text">You&rsquo;re up to date</p>
+                    <p className="text-xs text-text-subtle">
                       Running the latest version (v{currentVersion}).
                     </p>
                   </div>
@@ -140,7 +141,7 @@ export function SettingsPage() {
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5">
-              <span className="text-[11px] text-text-subtle">
+              <span className="text-xs text-text-subtle">
                 Last checked {formatRelative(lastCheckedAt)} · via{' '}
                 <span className="text-text-muted">GitHub Releases</span>
               </span>
@@ -151,7 +152,11 @@ export function SettingsPage() {
                 onClick={() => void check()}
                 disabled={isChecking}
               >
-                <IconRefresh size={12} className={isChecking ? 'animate-spin' : ''} />
+                {isChecking ? (
+                  <Spinner size={12} className="text-current" />
+                ) : (
+                  <IconRefresh size={12} />
+                )}
                 Check now
               </Button>
             </div>
@@ -165,7 +170,7 @@ export function SettingsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-8 flex flex-col gap-3">
-      <h2 className="text-[10.5px] font-semibold uppercase tracking-wider text-text-subtle">
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-text-subtle">
         {title}
       </h2>
       {children}

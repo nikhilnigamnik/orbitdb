@@ -11,7 +11,7 @@ const DropdownMenuGroup = DropdownMenuPrimitive.Group
 const DropdownMenuSub = DropdownMenuPrimitive.Sub
 
 const MENU_PANEL =
-  'z-50 min-w-[10rem] overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-xl shadow-black/30 drop-shadow-xs'
+  'z-50 min-w-[10rem] overflow-hidden rounded-lg border border-border-strong bg-surface p-1 shadow-2xl shadow-black/70'
 
 function DropdownMenuContent({
   className,
@@ -32,7 +32,7 @@ function DropdownMenuContent({
 }
 
 const ITEM_BASE =
-  'flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-[12px] outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
+  'flex w-full cursor-pointer select-none items-center gap-2 rounded-[5px] px-2 py-1.5 text-xs outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
 
 function DropdownMenuItem({
   className,
@@ -46,7 +46,7 @@ function DropdownMenuItem({
       className={cn(
         ITEM_BASE,
         variant === 'danger'
-          ? 'text-rose-500 data-highlighted:bg-rose-500/10 data-highlighted:text-rose-500'
+          ? 'text-danger data-highlighted:bg-danger/10 data-highlighted:text-danger'
           : 'text-text-muted data-highlighted:bg-surface-elevated data-highlighted:text-text',
         className
       )}

@@ -36,7 +36,7 @@ function Dialog({
           onOpenAutoFocus={onOpenAutoFocus}
           onEscapeKeyDown={onEscapeKeyDown}
           className={cn(
-            'animate-scale-in fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(600px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl shadow-black/60',
+            'animate-scale-in fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(600px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border-strong bg-surface shadow-2xl shadow-black/70',
             className
           )}
         >

@@ -98,7 +98,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          'fixed z-50 m-1 flex flex-col rounded-lg border border-border bg-surface shadow-2xl shadow-black/40 transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-150 data-[state=open]:duration-200',
+          'fixed z-50 m-1 flex flex-col rounded-lg border border-border-strong bg-surface shadow-2xl shadow-black/70 transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-150 data-[state=open]:duration-200',
           side === 'right' && floatingStyles.right,
           side === 'left' && floatingStyles.left,
           side === 'top' &&

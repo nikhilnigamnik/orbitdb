@@ -135,14 +135,13 @@ export function ConnectionsPage() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <img src={orbitdbLogo} alt={APP_NAME} className="h-7 w-7 object-contain" />
-                <span className="truncate text-[18px] font-semibold text-text">{APP_NAME}</span>
+                <span className="truncate text-xs font-semibold text-text">{APP_NAME}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
                 variant="ghost"
-                className="rounded-md border border-border bg-surface px-3 text-text-muted hover:bg-surface-elevated hover:text-text"
                 onClick={refresh}
                 disabled={isLoading}
                 title="Refresh"
@@ -175,7 +174,7 @@ export function ConnectionsPage() {
               openPopover={sortOpen}
               setOpenPopover={setSortOpen}
               align="end"
-              popoverContentClassName="w-48 overflow-hidden shadow-xl shadow-black/40"
+              popoverContentClassName="w-48 overflow-hidden"
               content={
                 <div className="flex flex-col p-1">
                   {(Object.keys(SORT_LABEL) as SortMode[]).map((key) => (
@@ -228,7 +227,7 @@ export function ConnectionsPage() {
                 action={
                   <Button
                     size="sm"
-                    className="rounded-lg bg-accent px-3.5 text-white hover:bg-accent/90"
+                    className="rounded-lg px-3.5"
                     onClick={openCreate}
                   >
                     Add new

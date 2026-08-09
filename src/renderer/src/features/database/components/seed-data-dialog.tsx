@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { IconSeeding, IconLoader2, IconAlertTriangle } from '@tabler/icons-react'
+import { IconSeeding, IconAlertTriangle } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
@@ -74,23 +75,23 @@ export function SeedDataDialog({
         <div className="flex h-full min-h-0 flex-col">
           <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3 pr-12">
             <IconSeeding size={15} className="shrink-0 " />
-            <h2 className="truncate text-[13px] font-semibold text-text">Seed data</h2>
+            <h2 className="truncate text-xs font-semibold text-text">Seed data</h2>
           </div>
 
           {status === 'done' ? (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
               <div className="space-y-1">
-                <p className="text-[14px] font-semibold text-text">
+                <p className="text-xs font-semibold text-text">
                   Added {inserted} {inserted === 1 ? 'row' : 'rows'}
                 </p>
-                <p className="text-[12px] text-text-subtle">
+                <p className="text-xs text-text-subtle">
                   Inserted into{' '}
                   <span className="font-mono text-text-muted">
                     {schema}.{table}
                   </span>
                 </p>
                 {skipped > 0 && (
-                  <p className="text-[11px] text-text-subtle/70">
+                  <p className="text-xs text-text-subtle/70">
                     {skipped} {skipped === 1 ? 'row was' : 'rows were'} skipped (duplicates or
                     constraints)
                   </p>
@@ -108,8 +109,7 @@ export function SeedDataDialog({
                 </Button>
                 <Button
                   size="sm"
-                  className="bg-accent text-white hover:bg-accent/90"
-                  onClick={onClose}
+                      onClick={onClose}
                 >
                   Done
                 </Button>
@@ -118,15 +118,15 @@ export function SeedDataDialog({
           ) : (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
               <div className="space-y-2">
-                <p className="text-[14px] font-semibold text-text">Generate sample rows</p>
-                <p className="mx-auto max-w-60 text-[12px] leading-relaxed text-text-subtle">
+                <p className="text-xs font-semibold text-text">Generate sample rows</p>
+                <p className="mx-auto max-w-60 text-xs leading-relaxed text-text-subtle">
                   AI creates realistic test data that fits this table&apos;s columns and
                   constraints, then inserts it for you.
                 </p>
               </div>
 
               <div className="w-full space-y-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-text-subtle">
+                <p className="text-xs font-semibold uppercase tracking-wider text-text-subtle">
                   Rows
                 </p>
                 <div className="flex justify-center gap-1.5">
@@ -137,7 +137,7 @@ export function SeedDataDialog({
                       disabled={isWorking}
                       onClick={() => setRowCount(n)}
                       className={cn(
-                        'h-8 w-12 cursor-pointer rounded-md border text-[12px] font-medium tabular-nums transition-colors disabled:opacity-50',
+                        'h-8 w-12 cursor-pointer rounded-md border text-xs font-medium tabular-nums transition-colors disabled:opacity-50',
                         rowCount === n
                           ? 'border-accent/40 bg-accent/15 text-text'
                           : 'border-border bg-surface-elevated/40 text-text-subtle hover:border-border-strong hover:text-text'
@@ -151,13 +151,12 @@ export function SeedDataDialog({
 
               <Button
                 size="sm"
-                className="bg-accent text-white hover:bg-accent/90"
-                onClick={seed}
+                  onClick={seed}
                 disabled={isWorking}
               >
                 {isWorking ? (
                   <>
-                    <IconLoader2 size={12} className="animate-spin" />
+                    <Spinner size={12} className="text-current" />
                     Generating & inserting…
                   </>
                 ) : (
@@ -166,7 +165,7 @@ export function SeedDataDialog({
               </Button>
 
               {error && (
-                <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2 text-left text-[11.5px] text-red-300">
+                <div className="flex items-start gap-2 rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-left text-xs text-danger">
                   <IconAlertTriangle size={14} className="mt-0.5 shrink-0" />
                   <span className="wrap-break-word">{error}</span>
                 </div>

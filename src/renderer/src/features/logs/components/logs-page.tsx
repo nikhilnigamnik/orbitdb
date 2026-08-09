@@ -10,6 +10,7 @@ import {
   IconTrash
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { Chip } from '@renderer/components/ui/chip'
 import { Input } from '@renderer/components/ui/input'
 import { Sheet } from '@renderer/components/ui/sheet'
@@ -122,14 +123,14 @@ export function LogsPage() {
     <div className="flex h-full min-h-0 flex-col bg-bg">
       <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-5 py-3">
         <div className="flex min-w-0 flex-col leading-tight">
-          <h1 className="text-[13px] font-semibold text-text">Query log</h1>
-          <p className="truncate text-[10.5px] text-text-subtle">
+          <h1 className="text-xs font-semibold text-text">Query log</h1>
+          <p className="truncate text-xs text-text-subtle">
             <span className="font-mono text-text-muted">{formatNumber(logs.length)}</span> entr
             {logs.length === 1 ? 'y' : 'ies'}
             {errorCount > 0 && (
               <>
                 <span className="text-text-subtle/60"> · </span>
-                <span className="text-red-300/80">{errorCount} failed</span>
+                <span className="text-danger">{errorCount} failed</span>
               </>
             )}
           </p>
@@ -153,13 +154,13 @@ export function LogsPage() {
             onClick={() => void load()}
             disabled={isLoading}
           >
-            <IconRefresh size={12} className={isLoading ? 'animate-spin' : ''} />
+            {isLoading ? <Spinner size={12} className="text-current" /> : <IconRefresh size={12} />}
             Refresh
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="text-text-muted hover:bg-surface-elevated hover:text-red-400"
+            className="text-text-muted hover:bg-surface-elevated hover:text-danger"
             onClick={clearConfirm.open}
             disabled={logs.length === 0}
           >
@@ -198,11 +199,11 @@ export function LogsPage() {
           <LoadingState />
         ) : filtered.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-text-subtle">
-            <p className="text-[12px]">
+            <p className="text-xs">
               {logs.length === 0 ? 'No queries logged yet' : 'No matches'}
             </p>
             {logs.length === 0 && (
-              <p className="text-[10.5px] text-text-subtle/70">
+              <p className="text-xs text-text-subtle/70">
                 {"Run a query and it'll show up here."}
               </p>
             )}
@@ -215,7 +216,7 @@ export function LogsPage() {
               onClick={() => setSelected(entry)}
               className="group/entry block w-full cursor-pointer border-b border-border/60 px-5 py-2.5 text-left transition-colors hover:bg-surface-elevated/40"
             >
-              <div className="flex items-center gap-2 text-[10.5px]">
+              <div className="flex items-center gap-2 text-xs">
                 {entry.success ? (
                   <Chip tone="emerald">
                     <IconCheck size={9} />
@@ -246,8 +247,8 @@ export function LogsPage() {
               </div>
               <p
                 className={cn(
-                  'mt-1 line-clamp-2 font-mono text-[12px] leading-snug',
-                  entry.success ? 'text-text' : 'text-red-300/80'
+                  'mt-1 line-clamp-2 font-mono text-xs leading-snug',
+                  entry.success ? 'text-text' : 'text-danger'
                 )}
               >
                 {entry.sql.trim() || '—'}
@@ -270,10 +271,10 @@ export function LogsPage() {
               <div className="flex shrink-0 items-start gap-3 border-b border-border px-4 py-3.5 pr-12">
                 <div
                   className={cn(
-                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-b ring-1 ring-inset',
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset',
                     selected.success
-                      ? 'from-emerald-500/20 to-emerald-500/5 text-emerald-200 ring-emerald-500/25 shadow-[inset_0_1px_0_rgba(110,231,183,0.35)]'
-                      : 'from-rose-500/20 to-rose-500/5 text-rose-200 ring-rose-500/25 shadow-[inset_0_1px_0_rgba(253,164,175,0.35)]'
+                      ? 'bg-success/12 text-success ring-success/25'
+                      : 'bg-danger/12 text-danger ring-danger/25'
                   )}
                 >
                   {selected.success ? (
@@ -284,12 +285,12 @@ export function LogsPage() {
                 </div>
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-[14px] font-semibold tracking-tight text-text">
+                    <h2 className="text-xs font-semibold tracking-tight text-text">
                       Query detail
                     </h2>
                     <Chip tone={ENGINE_TONE[selected.engine]}>{ENGINE_LABEL[selected.engine]}</Chip>
                   </div>
-                  <p className="truncate text-[11px] text-text-subtle">
+                  <p className="truncate text-xs text-text-subtle">
                     {connectionName(selected.connectionId)} ·{' '}
                     {new Date(selected.ranAt).toLocaleString()}
                   </p>
@@ -307,7 +308,7 @@ export function LogsPage() {
                   <Stat
                     label="Status"
                     value={selected.success ? 'Success' : 'Failed'}
-                    valueClassName={selected.success ? 'text-emerald-300' : 'text-rose-300'}
+                    valueClassName={selected.success ? 'text-success' : 'text-danger'}
                     border
                   />
                 </div>
@@ -319,16 +320,16 @@ export function LogsPage() {
                       onClick={copySql}
                       title="Copy SQL"
                       aria-label="Copy SQL"
-                      className="absolute right-2 top-2 z-10 flex h-6 cursor-pointer items-center gap-1 rounded-md border border-border bg-surface px-2 text-[10.5px] text-text-subtle opacity-0 transition-all group-hover/sql:opacity-100 hover:bg-surface-elevated hover:text-text"
+                      className="absolute right-2 top-2 z-10 flex h-6 cursor-pointer items-center gap-1 rounded-md border border-border bg-surface px-2 text-xs text-text-subtle opacity-0 transition-all group-hover/sql:opacity-100 hover:bg-surface-elevated hover:text-text"
                     >
                       {copied ? (
-                        <IconCheck size={11} className="text-emerald-400" />
+                        <IconCheck size={11} className="text-success" />
                       ) : (
                         <IconCopy size={11} />
                       )}
                       {copied ? 'Copied' : 'Copy'}
                     </button>
-                    <pre className="overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3.5 py-3 pr-14 font-mono text-[12px] leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
+                    <pre className="overflow-auto rounded-lg border border-border bg-surface-sunken px-3.5 py-3 pr-14 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
                       {selected.sql.trim() || '—'}
                     </pre>
                   </div>
@@ -336,7 +337,7 @@ export function LogsPage() {
 
                 {selected.params.length > 0 && (
                   <DetailSection label="Params">
-                    <pre className="overflow-auto rounded-lg border border-border bg-surface-elevated/40 px-3.5 py-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap wrap-anywhere text-text-muted">
+                    <pre className="overflow-auto rounded-lg border border-border bg-surface-sunken px-3.5 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-text-muted">
                       {JSON.stringify(selected.params, null, 2)}
                     </pre>
                   </DetailSection>
@@ -344,7 +345,7 @@ export function LogsPage() {
 
                 {selected.error && (
                   <DetailSection label="Error" tone="error">
-                    <pre className="overflow-auto rounded-lg border border-rose-500/20 bg-rose-500/5 px-3.5 py-3 font-mono text-[12px] leading-relaxed whitespace-pre-wrap wrap-anywhere text-rose-200">
+                    <pre className="overflow-auto rounded-lg border border-danger/20 bg-danger/5 px-3.5 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-danger">
                       {selected.error}
                     </pre>
                   </DetailSection>
@@ -383,10 +384,10 @@ function Stat({
 }) {
   return (
     <div className={cn('flex flex-col gap-0.5 px-3 py-2', border && 'border-l border-border')}>
-      <span className="text-[10px] font-medium uppercase tracking-wider text-text-subtle">
+      <span className="text-xs font-medium uppercase tracking-wider text-text-subtle">
         {label}
       </span>
-      <span className={cn('font-mono text-[12px] text-text', valueClassName)}>{value}</span>
+      <span className={cn('font-mono text-xs text-text', valueClassName)}>{value}</span>
     </div>
   )
 }
@@ -407,8 +408,8 @@ function DetailSection({
       <div className="flex h-6 items-center justify-between">
         <span
           className={cn(
-            'text-[10.5px] font-semibold uppercase tracking-wider',
-            tone === 'error' ? 'text-rose-400/80' : 'text-text-subtle'
+            'text-xs font-semibold uppercase tracking-wider',
+            tone === 'error' ? 'text-danger' : 'text-text-subtle'
           )}
         >
           {label}

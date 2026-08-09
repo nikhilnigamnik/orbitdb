@@ -30,7 +30,6 @@ export function DiagramPage() {
           action={
             <Button
               size="sm"
-              className="bg-accent text-white hover:bg-accent/90"
               onClick={() => navigate(ROUTES.connections)}
             >
               Go to connections
@@ -107,12 +106,12 @@ function DiagramToolbar({ schemas, activeSchema, onPickSchema }: DiagramToolbarP
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2">
       <IconSchema size={14} className="text-text-subtle" />
-      <span className="text-[11.5px] text-text-subtle">Schema</span>
+      <span className="text-xs text-text-subtle">Schema</span>
       <Popover
         openPopover={open}
         setOpenPopover={setOpen}
         align="start"
-        popoverContentClassName="w-56 overflow-hidden shadow-xl shadow-black/40"
+        popoverContentClassName="w-56 overflow-hidden"
         content={
           <div className="flex max-h-64 flex-col overflow-auto p-1">
             {schemas.map((name) => (
@@ -124,7 +123,7 @@ function DiagramToolbar({ schemas, activeSchema, onPickSchema }: DiagramToolbarP
                   setOpen(false)
                 }}
                 className={cn(
-                  'flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-left font-mono text-[11.5px] hover:bg-surface-elevated',
+                  'flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-left font-mono text-xs hover:bg-surface-elevated',
                   activeSchema === name ? 'text-text' : 'text-text-muted'
                 )}
               >
@@ -134,7 +133,7 @@ function DiagramToolbar({ schemas, activeSchema, onPickSchema }: DiagramToolbarP
           </div>
         }
       >
-        <Button size="sm" variant="ghost" className="font-mono text-[12px] text-text">
+        <Button size="sm" variant="ghost" className="font-mono text-xs text-text">
           {activeSchema}
         </Button>
       </Popover>

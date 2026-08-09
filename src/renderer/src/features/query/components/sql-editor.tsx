@@ -27,7 +27,7 @@ export function SqlEditor({ value, onChange, onSubmit, disabled, className }: Sq
       disabled={disabled}
       spellCheck={false}
       className={cn(
-        'h-full min-h-0 resize-none rounded-none border-0 bg-surface px-4 py-3 font-mono text-[13px] leading-relaxed text-text placeholder:text-text-subtle/70 focus-visible:ring-0',
+        'h-full min-h-0 resize-none rounded-none border-0 bg-input px-4 py-3 font-mono text-xs leading-relaxed text-text placeholder:text-text-subtle/70 focus-visible:ring-0',
         className
       )}
     />

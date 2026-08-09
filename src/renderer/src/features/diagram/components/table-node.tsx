@@ -50,11 +50,11 @@ export function TableNode({ data, selected }: NodeProps) {
       )}
     >
       <div
-        className="flex items-center justify-between gap-2 border-b border-border bg-surface-elevated/60 px-2.5 font-mono text-[11px] font-semibold text-text"
+        className="flex items-center justify-between gap-2 border-b border-border bg-surface-elevated/60 px-2.5 font-mono text-xs font-semibold text-text"
         style={{ height: NODE_HEADER_HEIGHT }}
       >
         <span className="truncate">{node.name}</span>
-        <span className="shrink-0 text-[9px] font-normal uppercase tracking-[0.08em] text-text-subtle">
+        <span className="shrink-0 text-xs font-normal uppercase tracking-[0.08em] text-text-subtle">
           {node.schema}
         </span>
       </div>
@@ -62,7 +62,7 @@ export function TableNode({ data, selected }: NodeProps) {
       <div>
         {node.columns.length === 0 ? (
           <div
-            className="flex items-center px-2.5 font-mono text-[10.5px] italic text-text-subtle"
+            className="flex items-center px-2.5 font-mono text-xs italic text-text-subtle"
             style={{ height: NODE_ROW_HEIGHT }}
           >
             no columns
@@ -72,7 +72,7 @@ export function TableNode({ data, selected }: NodeProps) {
             <div
               key={col.name}
               style={{ height: NODE_ROW_HEIGHT }}
-              className="relative flex min-w-0 items-center gap-1.5 px-2.5 font-mono text-[10.5px] text-text-muted hover:bg-surface-elevated/40"
+              className="relative flex min-w-0 items-center gap-1.5 px-2.5 font-mono text-xs text-text-muted hover:bg-surface-elevated/40"
             >
               <Handle
                 type="target"
@@ -83,9 +83,9 @@ export function TableNode({ data, selected }: NodeProps) {
               />
               <span className="flex w-3 shrink-0 items-center justify-center text-text-subtle">
                 {col.isPrimaryKey ? (
-                  <IconKey size={9} className="text-amber-300" />
+                  <IconKey size={9} className="text-warning" />
                 ) : col.isForeignKey ? (
-                  <IconLink size={9} className="text-sky-300" />
+                  <IconLink size={9} className="text-info" />
                 ) : null}
               </span>
               <span
@@ -99,7 +99,7 @@ export function TableNode({ data, selected }: NodeProps) {
               </span>
               <span
                 title={col.dataType}
-                className="ml-1 max-w-[45%] shrink-0 truncate text-[9.5px] uppercase text-text-subtle"
+                className="ml-1 max-w-[45%] shrink-0 truncate text-xs uppercase text-text-subtle"
               >
                 {shortenDataType(col.dataType)}
               </span>

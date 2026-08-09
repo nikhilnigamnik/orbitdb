@@ -55,8 +55,8 @@ export function Select<T extends string = string>({
           'disabled:cursor-not-allowed disabled:opacity-50',
           'data-[state=open]:border-[var(--color-border-strong)] data-[state=open]:bg-surface-elevated',
           'data-placeholder:text-text-subtle',
-          'data-[size=default]:h-8 data-[size=default]:text-[12.5px]',
-          'data-[size=sm]:h-7 data-[size=sm]:text-[11.5px]',
+          'data-[size=default]:h-8 data-[size=default]:text-xs',
+          'data-[size=sm]:h-7 data-[size=sm]:text-xs',
           className
         )}
       >
@@ -87,7 +87,7 @@ export function Select<T extends string = string>({
                 value={option.value}
                 disabled={option.disabled}
                 className={cn(
-                  'relative flex cursor-pointer select-none items-center gap-2 rounded-md py-1.5 pl-2 pr-7 text-[12px] text-text-muted outline-none transition-colors',
+                  'relative flex cursor-pointer select-none items-center gap-2 rounded-md py-1.5 pl-2 pr-7 text-xs text-text-muted outline-none transition-colors',
                   'focus:bg-surface-elevated focus:text-text',
                   'data-[state=checked]:text-text',
                   'data-disabled:pointer-events-none data-disabled:opacity-50'
