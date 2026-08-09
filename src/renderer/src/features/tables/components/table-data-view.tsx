@@ -1,7 +1,14 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { RowSelectionState } from '@tanstack/react-table'
-import { IconArrowBackUp, IconDownload, IconSeeding, IconTrash, IconX } from '@tabler/icons-react'
+import {
+  IconArrowBackUp,
+  IconArrowNarrowRight,
+  IconDownload,
+  IconSeeding,
+  IconTrash,
+  IconX
+} from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Kbd } from '@renderer/components/ui/kbd'
 import { AiPrompt } from '@renderer/features/query/components/ai-prompt'
@@ -10,6 +17,7 @@ import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { formatCellValue } from '@renderer/lib/format'
+import { cn } from '@renderer/lib/utils'
 import { unwrap } from '@renderer/lib/ipc'
 import {
   FILTERS_PARAM,
@@ -414,13 +422,17 @@ export function TableDataView({
     pk: Record<string, unknown>
     column: string
     previousValue: unknown
+    newValue: unknown
   } | null>(null)
+  // The prompt is a hint, not the capability: it fades, but cmd-Z keeps working
+  // until another edit replaces it or the table changes. Tying the two together
+  // meant looking away for twelve seconds silently cost you the undo.
+  const [isUndoPromptVisible, setIsUndoPromptVisible] = React.useState(false)
   const [isUndoing, setIsUndoing] = React.useState(false)
 
-  // The offer expires so it can't be mistaken for undoing something more recent.
   React.useEffect(() => {
     if (!lastEdit) return
-    const timer = setTimeout(() => setLastEdit(null), 12_000)
+    const timer = setTimeout(() => setIsUndoPromptVisible(false), 12_000)
     return () => clearTimeout(timer)
   }, [lastEdit])
 
@@ -452,14 +464,6 @@ export function TableDataView({
       })
     )
   }
-
-  /** Which row the pending undo belongs to, as `pk=value` for a simple key. */
-  const undoRowLabel = React.useMemo(() => {
-    if (!lastEdit) return null
-    const entries = Object.entries(lastEdit.pk)
-    if (entries.length === 0) return null
-    return entries.map(([key, value]) => `${key}=${formatCellValue(value)}`).join(', ')
-  }, [lastEdit])
 
   async function undoLastEdit() {
     if (!lastEdit || isUndoing) return
@@ -496,7 +500,8 @@ export function TableDataView({
     // triggers/defaults) instead of reloading — no grid flash, and the
     // cell-editing session survives for Tab navigation.
     await writeCell(pk, column, value, row)
-    setLastEdit({ pk, column, previousValue })
+    setLastEdit({ pk, column, previousValue, newValue: value })
+    setIsUndoPromptVisible(true)
   }
 
   async function handleDelete() {
@@ -673,6 +678,7 @@ export function TableDataView({
           isInitialLoad={isLoading && !hasLoadedOnce}
           fkColumns={fkByColumn}
           onOpenForeignKey={openForeignKey}
+          pendingUndoRow={lastEdit?.pk ?? null}
           hasFilters={filters.length > 0}
           onClearFilters={() => {
             setFilters([])
@@ -680,38 +686,29 @@ export function TableDataView({
           }}
         />
 
-        {lastEdit && selectedCount === 0 && (
+        {lastEdit && isUndoPromptVisible && selectedCount === 0 && (
           // Sits where the selection bar sits, and only when that is absent —
           // two stacked floating bars would fight for the same corner.
-          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
-            {/* One row, one control: a bordered button inside a bordered bar
-                inside a Kbd chip was three boxes for a single action. The action
-                only takes chrome once it is hovered. */}
-            <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-lg border border-border-strong/70 bg-surface/95 py-1 pl-3 pr-1 text-xs shadow-2xl shadow-black/60 backdrop-blur-xl">
-              {/* Names the row as well as the column: editing the same column in
-                  several rows produced an identical label each time, so there
-                  was no way to tell what Undo would revert. Mono sits at 11px
-                  because Geist Mono reads larger than the sans at the same size. */}
-              <span className="flex min-w-0 items-center gap-1 text-text-subtle">
-                Updated
-                <span className="font-mono text-[11px] text-text">{lastEdit.column}</span>
-                {undoRowLabel && (
-                  <>
-                    <span className="text-text-subtle/50">in</span>
-                    <span
-                      className="max-w-40 truncate font-mono text-[11px] text-text-muted"
-                      title={undoRowLabel}
-                    >
-                      {undoRowLabel}
-                    </span>
-                  </>
-                )}
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+            <div className="animate-slide-up-fade pointer-events-auto flex min-w-0 items-center gap-1 rounded-lg border border-border-strong/70 bg-surface/95 py-1 pl-3 pr-1 text-xs shadow-2xl shadow-black/60 backdrop-blur-xl">
+              {/* The change itself, not its coordinates: a truncated key told you
+                  where an edit happened but never what it did, which is the only
+                  question this control exists to answer. The edited row is
+                  highlighted in the grid, which identifies it far better than a
+                  fragment of a UUID could. */}
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="shrink-0 font-mono text-[11px] text-text-muted">
+                  {lastEdit.column}
+                </span>
+                <UndoValue value={lastEdit.previousValue} muted />
+                <IconArrowNarrowRight size={12} className="shrink-0 text-text-subtle/60" />
+                <UndoValue value={lastEdit.newValue} />
               </span>
               <button
                 type="button"
                 onClick={() => void undoLastEdit()}
                 disabled={isUndoing}
-                className="ml-1 flex h-6 cursor-pointer items-center gap-1.5 rounded-md px-2 text-text-muted transition-colors hover:bg-surface-elevated hover:text-text focus-visible:bg-surface-elevated focus-visible:text-text focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                className="ml-1 flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 text-text-muted transition-colors hover:bg-surface-elevated hover:text-text focus-visible:bg-surface-elevated focus-visible:text-text focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <IconArrowBackUp size={12} className="shrink-0" />
                 {isUndoing ? 'Undoing…' : 'Undo'}
@@ -855,5 +852,26 @@ export function TableDataView({
         isLoading={isMutating}
       />
     </div>
+  )
+}
+
+/**
+ * One side of an edit, in the same shape the grid uses: NULL named rather than
+ * shown as a blank, and anything long clipped with the whole value in the title.
+ */
+function UndoValue({ value, muted }: { value: unknown; muted?: boolean }) {
+  const display = formatCellValue(value)
+  const isNull = value === null
+  return (
+    <span
+      title={display}
+      className={cn(
+        'max-w-28 truncate font-mono text-[11px]',
+        isNull && 'italic',
+        muted ? 'text-text-subtle' : 'text-text'
+      )}
+    >
+      {display}
+    </span>
   )
 }
