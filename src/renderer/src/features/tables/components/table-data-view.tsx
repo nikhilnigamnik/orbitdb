@@ -20,6 +20,7 @@ import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { formatCellValue } from '@renderer/lib/format'
 import { errorMessage } from '@renderer/lib/errors'
+import { isMissingAiKeyError } from '@renderer/components/common/ai-key-required'
 import { cn } from '@renderer/lib/utils'
 import { unwrap } from '@renderer/lib/ipc'
 import {
@@ -30,7 +31,7 @@ import {
   encodeFilters
 } from '@renderer/features/tables/lib/filter-params'
 import { DEFAULT_PAGE_SIZE, UNDO_PROMPT_MS } from '@renderer/config/site'
-import { tableRouteWithFk } from '@renderer/config/routes'
+import { ROUTES, tableRouteWithFk } from '@renderer/config/routes'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import type {
   ColumnInfo,
@@ -396,7 +397,16 @@ export function TableDataView({
       setOffset(0)
       aiPrompt.close()
     } catch (err) {
-      toast.error('AI filter failed', { description: errorMessage(err) })
+      const message = errorMessage(err)
+      // A missing key is a setup step, not a failure — say what to do about it.
+      if (isMissingAiKeyError(message)) {
+        toast.error('AI needs an Anthropic API key', {
+          description: 'It stays encrypted on this machine.',
+          action: { label: 'Open settings', onClick: () => navigate(ROUTES.settings) }
+        })
+      } else {
+        toast.error('AI filter failed', { description: message })
+      }
     } finally {
       setIsAiFiltering(false)
     }

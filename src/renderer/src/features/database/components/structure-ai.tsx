@@ -1,10 +1,13 @@
 import * as React from 'react'
 import { IconSparkles, IconBulb, IconCheck, IconAlertTriangle } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { Chip } from '@renderer/components/ui/chip'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { MarkdownView } from '@renderer/components/common/markdown'
 import { unwrap } from '@renderer/lib/ipc'
+import { errorMessage } from '@renderer/lib/errors'
+import { AiKeyRequired, isMissingAiKeyError } from '@renderer/components/common/ai-key-required'
 import { cn } from '@renderer/lib/utils'
 import type { IndexSuggestion } from '@renderer/types'
 
@@ -152,6 +155,8 @@ function ExplainSheet({
               <Spinner size={15} className="text-current" />
               <span className="text-xs">Analyzing table…</span>
             </Centered>
+          ) : isMissingAiKeyError(error) ? (
+            <AiKeyRequired onNavigate={onClose} />
           ) : error ? (
             <ErrorLine message={error} />
           ) : (
@@ -184,20 +189,37 @@ function IndexesSheet({
   const [suggestions, setSuggestions] = React.useState<IndexSuggestion[]>([])
   const [error, setError] = React.useState<string | null>(null)
   const [applied, setApplied] = React.useState<Record<string, 'applying' | 'done' | string>>({})
+  /** The exact statement each suggestion would run, by suggestion name. */
+  const [preview, setPreview] = React.useState<Record<string, string>>({})
 
   React.useEffect(() => {
     if (!open) return
     setSuggestions([])
     setError(null)
     setApplied({})
+    setPreview({})
     setIsLoading(true)
     let cancelled = false
     void (async () => {
       try {
         const result = await unwrap(window.api.ai.suggestIndexes({ connectionId, schema, table }))
-        if (!cancelled) setSuggestions(result.suggestions)
+        if (cancelled) return
+        setSuggestions(result.suggestions)
+        // Every other DDL path in the app shows the statement before running it,
+        // and these are a model's guesses — the one place it matters most.
+        // ddlPreview builds the SQL without touching the database.
+        const previews = await Promise.all(
+          result.suggestions.map(async (s) => {
+            try {
+              return [s.name, await unwrap(window.api.db.ddlPreview(ddlRequest(s)))] as const
+            } catch {
+              return [s.name, ''] as const
+            }
+          })
+        )
+        if (!cancelled) setPreview(Object.fromEntries(previews.filter(([, sql]) => sql)))
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) setError(errorMessage(err))
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -207,22 +229,24 @@ function IndexesSheet({
     }
   }, [open, connectionId, schema, table])
 
+  function ddlRequest(s: IndexSuggestion) {
+    return {
+      connectionId,
+      schema,
+      table,
+      operation: {
+        kind: 'create-index' as const,
+        name: s.name,
+        columns: s.columns,
+        isUnique: s.isUnique
+      }
+    }
+  }
+
   async function apply(s: IndexSuggestion) {
     setApplied((prev) => ({ ...prev, [s.name]: 'applying' }))
     try {
-      await unwrap(
-        window.api.db.ddlExecute({
-          connectionId,
-          schema,
-          table,
-          operation: {
-            kind: 'create-index',
-            name: s.name,
-            columns: s.columns,
-            isUnique: s.isUnique
-          }
-        })
-      )
+      await unwrap(window.api.db.ddlExecute(ddlRequest(s)))
       setApplied((prev) => ({ ...prev, [s.name]: 'done' }))
       onApplied()
     } catch (err) {
@@ -247,6 +271,8 @@ function IndexesSheet({
               <Spinner size={15} className="text-current" />
               <span className="text-xs">Analyzing structure…</span>
             </Centered>
+          ) : isMissingAiKeyError(error) ? (
+            <AiKeyRequired onNavigate={onClose} />
           ) : error ? (
             <ErrorLine message={error} />
           ) : suggestions.length === 0 ? (
@@ -259,45 +285,56 @@ function IndexesSheet({
               {suggestions.map((s) => {
                 const state = applied[s.name]
                 return (
-                  <div key={s.name} className="flex items-start gap-3 px-4 py-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="truncate font-mono text-xs font-medium text-text">
-                          {s.name}
-                        </span>
-                        {s.isUnique && (
-                          <span className="rounded bg-surface-elevated px-1 py-0 text-xs font-semibold uppercase tracking-wider text-text-subtle">
-                            Unique
+                  <div key={s.name} className="flex flex-col gap-2 px-4 py-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="flex items-center gap-1.5">
+                          <span className="min-w-0 truncate font-mono text-xs font-medium text-text">
+                            {s.name}
                           </span>
-                        )}
+                          {s.isUnique && <Chip tone="neutral">Unique</Chip>}
+                        </span>
+                        <span className="font-mono text-xs text-text-subtle">
+                          ({s.columns.join(', ')})
+                        </span>
                       </div>
-                      <p className="mt-0.5 font-mono text-xs text-text-muted">
-                        ({s.columns.join(', ')})
-                      </p>
-                      <p className="mt-1 text-xs leading-snug text-text-subtle">{s.rationale}</p>
-                      {typeof state === 'string' && state !== 'applying' && state !== 'done' && (
-                        <p className="mt-1 text-xs text-danger">{state}</p>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={state === 'applying' || state === 'done'}
+                        className={cn(
+                          'shrink-0',
+                          state === 'done'
+                            ? 'text-success'
+                            : 'text-text-muted hover:bg-surface-elevated hover:text-text'
+                        )}
+                        onClick={() => apply(s)}
+                      >
+                        {state === 'applying' ? (
+                          <Spinner size={12} className="text-current" />
+                        ) : state === 'done' ? (
+                          <IconCheck size={12} />
+                        ) : null}
+                        {state === 'done'
+                          ? 'Created'
+                          : state === 'applying'
+                            ? 'Creating…'
+                            : 'Create'}
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={state === 'applying' || state === 'done'}
-                      className={cn(
-                        'shrink-0',
-                        state === 'done'
-                          ? 'text-success'
-                          : 'text-text-muted hover:bg-surface-elevated hover:text-text'
-                      )}
-                      onClick={() => apply(s)}
-                    >
-                      {state === 'applying' ? (
-                        <Spinner size={12} className="text-current" />
-                      ) : state === 'done' ? (
-                        <IconCheck size={12} />
-                      ) : null}
-                      {state === 'done' ? 'Created' : state === 'applying' ? 'Creating…' : 'Create'}
-                    </Button>
+
+                    <p className="text-xs leading-relaxed text-text-subtle">{s.rationale}</p>
+
+                    {preview[s.name] && (
+                      // Wrapped, not scrolled: a statement you have to drag
+                      // sideways to read is not a preview of anything.
+                      <pre className="rounded-md border border-border bg-input px-2.5 py-2 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap text-text-muted">
+                        {preview[s.name]}
+                      </pre>
+                    )}
+                    {typeof state === 'string' && state !== 'applying' && state !== 'done' && (
+                      <p className="text-xs text-danger">{state}</p>
+                    )}
                   </div>
                 )
               })}
