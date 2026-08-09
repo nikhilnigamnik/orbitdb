@@ -55,6 +55,8 @@ interface DataGridProps {
   /** Set when filters are narrowing the result, so empty can say why. */
   hasFilters?: boolean
   onClearFilters?: () => void
+  /** Primary key of the row a pending undo belongs to, highlighted while it lasts. */
+  pendingUndoRow?: Record<string, unknown> | null
 }
 
 const SELECT_COLUMN_ID = '__select__'
@@ -79,7 +81,8 @@ export function DataGrid({
   fkColumns,
   onOpenForeignKey,
   hasFilters = false,
-  onClearFilters
+  onClearFilters,
+  pendingUndoRow
 }: DataGridProps) {
   const [internalRowSelection, setInternalRowSelection] = React.useState<RowSelectionState>({})
   const isControlled = controlledRowSelection !== undefined
@@ -512,6 +515,9 @@ export function DataGrid({
           ) : (
             table.getRowModel().rows.map((row) => {
               const isSelected = row.getIsSelected()
+              const isPendingUndo =
+                pendingUndoRow != null &&
+                Object.entries(pendingUndoRow).every(([key, value]) => row.original[key] === value)
               return (
                 <tr
                   key={row.id}
@@ -522,7 +528,12 @@ export function DataGrid({
                     isSelected
                       ? // tr can't render Tailwind ring (box-shadow); outline works in Chromium
                         'bg-surface-elevated/70 outline outline-border-strong -outline-offset-1'
-                      : 'hover:bg-surface-elevated/40'
+                      : isPendingUndo
+                        ? // Points at the row the undo prompt is about: a
+                          // truncated key could never identify it, and the row is
+                          // on screen anyway.
+                          'bg-accent/8 outline outline-accent/40 -outline-offset-1'
+                        : 'hover:bg-surface-elevated/40'
                   )}
                 >
                   {row.getVisibleCells().map((cell) => {
