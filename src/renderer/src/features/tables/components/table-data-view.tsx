@@ -556,7 +556,7 @@ export function TableDataView({
                   <span className="mx-1 h-4 w-px bg-white/10" />
                   <Button
                     size="sm"
-                    className="h-7 gap-1 rounded-md bg-danger-fill px-3 text-white ring-1 ring-inset ring-white/15 hover:bg-danger focus-visible:border-white/60 focus-visible:ring-2 focus-visible:ring-white/30"
+                    className="h-7 gap-1 rounded-md bg-danger-fill px-3 text-white shadow-[inset_0_-2px_0_0_var(--color-danger-shade),0_1px_3px_0_rgba(0,0,0,0.4)] ring-1 ring-inset ring-white/15 hover:bg-danger hover:shadow-none active:shadow-none focus-visible:border-white/60 focus-visible:ring-2 focus-visible:ring-white/30"
                     onClick={bulkDeleteConfirm.open}
                   >
                     <IconTrash size={12} />
