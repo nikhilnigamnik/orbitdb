@@ -4,6 +4,7 @@ import {
   IconDotsVertical,
   IconLock,
   IconPencil,
+  IconPlugOff,
   IconTrash
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
@@ -34,8 +35,7 @@ interface ConnectionCardProps {
 
 const HEALTH_DOT_CLASSES: Record<ConnectionHealth, string> = {
   unknown: 'bg-text-subtle/55',
-  checking:
-    'bg-warning shadow-[0_0_4px_0_rgba(251,191,36,0.45)] animate-pulse',
+  checking: 'bg-warning shadow-[0_0_4px_0_rgba(251,191,36,0.45)] animate-pulse',
   ok: 'bg-success shadow-[0_0_4px_0_rgba(52,211,153,0.4)]',
   fail: 'bg-danger shadow-[0_0_4px_0_rgba(244,63,94,0.45)]'
 }
@@ -166,10 +166,13 @@ export function ConnectionCard({
 
       <Button
         variant="secondary"
-        tone={isActive ? 'emerald' : 'default'}
         onClick={isActive ? onDisconnect : onConnect}
         disabled={isConnecting}
         aria-label={isActive ? 'Disconnect' : isConnecting ? 'Connecting' : 'Connect'}
+        className={cn(
+          'w-28 justify-center',
+          isActive && 'hover:border-danger/30 hover:bg-danger/10 hover:text-danger'
+        )}
       >
         {isConnecting ? (
           <>
@@ -177,8 +180,18 @@ export function ConnectionCard({
             <span>Connecting…</span>
           </>
         ) : isActive ? (
+          // The button reads as the state it is in, and as the action it performs
+          // once you reach for it — a green "Connected" button said neither, and
+          // gave no hint that clicking it disconnects.
           <>
-            <span>Connected</span>
+            <span className="flex items-center gap-1.5 group-hover/button:hidden group-focus-visible/button:hidden">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden />
+              Connected
+            </span>
+            <span className="hidden items-center gap-1.5 group-hover/button:flex group-focus-visible/button:flex">
+              <IconPlugOff size={12} />
+              Disconnect
+            </span>
           </>
         ) : (
           <span>Connect</span>
