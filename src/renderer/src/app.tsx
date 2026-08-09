@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@renderer/components/layout/app-shell'
+import { ToastProvider } from '@renderer/components/ui/toast'
 import { ConnectionProvider } from '@renderer/features/connections/store/connection-store'
 import { CommandPaletteProvider } from '@renderer/features/command-palette/store'
 import { UpdateCheckProvider } from '@renderer/features/settings/store'
@@ -13,24 +14,26 @@ import { ROUTES } from '@renderer/config/routes'
 
 function App() {
   return (
-    <ConnectionProvider>
-      <UpdateCheckProvider>
-        <CommandPaletteProvider>
-          <AppShell>
-            <Routes>
-              <Route path={ROUTES.connections} element={<ConnectionsPage />} />
-              <Route path={ROUTES.database} element={<DatabasePage />} />
-              <Route path={ROUTES.table} element={<DatabasePage />} />
-              <Route path={ROUTES.diagram} element={<DiagramPage />} />
-              <Route path={ROUTES.query} element={<QueryPage />} />
-              <Route path={ROUTES.logs} element={<LogsPage />} />
-              <Route path={ROUTES.settings} element={<SettingsPage />} />
-              <Route path="*" element={<Navigate to={ROUTES.connections} replace />} />
-            </Routes>
-          </AppShell>
-        </CommandPaletteProvider>
-      </UpdateCheckProvider>
-    </ConnectionProvider>
+    <ToastProvider>
+      <ConnectionProvider>
+        <UpdateCheckProvider>
+          <CommandPaletteProvider>
+            <AppShell>
+              <Routes>
+                <Route path={ROUTES.connections} element={<ConnectionsPage />} />
+                <Route path={ROUTES.database} element={<DatabasePage />} />
+                <Route path={ROUTES.table} element={<DatabasePage />} />
+                <Route path={ROUTES.diagram} element={<DiagramPage />} />
+                <Route path={ROUTES.query} element={<QueryPage />} />
+                <Route path={ROUTES.logs} element={<LogsPage />} />
+                <Route path={ROUTES.settings} element={<SettingsPage />} />
+                <Route path="*" element={<Navigate to={ROUTES.connections} replace />} />
+              </Routes>
+            </AppShell>
+          </CommandPaletteProvider>
+        </UpdateCheckProvider>
+      </ConnectionProvider>
+    </ToastProvider>
   )
 }
 
