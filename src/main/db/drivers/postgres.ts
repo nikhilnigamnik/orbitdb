@@ -29,6 +29,7 @@ import {
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
+import { buildOrderBySql } from '../order-by'
 import { buildFilterSql, type FilterDialect } from '../filters'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
@@ -421,13 +422,9 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
     opts.filterJoin
   )
 
-  let orderSql = ''
-  if (opts.orderBy && validColumns.has(opts.orderBy)) {
-    const dir = opts.orderDir === 'desc' ? 'desc' : 'asc'
-    orderSql = `order by ${quoteIdent(opts.orderBy)} ${dir}`
-  } else if (details.primaryKey.length > 0) {
-    orderSql = `order by ${details.primaryKey.map(quoteIdent).join(', ')}`
-  }
+  const orderSql = buildOrderBySql(opts.orderBy, opts.orderDir, details.primaryKey, validColumns, {
+    quoteIdent
+  })
 
   const limit = Math.max(1, Math.min(opts.limit ?? 100, 1000))
   const offset = Math.max(0, opts.offset ?? 0)
