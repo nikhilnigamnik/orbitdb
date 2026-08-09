@@ -211,6 +211,22 @@ describe('the filter row', () => {
 })
 
 describe('the floating selection toolbar', () => {
+  /**
+   * Rendering the bar needs a loaded table, so it is read from the source. The
+   * class list is split so a test can assert on what is absent as well as
+   * present — this button inherits from Button's `default` variant, and the bug
+   * it keeps hitting is an accent token that was never overridden.
+   */
+  function deleteButtonClasses(): string[] {
+    const source = readFileSync(
+      resolve('src/renderer/src/features/tables/components/table-data-view.tsx'),
+      'utf8'
+    )
+    const button = /className="([^"]*bg-danger-fill[^"]*)"/.exec(source)
+    expect(button, 'could not find the solid delete button').not.toBeNull()
+    return button![1].split(/\s+/)
+  }
+
   it('is rounded, not a pill', () => {
     // Rendering it needs a loaded table, so it is checked at the source, keyed
     // on the entrance animation the bar is the only user of.
@@ -237,16 +253,18 @@ describe('the floating selection toolbar', () => {
     // Button's base focus treatment is accent blue, and closing the confirm
     // dialog restores focus to the trigger — so a solid red fill has to override
     // it or the button sits there ringed in blue.
-    const source = readFileSync(
-      resolve('src/renderer/src/features/tables/components/table-data-view.tsx'),
-      'utf8'
-    )
-    const deleteButton = /className="([^"]*bg-danger-fill[^"]*)"/.exec(source)
-    expect(deleteButton, 'could not find the solid delete button').not.toBeNull()
-
-    const classes = deleteButton![1].split(/\s+/)
+    const classes = deleteButtonClasses()
     expect(classes.some((c) => /^focus-visible:(border|ring)-white/.test(c))).toBe(true)
-    expect(classes.filter((c) => c.includes('accent'))).toEqual([])
+  })
+
+  it('bevels the delete button in danger, not the accent blue it inherits', () => {
+    // The real trap: `default` paints an inset bevel in --color-accent-shade,
+    // which is blue. Overriding only bg- leaves that blue line along the bottom,
+    // and it is invisible in the className until you look for what is *missing*.
+    const shadow = deleteButtonClasses().find((c) => c.startsWith('shadow-['))
+    expect(shadow, 'the delete button does not override the inherited bevel').toBeDefined()
+    expect(shadow).toContain('--color-danger-shade')
+    expect(shadow).not.toContain('accent')
   })
 })
 
