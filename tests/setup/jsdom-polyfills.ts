@@ -6,7 +6,18 @@
  * Applied to every spec; the guard makes it a no-op for the node-environment
  * ones.
  */
+import { configure } from '@testing-library/dom'
+
 if (typeof window !== 'undefined') {
+  // Testing Library waits one second by default, which a few hundred rows in
+  // jsdom can outlast when workers compete for CPU — with a dev server running,
+  // or on a CI runner. That showed up as specs failing at random.
+  //
+  // It has to stay well under vitest's testTimeout: if a query can run for as
+  // long as the test is allowed, a slow render exhausts the budget and the test
+  // times out instead of the query retrying and passing.
+  configure({ asyncUtilTimeout: 3_000 })
+
   if (!('ResizeObserver' in window)) {
     // Deliberately inert: nothing under test depends on resize callbacks, only
     // on the constructor existing.
