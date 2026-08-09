@@ -1,5 +1,4 @@
-import { format as formatDate } from 'date-fns'
-
+import { stringifyDate } from '@renderer/lib/format'
 import type { ColumnInfo } from '@renderer/types'
 
 const INTEGER_TYPES = ['int2', 'int4', 'int8']
@@ -50,15 +49,6 @@ export function boolishToString(value: unknown): 'true' | 'false' | '' {
     return 'true'
   }
   return 'false'
-}
-
-function stringifyDate(value: Date, udtName?: string): string {
-  if (Number.isNaN(value.getTime())) return String(value)
-  if (udtName && isDateOnlyType(udtName)) return formatDate(value, 'yyyy-MM-dd')
-  const base = value.getMilliseconds() === 0 ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd HH:mm:ss.SSS'
-  // timestamptz is an absolute instant — keep the local UTC offset so saving
-  // the string back doesn't shift the value when the server timezone differs.
-  return formatDate(value, udtName === 'timestamptz' ? `${base}XXX` : base)
 }
 
 /** Turns a raw cell value into the editable string shown in an input. */
