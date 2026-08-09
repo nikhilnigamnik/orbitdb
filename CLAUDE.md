@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-OrbitDB is an Electron desktop DB client for PostgreSQL, MySQL/MariaDB, and Cloudflare D1. React 19 + TypeScript renderer, Node main process, electron-vite build.
+OrbitDB is an Electron desktop DB client for PostgreSQL, MySQL/MariaDB, local SQLite files, and Cloudflare D1. React 19 + TypeScript renderer, Node main process, electron-vite build.
 
 ## Commands
 
@@ -75,9 +75,13 @@ To add a new IPC endpoint, you touch **three** files:
 
 ### Database driver abstraction
 
-`DatabaseDriver` (`src/main/db/drivers/types.ts`) is implemented three times: `postgres.ts`, `mysql.ts`, `d1.ts`. `src/main/db/manager.ts` looks up the saved connection's `engine` field and dispatches to the right driver. To add a new engine: implement the interface, register it in `manager.ts:driverFor()`. The renderer is engine-agnostic — it just passes `connectionId` around.
+`DatabaseDriver` (`src/main/db/drivers/types.ts`) is implemented four times: `postgres.ts`, `mysql.ts`, `sqlite.ts`, `d1.ts`. `src/main/db/manager.ts` looks up the saved connection's `engine` field and dispatches to the right driver. To add a new engine: implement the interface, register it in `manager.ts:driverFor()`. The renderer is engine-agnostic — it just passes `connectionId` around.
 
 D1 is special: it has no schemas (returns `[]`), uses the Cloudflare REST API instead of a socket connection, and has no concept of enums or PK introspection beyond what `pragma table_info` exposes.
+
+`sqlite.ts` and `d1.ts` are the same dialect over different transports — a local file via `better-sqlite3` and Cloudflare's REST API. The pragma row mapping, quoting, type normalisation and DDL/filter dialects they share live in `src/main/db/sqlite-shared.ts`; each driver keeps only its own fetching and orchestration.
+
+**better-sqlite3 cannot be imported from vitest.** `electron-builder install-app-deps` rebuilds it against Electron's ABI, so requiring it in plain node segfaults the runner (exit 139). That is why the shared module exists and is where the logic lives. The driver itself is exercised by `pnpm verify:sqlite`, which bundles a harness and runs it under Electron against a throwaway database — not part of CI, so run it after touching either SQLite driver.
 
 ### DDL / structure editing
 

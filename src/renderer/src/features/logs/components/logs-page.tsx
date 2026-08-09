@@ -31,13 +31,15 @@ type ChipTone = React.ComponentProps<typeof Chip>['tone']
 const ENGINE_TONE: Record<QueryLogEntry['engine'], ChipTone> = {
   postgres: 'sky',
   mysql: 'orange',
-  d1: 'amber'
+  d1: 'amber',
+  sqlite: 'emerald'
 }
 
 const ENGINE_LABEL: Record<QueryLogEntry['engine'], string> = {
   postgres: 'pg',
   mysql: 'mysql',
-  d1: 'd1'
+  d1: 'd1',
+  sqlite: 'sqlite'
 }
 
 export function LogsPage() {
@@ -199,13 +201,9 @@ export function LogsPage() {
           <LoadingState />
         ) : filtered.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-text-subtle">
-            <p className="text-xs">
-              {logs.length === 0 ? 'No queries logged yet' : 'No matches'}
-            </p>
+            <p className="text-xs">{logs.length === 0 ? 'No queries logged yet' : 'No matches'}</p>
             {logs.length === 0 && (
-              <p className="text-xs text-text-subtle/70">
-                {"Run a query and it'll show up here."}
-              </p>
+              <p className="text-xs text-text-subtle/70">{"Run a query and it'll show up here."}</p>
             )}
           </div>
         ) : (
@@ -285,9 +283,7 @@ export function LogsPage() {
                 </div>
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-xs font-semibold tracking-tight text-text">
-                      Query detail
-                    </h2>
+                    <h2 className="text-xs font-semibold tracking-tight text-text">Query detail</h2>
                     <Chip tone={ENGINE_TONE[selected.engine]}>{ENGINE_LABEL[selected.engine]}</Chip>
                   </div>
                   <p className="truncate text-xs text-text-subtle">
@@ -384,9 +380,7 @@ function Stat({
 }) {
   return (
     <div className={cn('flex flex-col gap-0.5 px-3 py-2', border && 'border-l border-border')}>
-      <span className="text-xs font-medium uppercase tracking-wider text-text-subtle">
-        {label}
-      </span>
+      <span className="text-xs font-medium uppercase tracking-wider text-text-subtle">{label}</span>
       <span className={cn('font-mono text-xs text-text', valueClassName)}>{value}</span>
     </div>
   )

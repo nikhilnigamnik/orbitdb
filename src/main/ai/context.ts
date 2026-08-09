@@ -5,13 +5,15 @@ import { MAX_SCHEMA_TABLES } from './config'
 const SYSTEM_SCHEMAS: Record<DatabaseEngine, string[]> = {
   postgres: ['information_schema', 'pg_catalog', 'pg_toast'],
   mysql: ['information_schema', 'performance_schema', 'mysql', 'sys'],
-  d1: []
+  d1: [],
+  sqlite: []
 }
 
 export const ENGINE_DIALECT: Record<DatabaseEngine, string> = {
   postgres: 'PostgreSQL',
   mysql: 'MySQL',
-  d1: 'SQLite (Cloudflare D1)'
+  d1: 'SQLite (Cloudflare D1)',
+  sqlite: 'SQLite'
 }
 
 // Mixed-case identifiers (e.g. "createdAt") must be quoted or the engine folds
@@ -21,7 +23,9 @@ export const QUOTE_HINT: Record<DatabaseEngine, string> = {
     'ALWAYS wrap every table and column identifier in double quotes (e.g. "createdAt") so mixed-case names are preserved.',
   mysql:
     'ALWAYS wrap every table and column identifier in backticks (e.g. `createdAt`) so mixed-case names are preserved.',
-  d1: 'ALWAYS wrap every table and column identifier in double quotes (e.g. "createdAt") so mixed-case names are preserved.'
+  d1: 'ALWAYS wrap every table and column identifier in double quotes (e.g. "createdAt") so mixed-case names are preserved.',
+  sqlite:
+    'ALWAYS wrap every table and column identifier in double quotes (e.g. "createdAt") so mixed-case names are preserved.'
 }
 
 /** Compact, whole-database schema map for grounding free-form SQL generation. */

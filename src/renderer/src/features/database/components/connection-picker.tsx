@@ -19,7 +19,8 @@ type ChipTone = React.ComponentProps<typeof Chip>['tone']
 const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; iconClass: string }> = {
   postgres: { bg: 'bg-info/8', iconClass: 'text-info' },
   mysql: { bg: 'bg-orange/8', iconClass: 'text-orange' },
-  d1: { bg: 'bg-warning/8', iconClass: 'text-warning' }
+  d1: { bg: 'bg-warning/8', iconClass: 'text-warning' },
+  sqlite: { bg: 'bg-success/8', iconClass: 'text-success' }
 }
 
 const ENGINE_FALLBACK = { bg: 'bg-text-muted/8', iconClass: 'text-text-muted' }
@@ -88,10 +89,7 @@ export function ConnectionPicker() {
         title="No connections yet"
         description="Add a Postgres, MySQL, or D1 connection to start browsing schemas and tables."
         action={
-          <Button
-            size="sm"
-            onClick={() => navigate(ROUTES.connections)}
-          >
+          <Button size="sm" onClick={() => navigate(ROUTES.connections)}>
             Add a connection
           </Button>
         }

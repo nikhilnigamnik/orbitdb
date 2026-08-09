@@ -13,25 +13,29 @@ export const MAX_PAGE_SIZE = 1000
 export const ENGINE_LABEL: Record<DatabaseEngine, string> = {
   postgres: 'Postgres',
   mysql: 'MySQL',
-  d1: 'D1'
+  d1: 'D1',
+  sqlite: 'SQLite'
 }
 
 export const DEFAULT_PORTS: Record<DatabaseEngine, number> = {
   postgres: 5432,
   mysql: 3306,
-  d1: 0
+  d1: 0,
+  sqlite: 0
 }
 
 export const DEFAULT_USERS: Record<DatabaseEngine, string> = {
   postgres: 'postgres',
   mysql: 'root',
-  d1: ''
+  d1: '',
+  sqlite: ''
 }
 
 export const DEFAULT_DATABASES: Record<DatabaseEngine, string> = {
   postgres: 'postgres',
   mysql: '',
-  d1: ''
+  d1: '',
+  sqlite: ''
 }
 
 export const ENVIRONMENTS: ConnectionEnvironment[] = ['dev', 'stage', 'prod']
@@ -56,5 +60,6 @@ export const DEFAULT_CONNECTION_VALUES = {
   ssl: false,
   accountId: '',
   databaseId: '',
-  apiToken: ''
+  apiToken: '',
+  filePath: ''
 }

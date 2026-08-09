@@ -114,9 +114,7 @@ export function TableStructure({ details, onEdit, header }: TableStructureProps)
               <tr key={col.name} className={`group ${i > 0 ? 'border-t border-border/50' : ''}`}>
                 <td className={`${TD} font-medium text-text`}>
                   <span className="flex items-center gap-1.5">
-                    {col.isPrimaryKey && (
-                      <IconKey size={11} className="shrink-0 text-warning" />
-                    )}
+                    {col.isPrimaryKey && <IconKey size={11} className="shrink-0 text-warning" />}
                     {col.name}
                   </span>
                 </td>

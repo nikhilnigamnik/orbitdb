@@ -23,10 +23,12 @@ import type { ActiveMeta, DatabaseDriver } from './drivers/types'
 import { postgresDriver } from './drivers/postgres'
 import { mysqlDriver } from './drivers/mysql'
 import { d1Driver } from './drivers/d1'
+import { sqliteDriver } from './drivers/sqlite'
 
 function driverFor(engine: DatabaseEngine): DatabaseDriver {
   if (engine === 'mysql') return mysqlDriver
   if (engine === 'd1') return d1Driver
+  if (engine === 'sqlite') return sqliteDriver
   return postgresDriver
 }
 
@@ -54,7 +56,8 @@ export async function disconnectAll(): Promise<void> {
   await Promise.all([
     postgresDriver.disconnectAll(),
     mysqlDriver.disconnectAll(),
-    d1Driver.disconnectAll()
+    d1Driver.disconnectAll(),
+    sqliteDriver.disconnectAll()
   ])
 }
 
