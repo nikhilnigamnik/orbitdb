@@ -17,6 +17,7 @@ import { Sheet } from '@renderer/components/ui/sheet'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { unwrap } from '@renderer/lib/ipc'
+import { useToast } from '@renderer/components/ui/toast'
 import { cn } from '@renderer/lib/utils'
 import { ROUTES } from '@renderer/config/routes'
 import { DEFAULT_QUERY } from '@renderer/config/site'
@@ -70,6 +71,7 @@ export function QueryPage() {
   const { active, current } = useConnection()
   const connectionId = active?.connectionId ?? ''
   const engine = current?.engine ?? 'postgres'
+  const toast = useToast()
   const [sql, setSql] = React.useState('')
   const [result, setResult] = React.useState<QueryResult | null>(null)
   const [isRunning, setIsRunning] = React.useState(false)
@@ -215,8 +217,16 @@ export function QueryPage() {
       // Put it in the editor rather than running it. The model is told to
       // prefer SELECT, but that is a preference in a prompt — a misread request
       // used to reach the database with nothing in between.
+      const replaced = sql
       setSql(generated)
       setIsAiOpen(false)
+      // The draft is persisted on every keystroke, so overwriting it puts the
+      // old text beyond reach — history only holds queries that were run.
+      if (replaced.trim()) {
+        toast.info('Replaced the editor contents', {
+          action: { label: 'Undo', onClick: () => setSql(replaced) }
+        })
+      }
     } catch (err) {
       setIsAiOpen(false)
       setResult({

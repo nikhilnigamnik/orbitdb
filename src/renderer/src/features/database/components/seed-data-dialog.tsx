@@ -4,6 +4,7 @@ import { Button } from '@renderer/components/ui/button'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { unwrap } from '@renderer/lib/ipc'
+import { AiKeyRequired, isMissingAiKeyError } from '@renderer/components/common/ai-key-required'
 import { cn } from '@renderer/lib/utils'
 
 interface SeedDataDialogProps {
@@ -157,11 +158,15 @@ export function SeedDataDialog({
                 )}
               </Button>
 
-              {error && (
-                <div className="flex items-start gap-2 rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-left text-xs text-danger">
-                  <IconAlertTriangle size={14} className="mt-0.5 shrink-0" />
-                  <span className="wrap-break-word">{error}</span>
-                </div>
+              {isMissingAiKeyError(error) ? (
+                <AiKeyRequired onNavigate={onClose} className="py-4" />
+              ) : (
+                error && (
+                  <div className="flex items-start gap-2 rounded-md border border-danger/20 bg-danger/5 px-3 py-2 text-left text-xs text-danger">
+                    <IconAlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <span className="wrap-break-word">{error}</span>
+                  </div>
+                )
               )}
             </div>
           )}

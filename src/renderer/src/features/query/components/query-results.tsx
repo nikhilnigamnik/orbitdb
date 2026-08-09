@@ -7,6 +7,7 @@ import { formatCellValue, formatNumber } from '@renderer/lib/format'
 import { ExportMenu } from '@renderer/features/tables/components/export-menu'
 import { pgTypeToUdt } from '@renderer/lib/pg-types'
 import type { QueryResult } from '@renderer/types'
+import { AiKeyRequired, isMissingAiKeyError } from '@renderer/components/common/ai-key-required'
 
 interface QueryResultsProps {
   result: QueryResult | null
@@ -22,6 +23,15 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
       <div className="flex h-full flex-col items-center justify-center gap-2 text-text-subtle">
         <IconTable size={22} className="text-text-subtle/60" />
         <p className="text-xs">Run a query to see results</p>
+      </div>
+    )
+  }
+  // A missing API key reached this pane only because the AI prompt failed — it is
+  // not a query error, and dressing it in red says the database rejected it.
+  if (!result.success && isMissingAiKeyError(result.error)) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <AiKeyRequired />
       </div>
     )
   }
