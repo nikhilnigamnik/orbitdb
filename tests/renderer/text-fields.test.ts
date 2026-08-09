@@ -232,6 +232,22 @@ describe('the floating selection toolbar', () => {
     )
     expect(source).not.toMatch(/shadow-danger/)
   })
+
+  it('does not focus the delete button in accent blue', () => {
+    // Button's base focus treatment is accent blue, and closing the confirm
+    // dialog restores focus to the trigger — so a solid red fill has to override
+    // it or the button sits there ringed in blue.
+    const source = readFileSync(
+      resolve('src/renderer/src/features/tables/components/table-data-view.tsx'),
+      'utf8'
+    )
+    const deleteButton = /className="([^"]*bg-danger-fill[^"]*)"/.exec(source)
+    expect(deleteButton, 'could not find the solid delete button').not.toBeNull()
+
+    const classes = deleteButton![1].split(/\s+/)
+    expect(classes.some((c) => /^focus-visible:(border|ring)-white/.test(c))).toBe(true)
+    expect(classes.filter((c) => c.includes('accent'))).toEqual([])
+  })
 })
 
 describe('the refresh-schemas button', () => {
