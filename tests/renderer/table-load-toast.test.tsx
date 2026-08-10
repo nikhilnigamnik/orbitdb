@@ -68,9 +68,48 @@ describe('a reload that fails', () => {
     expect(await screen.findByText(/connection terminated/)).toBeTruthy()
     expect(screen.getByText('a1'), 'the rows already fetched stay put').toBeTruthy()
 
+    // The filters are not what changed, so reverting them would fix nothing.
+    expect(screen.queryByText('Undo filters')).toBeNull()
+
     const before = getRows.mock.calls.length
     fireEvent.click(screen.getByText('Refresh'))
     await waitFor(() => expect(getRows.mock.calls.length).toBeGreaterThan(before))
+  })
+
+  it('offers to undo the filter that broke it', async () => {
+    // An AI filter can name a value the column will not accept. Refresh would
+    // only re-run the same failing query, and the filter is in the URL too.
+    const getRows = vi.fn((opts: { filters?: unknown[] }) =>
+      opts.filters?.length
+        ? Promise.resolve({
+            success: false,
+            error: 'invalid input value for enum audit_action: "update"'
+          })
+        : ok({ rows: [{ id: 'a1' }], columns, totalEstimate: 1 })
+    )
+    const filterTable = vi.fn(() =>
+      ok({ filters: [{ column: 'id', operator: '=', value: 'update' }] })
+    )
+    Object.assign(window, {
+      api: { db: { getRows, countRows: () => ok(1) }, ai: { filterTable } }
+    })
+    mount()
+    await screen.findByText('a1')
+
+    fireEvent.click(screen.getByLabelText(/natural language/i))
+    const input = await screen.findByPlaceholderText(/filter activity/i)
+    fireEvent.change(input, { target: { value: 'rows where action is update' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(await screen.findByText(/invalid input value for enum/)).toBeTruthy()
+    expect(screen.getByText('Undo filters')).toBeTruthy()
+    expect(screen.queryByText('Refresh')).toBeNull()
+
+    fireEvent.click(screen.getByText('Undo filters'))
+    await waitFor(() => {
+      const last = getRows.mock.calls.at(-1)?.[0]
+      expect(last?.filters, 'reverted to the filters that last loaded').toEqual([])
+    })
   })
 
   it('shows the full-area error instead when no rows ever arrived', async () => {
