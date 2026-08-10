@@ -125,7 +125,7 @@ export function TableStructure({ details, onEdit, header }: TableStructureProps)
                 </td>
                 <td className={`${TD} text-text-subtle`}>{col.isNullable ? 'YES' : 'NO'}</td>
                 <td className={`${TD} font-mono text-xs text-text-subtle`}>
-                  {col.defaultValue ?? '—'}
+                  {col.defaultValue ?? '-'}
                 </td>
                 {canEdit && (
                   <td className="px-3 py-1">

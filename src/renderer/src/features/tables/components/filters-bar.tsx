@@ -319,7 +319,7 @@ export function FiltersBar({
                         {isPattern && (
                           <p className="text-xs text-text-subtle">
                             <span className="font-mono text-text-muted">%</span> matches any run of
-                            characters — a bare term matches only an exact value.
+                            characters - a bare term matches only an exact value.
                           </p>
                         )}
 

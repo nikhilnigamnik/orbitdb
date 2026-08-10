@@ -5,7 +5,7 @@ import type { AiModelId, AiProviderId, AiSettingsView } from '@renderer/types'
 
 function settingsApi() {
   if (typeof window === 'undefined' || !window.api?.settings) {
-    throw new Error('Settings IPC bridge unavailable — restart the dev server so preload reloads.')
+    throw new Error('Settings IPC bridge unavailable - restart the dev server so preload reloads.')
   }
   return window.api.settings
 }

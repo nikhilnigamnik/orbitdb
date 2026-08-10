@@ -56,7 +56,7 @@ export function ConnectionPicker() {
     setPendingId(connection.id)
     try {
       await connect(connection.id)
-      // active flips to this connection — DatabasePage re-renders into the data view
+      // active flips to this connection - DatabasePage re-renders into the data view
     } catch {
       // surfaced via connectError
     } finally {

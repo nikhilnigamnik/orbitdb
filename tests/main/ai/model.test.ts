@@ -16,7 +16,7 @@ vi.mock('../../../src/main/store/settings-store', () => ({
 }))
 
 // Stand-ins for each provider SDK: they record what they were built with, so a
-// test can tell a rebuild from a reuse — and which SDK was reached for.
+// test can tell a rebuild from a reuse - and which SDK was reached for.
 function stubSdk(name: string) {
   return ({ apiKey }: { apiKey: string }) => {
     created.providers.push(name)

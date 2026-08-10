@@ -63,7 +63,7 @@ export function SchemaTree({ connectionId, schemas, onRefresh, isLoading }: Sche
   const activeTable = searchParams.get('table') ?? ''
 
   const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set())
-  // 'public' only exists on Postgres — D1 calls its one schema 'main' and MySQL
+  // 'public' only exists on Postgres - D1 calls its one schema 'main' and MySQL
   // uses database names, so hardcoding it left those engines collapsed on every
   // launch. Open the conventional one if it is there, otherwise the only one.
   const hasAutoExpanded = React.useRef(false)

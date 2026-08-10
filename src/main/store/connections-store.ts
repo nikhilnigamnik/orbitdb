@@ -15,7 +15,7 @@ interface StoreShape {
 }
 
 // getConnection runs on every database IPC call, and each read parses the file
-// and unseals every secret — a synchronous keychain round-trip per secret. Both
+// and unseals every secret - a synchronous keychain round-trip per secret. Both
 // the on-disk bytes and the decrypted view are cached until we write.
 let rawCache: StoreShape | null = null
 let decryptedCache: StoreShape | null = null
@@ -58,7 +58,7 @@ function decryptFromDisk(conn: SavedConnection): SavedConnection {
     undecryptable.set(conn.id, failed)
     console.error(
       `[connections-store] cannot decrypt ${[...failed].join(', ')} for connection ` +
-        `"${conn.name}" — the stored value is kept on disk untouched.`
+        `"${conn.name}" - the stored value is kept on disk untouched.`
     )
   } else {
     undecryptable.delete(conn.id)
@@ -129,7 +129,7 @@ function write(state: StoreShape): void {
   const connections = state.connections.map((conn) => {
     const failed = undecryptable.get(conn.id)
     if (!failed?.size) return encryptForDisk(conn)
-    // A secret we could not unseal reads back as '' — writing that would destroy
+    // A secret we could not unseal reads back as '' - writing that would destroy
     // it. Keep the untouched ciphertext unless the user typed a replacement.
     const stored = onDisk.get(conn.id)
     const merged: SavedConnection = { ...conn }
@@ -157,7 +157,7 @@ export function getConnection(id: string): SavedConnection | undefined {
 
 /**
  * Resolve a connection for driver use, refusing to open one whose credentials
- * could not be decrypted — otherwise the engine reports a bare "authentication
+ * could not be decrypted - otherwise the engine reports a bare "authentication
  * failed" and the real cause stays hidden.
  */
 export function requireConnection(id: string): SavedConnection {

@@ -1,7 +1,7 @@
 /**
  * Spots statements worth stopping the user on before they run.
  *
- * This is a warning, not a security boundary — the user is entitled to run any
+ * This is a warning, not a security boundary - the user is entitled to run any
  * SQL they like. It exists because the query editor is the one place in the app
  * that will destroy data without asking, while deleting a single row asks twice.
  */
@@ -20,8 +20,8 @@ export interface DestructiveStatement {
 }
 
 /**
- * Remove comments and string literals so a mention of a keyword inside them —
- * `select 'drop table'` — cannot raise a false alarm.
+ * Remove comments and string literals so a mention of a keyword inside them -
+ * `select 'drop table'` - cannot raise a false alarm.
  */
 function stripNoise(sql: string): string {
   return sql

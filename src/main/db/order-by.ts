@@ -8,7 +8,7 @@ export interface OrderDialect {
  * Build a deterministic ORDER BY.
  *
  * Sorting by a non-unique column is not a total order, and LIMIT/OFFSET over a
- * partial order is undefined between statements — the same row can land on two
+ * partial order is undefined between statements - the same row can land on two
  * pages, or on none. Appending the primary key breaks every tie, which costs
  * nothing when the sort column is already unique.
  */
@@ -27,7 +27,7 @@ export function buildOrderBySql(
   }
 
   for (const key of primaryKey) {
-    // Already sorted by it — a second mention would be redundant, and on some
+    // Already sorted by it - a second mention would be redundant, and on some
     // engines an error.
     if (key === orderBy) continue
     terms.push(dialect.quoteIdent(key))

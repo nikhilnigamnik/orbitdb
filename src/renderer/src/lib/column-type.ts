@@ -2,7 +2,7 @@
  * The type to show against a column.
  *
  * Postgres reports `information_schema.data_type`, which is the SQL standard
- * spelling — verbose (`timestamp with time zone`) and sometimes not a type name
+ * spelling - verbose (`timestamp with time zone`) and sometimes not a type name
  * at all: `USER-DEFINED` for enums and composites, `ARRAY` for arrays. The real
  * name is in `udt_name`.
  *

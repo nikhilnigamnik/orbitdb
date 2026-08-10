@@ -125,7 +125,7 @@ describe('every call through the wrapper', () => {
 
   it('counts only the pass that came back, when the first one threw', async () => {
     // generateJson can call the model twice. A throw carries no usage object, so
-    // the failed attempt is genuinely uncountable — the reported figure is a
+    // the failed attempt is genuinely uncountable - the reported figure is a
     // lower bound, not a guess, which is the honest way round.
     generated.failFirst = true
 

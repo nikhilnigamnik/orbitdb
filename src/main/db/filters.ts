@@ -2,7 +2,7 @@ import type { FilterJoin, RowFilter } from '../../shared/types'
 
 /**
  * Operators the renderer is allowed to ask for. Anything outside this set is
- * dropped rather than interpolated — the operator is the one part of a filter
+ * dropped rather than interpolated - the operator is the one part of a filter
  * that cannot be bound as a parameter.
  */
 const ALLOWED_OPERATORS = new Set<RowFilter['operator']>([

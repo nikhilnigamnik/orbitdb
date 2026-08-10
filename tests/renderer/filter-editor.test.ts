@@ -46,7 +46,7 @@ describe('resolveFilter', () => {
   })
 
   it('treats the empty string as a value, not as absence', () => {
-    // Only a NULL *pick* means absence — an emptied text box is still a value.
+    // Only a NULL *pick* means absence - an emptied text box is still a value.
     expect(resolveFilter('a', '=', '')).toEqual({ column: 'a', operator: '=', value: '' })
   })
 

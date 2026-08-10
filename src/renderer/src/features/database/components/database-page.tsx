@@ -48,7 +48,7 @@ export function DatabasePage() {
   }, [schema, table, view])
 
   // Which connection the schema/table in the URL belongs to. Survives a
-  // disconnect so reconnecting elsewhere is still seen as a connection change —
+  // disconnect so reconnecting elsewhere is still seen as a connection change -
   // otherwise the previous connection's table leaks into the new one and its
   // details lookup fails with "Table X not found".
   const selectionOwner = React.useRef<string | null>(null)
@@ -59,7 +59,7 @@ export function DatabasePage() {
     selectionOwner.current = active.connectionId
     if (schema && table && !isForeignSelection) return
     navigate(readLastTable(active.connectionId) ?? ROUTES.database, { replace: true })
-    // schema/table intentionally not in deps — only restore on connection change
+    // schema/table intentionally not in deps - only restore on connection change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, navigate])
 
@@ -155,7 +155,7 @@ function TableViewContainer({
     [connectionId, schema, table]
   )
 
-  // The header reports the table's own size, unfiltered — the pagination bar
+  // The header reports the table's own size, unfiltered - the pagination bar
   // answers the different question of how many rows the current filters match.
   // Null while it loads, and for tables too large to count, where the header
   // falls back to the estimate.
@@ -181,7 +181,7 @@ function TableViewContainer({
     target?: string
   } | null>(null)
   // Hold the header until the first page of rows lands so the whole view reveals
-  // at once (one loader). Sticky once shown — and the structure tab, which has no
+  // at once (one loader). Sticky once shown - and the structure tab, which has no
   // async load, reveals it immediately. Resets per table via the container key.
   const [headerShown, setHeaderShown] = React.useState(activeTab !== 'data')
   React.useEffect(() => {

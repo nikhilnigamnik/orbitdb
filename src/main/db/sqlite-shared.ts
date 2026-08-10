@@ -22,12 +22,12 @@ export const sqliteFilterDialect: FilterDialect = {
   supportsIlike: false
 }
 
-// SQLite has no schemas — identifiers are table-only and indexes are global.
+// SQLite has no schemas - identifiers are table-only and indexes are global.
 export const sqliteDdlDialect: DdlDialect = {
   quoteIdent,
   qualifiedTable: (_schema, table) => quoteIdent(table),
   dropIndex: (_schema, _table, name) => `DROP INDEX ${quoteIdent(name)}`,
-  // SQLite has no TRUNCATE — DELETE FROM clears every row.
+  // SQLite has no TRUNCATE - DELETE FROM clears every row.
   truncate: (_schema, table) => `DELETE FROM ${quoteIdent(table)}`
 }
 
@@ -121,7 +121,7 @@ export function toIndex(index: IndexListRow, columns: IndexInfoRow[]): IndexInfo
 }
 
 /**
- * `pragma foreign_key_list` returns one row per column pair, keyed by `id` —
+ * `pragma foreign_key_list` returns one row per column pair, keyed by `id` -
  * a composite key arrives as several rows that have to be regrouped, in `seq`
  * order, or the columns pair up wrongly.
  */

@@ -15,7 +15,7 @@ export function isMissingAiKeyError(message: string | null | undefined): boolean
 }
 
 interface AiKeyRequiredProps {
-  /** Runs before navigating — for closing the sheet or dialog this sits inside. */
+  /** Runs before navigating - for closing the sheet or dialog this sits inside. */
   onNavigate?: () => void
   className?: string
 }

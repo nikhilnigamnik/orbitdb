@@ -9,7 +9,7 @@ export interface DdlDialect {
   quoteIdent(name: string): string
   qualifiedTable(schema: string, table: string): string
   dropIndex(schema: string, table: string, name: string): string
-  /** TRUNCATE has no portable grammar — SQLite/D1 has no TRUNCATE statement. */
+  /** TRUNCATE has no portable grammar - SQLite/D1 has no TRUNCATE statement. */
   truncate(schema: string, table: string): string
 }
 

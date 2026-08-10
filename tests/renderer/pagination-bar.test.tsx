@@ -50,9 +50,9 @@ describe('the total it reports', () => {
 describe('jumping to the last page', () => {
   it('is not offered against an estimate', () => {
     // Navigating to an offset derived from table statistics lands mid-table, or
-    // past the end — the estimate is for reading, not for paging.
+    // past the end - the estimate is for reading, not for paging.
     setup({ totalEstimate: 10_000, totalExact: null })
-    // Not merely disabled — the control is absent, so nothing suggests the jump
+    // Not merely disabled - the control is absent, so nothing suggests the jump
     // is available at all.
     expect(screen.queryByLabelText('Last page')).toBeNull()
   })
@@ -67,7 +67,7 @@ describe('jumping to the last page', () => {
 
 describe('the next control', () => {
   it('stops at the end when the row count is an exact multiple of the page size', () => {
-    // The old rule — "a full page means there is another" — left this enabled
+    // The old rule - "a full page means there is another" - left this enabled
     // onto an empty page.
     setup({ offset: 50, pageSize: 50, loadedCount: 50, totalExact: 100 })
     expect(pager('Next page').disabled).toBe(true)

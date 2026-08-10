@@ -124,7 +124,7 @@ describe('a key that cannot be unsealed on this machine', () => {
   })
 
   it('keeps its ciphertext when something else is saved', () => {
-    // The unreadable key reads back as '' — writing that would destroy a key the
+    // The unreadable key reads back as '' - writing that would destroy a key the
     // user could still recover by logging into the right OS account.
     store.setAiModel('anthropic', 'claude-haiku-4-5-20251001')
 
@@ -248,7 +248,7 @@ describe('more than one provider', () => {
   })
 
   it('refuses a model that belongs to a different provider', () => {
-    // gemini-2.5-flash is a real model — just not an OpenAI one, and sending it
+    // gemini-2.5-flash is a real model - just not an OpenAI one, and sending it
     // there returns an opaque 404.
     expect(() => store.setAiModel('openai', 'gemini-2.5-flash')).toThrow(/unknown model/i)
   })

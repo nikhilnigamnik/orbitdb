@@ -13,7 +13,7 @@ interface TableHeaderProps {
 
 const TYPE_LABEL: Record<TableDetails['type'], string | null> = {
   // A plain table is the default and needs no badge; the other two change what
-  // the page can do — DDL controls do not render for them.
+  // the page can do - DDL controls do not render for them.
   table: null,
   view: 'View',
   materialized_view: 'Materialized view'

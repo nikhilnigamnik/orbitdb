@@ -153,7 +153,7 @@ export function ConnectionsPage() {
                 {isLoading ? <Spinner size={14} /> : <IconRefresh size={14} />}
                 Refresh
               </Button>
-              {/* The sidebar's settings entry isn't here — this page renders
+              {/* The sidebar's settings entry isn't here - this page renders
                   before a connection exists, so this is the only way in. */}
               <Button
                 size="icon-sm"

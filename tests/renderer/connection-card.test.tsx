@@ -56,7 +56,7 @@ describe('the connect control', () => {
 describe('once connected', () => {
   it('says what it does, not only what it is', () => {
     // The old button was a green "Connected" that quietly performed a disconnect
-    // — it named a state and gave no hint of the action behind it.
+    // - it named a state and gave no hint of the action behind it.
     setup({ isActive: true })
     expect(screen.getByText('Connected')).toBeTruthy()
     expect(screen.getByText('Disconnect')).toBeTruthy()

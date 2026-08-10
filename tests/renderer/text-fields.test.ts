@@ -21,13 +21,13 @@ function markupOf(element: Parameters<typeof renderToStaticMarkup>[0]): string {
   return renderToStaticMarkup(element)
 }
 
-/** Classes on the control itself — the first element carrying a class attribute. */
+/** Classes on the control itself - the first element carrying a class attribute. */
 function classesOf(markup: string): string {
   return /class="([^"]*)"/.exec(markup)?.[1] ?? ''
 }
 
 /**
- * Only the unprefixed classes — what the control looks like sitting there. Drops
+ * Only the unprefixed classes - what the control looks like sitting there. Drops
  * `hover:`, `data-[state=open]:` and friends, which describe other states.
  */
 function restingClassesOf(markup: string): string[] {
@@ -52,7 +52,7 @@ const fields = [
   }
 ]
 
-// The Switch is a track, not a field — its unchecked fill stays a raised surface
+// The Switch is a track, not a field - its unchecked fill stays a raised surface
 // so the white thumb reads against it. It shares the focus treatment only.
 const controls = [...fields, { name: 'Switch', element: () => createElement(Switch) }]
 
@@ -111,7 +111,7 @@ describe('control heights', () => {
     }
   })
 
-  // Buttons shaped like a field — a search or filter box that opens a panel
+  // Buttons shaped like a field - a search or filter box that opens a panel
   // instead of taking a caret. They are bespoke rather than primitives, so they
   // are checked at the source, keyed on the aria-label so they survive being
   // moved around their file.
@@ -165,7 +165,7 @@ describe('Kbd', () => {
   })
 
   it('lends its hairline-over-a-whisper surface to the subtle button', () => {
-    // The invariant is "these two match", not two copies of the same literal —
+    // The invariant is "these two match", not two copies of the same literal -
     // restyling Kbd should report the button as drifted, not pass quietly.
     const surface = kbdClasses().filter(
       (c) => c.startsWith('border-text-muted/') || c.startsWith('bg-text-muted/')
@@ -239,7 +239,7 @@ describe('the floating selection toolbar', () => {
   /**
    * Rendering the bar needs a loaded table, so it is read from the source. The
    * class list is split so a test can assert on what is absent as well as
-   * present — this button inherits from Button's `default` variant, and the bug
+   * present - this button inherits from Button's `default` variant, and the bug
    * it keeps hitting is an accent token that was never overridden.
    */
   function deleteButtonClasses(): string[] {
@@ -276,7 +276,7 @@ describe('the floating selection toolbar', () => {
 
   it('does not focus the delete button in accent blue', () => {
     // Button's base focus treatment is accent blue, and closing the confirm
-    // dialog restores focus to the trigger — so a solid red fill has to override
+    // dialog restores focus to the trigger - so a solid red fill has to override
     // it or the button sits there ringed in blue.
     const classes = deleteButtonClasses()
     expect(classes.some((c) => /^focus-visible:(border|ring)-white/.test(c))).toBe(true)
@@ -296,7 +296,7 @@ describe('the floating selection toolbar', () => {
 describe('the refresh-schemas button', () => {
   it('wears the subtle surface too', () => {
     // Lives inside a component needing router and palette context, so it is
-    // checked at the source — keyed on the aria-label.
+    // checked at the source - keyed on the aria-label.
     const source = readFileSync(
       resolve('src/renderer/src/features/database/components/schema-tree.tsx'),
       'utf8'

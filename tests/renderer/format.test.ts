@@ -10,7 +10,7 @@ import {
 import { stringifyValue } from '@renderer/features/tables/lib/cell-value'
 
 // vitest.config.ts pins TZ to Asia/Kolkata, so these offsets are the same on
-// any machine — and a non-zero offset means the zone actually renders, rather
+// any machine - and a non-zero offset means the zone actually renders, rather
 // than collapsing to the 'Z' that UTC would produce.
 const OFFSET = '+05:30'
 

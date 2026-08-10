@@ -46,8 +46,8 @@ export function LogsPage() {
   const [isLoading, setIsLoading] = React.useState(true)
   const [filter, setFilter] = React.useState('')
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'success' | 'error'>('all')
-  // Introspection outnumbers user queries by a wide margin — pragmas, column
-  // lookups, the pagination count — so the useful view is the default one.
+  // Introspection outnumbers user queries by a wide margin - pragmas, column
+  // lookups, the pagination count - so the useful view is the default one.
   const [originFilter, setOriginFilter] = React.useState<'user' | 'all'>('user')
   const [selected, setSelected] = React.useState<QueryLogEntry | null>(null)
   const [copied, setCopied] = React.useState(false)
@@ -259,7 +259,7 @@ export function LogsPage() {
                   entry.success ? 'text-text' : 'text-danger'
                 )}
               >
-                {entry.sql.trim() || '—'}
+                {entry.sql.trim() || '-'}
               </p>
             </button>
           ))
@@ -308,7 +308,7 @@ export function LogsPage() {
                   <Stat label="Duration" value={`${selected.durationMs} ms`} />
                   <Stat
                     label="Rows"
-                    value={selected.rowCount != null ? formatNumber(selected.rowCount) : '—'}
+                    value={selected.rowCount != null ? formatNumber(selected.rowCount) : '-'}
                     border
                   />
                   <Stat
@@ -336,7 +336,7 @@ export function LogsPage() {
                       {copied ? 'Copied' : 'Copy'}
                     </button>
                     <pre className="overflow-auto rounded-lg border border-border bg-surface-sunken px-3.5 py-3 pr-14 font-mono text-xs leading-relaxed whitespace-pre-wrap wrap-anywhere text-text">
-                      {selected.sql.trim() || '—'}
+                      {selected.sql.trim() || '-'}
                     </pre>
                   </div>
                 </DetailSection>

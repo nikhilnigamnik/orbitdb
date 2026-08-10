@@ -32,7 +32,8 @@ const checkboxVariants = cva(
 )
 
 interface CheckboxRootProps
-  extends React.ComponentPropsWithRef<typeof CheckboxPrimitive.Root>,
+  extends
+    React.ComponentPropsWithRef<typeof CheckboxPrimitive.Root>,
     VariantProps<typeof checkboxVariants> {}
 
 function CheckboxRoot({ className, size, radius, ref, ...props }: Readonly<CheckboxRootProps>) {
@@ -54,10 +55,7 @@ function CheckboxIndicator({ className, children, ref, ...props }: CheckboxIndic
   return (
     <CheckboxPrimitive.Indicator
       ref={ref}
-      className={cn(
-        'flex h-full w-full items-center justify-center text-white',
-        className
-      )}
+      className={cn('flex h-full w-full items-center justify-center text-white', className)}
       {...props}
     >
       {children ?? (
@@ -90,7 +88,8 @@ function CheckboxIndicator({ className, children, ref, ...props }: CheckboxIndic
 CheckboxIndicator.displayName = CheckboxPrimitive.Indicator.displayName
 
 export interface CheckboxProps
-  extends React.ComponentPropsWithRef<typeof CheckboxPrimitive.Root>,
+  extends
+    React.ComponentPropsWithRef<typeof CheckboxPrimitive.Root>,
     VariantProps<typeof checkboxVariants> {}
 
 function Checkbox({ className, size, radius, children, ref, ...props }: Readonly<CheckboxProps>) {

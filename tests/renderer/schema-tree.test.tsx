@@ -84,7 +84,7 @@ describe('row counts', () => {
 
   it('keeps showing the count once the table is pinned', async () => {
     // The count used to be suppressed for pinned tables because the pin icon
-    // took the same slot — pinning silently removed information.
+    // took the same slot - pinning silently removed information.
     localStorage.setItem(
       'orbitdb:pinned-tables:c1',
       JSON.stringify([{ schema: 'public', table: 'users' }])

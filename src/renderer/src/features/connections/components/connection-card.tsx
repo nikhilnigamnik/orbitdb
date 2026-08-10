@@ -41,7 +41,7 @@ const HEALTH_DOT_CLASSES: Record<ConnectionHealth, string> = {
 }
 
 const HEALTH_LABEL: Record<ConnectionHealth, string> = {
-  unknown: 'Status unknown — click to check',
+  unknown: 'Status unknown - click to check',
   checking: 'Checking…',
   ok: 'Reachable',
   fail: 'Unreachable'
@@ -181,7 +181,7 @@ export function ConnectionCard({
           </>
         ) : isActive ? (
           // The button reads as the state it is in, and as the action it performs
-          // once you reach for it — a green "Connected" button said neither, and
+          // once you reach for it - a green "Connected" button said neither, and
           // gave no hint that clicking it disconnects.
           <>
             <span className="flex items-center gap-1.5 group-hover/button:hidden group-focus-visible/button:hidden">

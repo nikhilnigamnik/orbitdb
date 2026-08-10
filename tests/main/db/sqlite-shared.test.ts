@@ -14,7 +14,7 @@ import {
 } from '../../../src/main/db/sqlite-shared'
 
 // These back the D1 driver, which cannot be exercised in a unit test without a
-// Cloudflare account — so the logic lives here, where it can be.
+// Cloudflare account - so the logic lives here, where it can be.
 
 function column(overrides: Partial<TableInfoRow>): TableInfoRow {
   return { cid: 0, name: 'id', type: 'INTEGER', notnull: 0, dflt_value: null, pk: 0, ...overrides }

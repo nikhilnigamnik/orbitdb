@@ -70,7 +70,7 @@ export function CellInlineEditor({
   const [raw, setRaw] = React.useState(initial)
   const [error, setError] = React.useState<string | null>(null)
   const [isSaving, setIsSaving] = React.useState(false)
-  // Blur cancels the edit — except while a commit is in flight, where the
+  // Blur cancels the edit - except while a commit is in flight, where the
   // input may lose focus (unmount, select portal) without the user leaving.
   const isCommittingRef = React.useRef(false)
   // Radix fires the select's close after a rejected save has already cleared
@@ -196,7 +196,7 @@ export function CellInlineEditor({
 
   if (selectOptions != null) {
     return (
-      // Wrapped so a rejected write has somewhere to be shown — picking a value
+      // Wrapped so a rejected write has somewhere to be shown - picking a value
       // dismisses the select, and without this the error had no anchor and the
       // save failed in silence.
       <PopoverPrimitive.Root open={error != null}>
@@ -209,7 +209,7 @@ export function CellInlineEditor({
               onOpenChange={(open) => {
                 if (open) return
                 // The select reports its close before it reports the chosen value, so
-                // decide after both have landed — otherwise picking a value looks like
+                // decide after both have landed - otherwise picking a value looks like
                 // dismissing the editor, and a rejected save closes with its error.
                 queueMicrotask(() => {
                   if (!isCommittingRef.current && !hasAttemptedCommitRef.current) onClose()

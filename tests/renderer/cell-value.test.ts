@@ -29,7 +29,7 @@ const coerce = (udt: string, raw: string, isNull = false, overrides: Partial<Col
   coerceCellValue(column(udt, overrides), raw, isNull)
 
 // vitest.config.ts pins TZ to Asia/Kolkata, so these offsets are the same on
-// any machine — and a non-zero offset means the zone actually renders, rather
+// any machine - and a non-zero offset means the zone actually renders, rather
 // than collapsing to the 'Z' that UTC would produce.
 const OFFSET = '+05:30'
 

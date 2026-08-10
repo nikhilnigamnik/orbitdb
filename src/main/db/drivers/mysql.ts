@@ -510,7 +510,7 @@ async function updateRow(opts: RowUpdate): Promise<Record<string, unknown>> {
   const [result] = await pool.query<ResultSetHeader>(sql, params)
   if (result.affectedRows === 0) throw new Error('No row matched the primary key')
 
-  // Fetch updated row — use new PK values if they were part of the update set
+  // Fetch updated row - use new PK values if they were part of the update set
   const newPk: Record<string, unknown> = {}
   for (const pkCol of details.primaryKey) {
     newPk[pkCol] = opts.values[pkCol] != null ? opts.values[pkCol] : opts.pk[pkCol]
@@ -565,7 +565,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   const pool = getPool(opts.connectionId)
   const started = Date.now()
   // Runs on a dedicated connection (so the thread id is stable for KILL QUERY),
-  // which bypasses the instrumented pool.query — log it explicitly.
+  // which bypasses the instrumented pool.query - log it explicitly.
   const conn = await pool.getConnection()
   try {
     if (opts.queryId) {

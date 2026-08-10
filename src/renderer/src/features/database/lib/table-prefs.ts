@@ -27,7 +27,7 @@ function writeJson(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value))
   } catch {
-    // quota / private mode — silently no-op
+    // quota / private mode - silently no-op
   }
 }
 

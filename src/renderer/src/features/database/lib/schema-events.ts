@@ -1,6 +1,6 @@
 /**
- * Tiny pub/sub so table mutations (truncate/drop) made in one place — the
- * schema-tree row menu or the table header overflow menu — can tell the schema
+ * Tiny pub/sub so table mutations (truncate/drop) made in one place - the
+ * schema-tree row menu or the table header overflow menu - can tell the schema
  * tree to re-fetch the affected schema. Avoids threading refresh callbacks
  * across unrelated components.
  */

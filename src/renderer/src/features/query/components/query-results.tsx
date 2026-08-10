@@ -26,7 +26,7 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
       </div>
     )
   }
-  // A missing API key reached this pane only because the AI prompt failed — it is
+  // A missing API key reached this pane only because the AI prompt failed - it is
   // not a query error, and dressing it in red says the database rejected it.
   if (!result.success && isMissingAiKeyError(result.error)) {
     return (
@@ -86,7 +86,7 @@ export function QueryResults({ result, isRunning }: QueryResultsProps) {
         )}
         <span className="ml-auto font-mono text-text-subtle">{result.durationMs} ms</span>
         {canExport && (
-          // The same three formats the data grid offers — this used to hand you
+          // The same three formats the data grid offers - this used to hand you
           // JSON with no indication the others existed.
           <ExportMenu
             rows={result.rows}

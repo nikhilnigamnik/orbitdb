@@ -564,7 +564,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
   const pool = getPool(opts.connectionId)
   const started = Date.now()
   // Runs on a dedicated client (so the backend PID is stable for cancellation),
-  // which bypasses the instrumented pool.query — log it explicitly.
+  // which bypasses the instrumented pool.query - log it explicitly.
   const client = await pool.connect()
   try {
     let pid: number | null = null
@@ -578,7 +578,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
     try {
       const res = await client.query<Record<string, unknown>>(opts.sql, opts.params)
       // A multi-statement query (e.g. several INSERTs) makes pg return an array of
-      // results — show the last statement's rows/columns and the total affected rows.
+      // results - show the last statement's rows/columns and the total affected rows.
       const results = Array.isArray(res) ? res : [res]
       const primary = results[results.length - 1]
       const allRows = primary.rows ?? []

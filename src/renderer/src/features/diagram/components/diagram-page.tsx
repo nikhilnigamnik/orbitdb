@@ -28,10 +28,7 @@ export function DiagramPage() {
           title="No active connection"
           description="Pick a connection to see the schema diagram."
           action={
-            <Button
-              size="sm"
-              onClick={() => navigate(ROUTES.connections)}
-            >
+            <Button size="sm" onClick={() => navigate(ROUTES.connections)}>
               Go to connections
             </Button>
           }
@@ -65,7 +62,7 @@ function DiagramContent({ connectionId, schema, onPickSchema }: DiagramContentPr
     if (schema) return
     const first = schemasState.data?.[0]?.name
     if (first) onPickSchema(first)
-    // onPickSchema intentionally excluded — stable through render lifetime
+    // onPickSchema intentionally excluded - stable through render lifetime
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schemasState.data, schema])
 
@@ -155,7 +152,7 @@ function DiagramView({ connectionId, schemas, schema, onPickSchema }: DiagramVie
   )
 
   // Until the graph loads the first time, hold the toolbar back and show one
-  // bare full-area loader — same spot as the schema-list loader — so navigating
+  // bare full-area loader - same spot as the schema-list loader - so navigating
   // to the diagram is a single continuous spinner, not loader-then-loader.
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false)
   React.useEffect(() => {

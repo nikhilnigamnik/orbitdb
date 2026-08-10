@@ -9,8 +9,8 @@ interface LoadingStateProps {
 
 /**
  * The single full-area loading state for pages and panels. Fills its container
- * and centers the spinner — `h-full` covers block parents, `flex-1` covers flex
- * parents — so loaders look identical everywhere instead of drifting to the top.
+ * and centers the spinner - `h-full` covers block parents, `flex-1` covers flex
+ * parents - so loaders look identical everywhere instead of drifting to the top.
  */
 export function LoadingState({ size = 20, label, className }: LoadingStateProps) {
   return (
