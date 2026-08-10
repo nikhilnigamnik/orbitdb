@@ -1,9 +1,10 @@
 import { z } from 'zod'
-import type { FilterTableOptions, FilterTableResult, RowFilter } from '../../shared/types'
+import type { FilterTableOptions, FilterTableResult } from '../../shared/types'
 import { getConnection } from '../store/connections-store'
 import { tableDetails } from '../db/manager'
 import { generateJson } from './client'
 import { asData, buildTableContext, ENGINE_DIALECT } from './context'
+import { repairFilters } from './filter-repair'
 
 const OPERATORS = [
   '=',
@@ -45,12 +46,15 @@ export async function filterTable(opts: FilterTableOptions): Promise<FilterTable
     schema: responseSchema,
     system:
       `You translate a natural-language request into structured filters and sorting for a single ` +
-      `${ENGINE_DIALECT[saved.engine]} table. You CANNOT aggregate, join, or group — only filter rows ` +
+      `${ENGINE_DIALECT[saved.engine]} table. You CANNOT aggregate, join, or group - only filter rows ` +
       `and optionally sort by one column. ` +
       `Use only the exact column names from the schema. ` +
       `Each filter is {column, operator, value}; operators are ${OPERATORS.join(', ')}. ` +
       `Omit "value" for "is null"/"is not null". Combine multiple conditions as separate filters (ANDed). ` +
-      `For text matching prefer "ilike" with % wildcards. ` +
+      `For free-text columns prefer "ilike" with % wildcards. ` +
+      `A column shown with "values:" is an enum: use ONLY "=" or "!=" on it, and copy one of ` +
+      `the listed values character-for-character - they are case-sensitive, and like/ilike is ` +
+      `not a legal operator on an enum. ` +
       `CRITICAL: every "value" is bound as a literal parameter, NOT raw SQL. ` +
       `Never use SQL functions or expressions (no now(), CURRENT_DATE, interval, etc.). ` +
       `The current date/time is ${nowIso}. Express relative dates as concrete ISO 8601 literals ` +
@@ -60,18 +64,17 @@ export async function filterTable(opts: FilterTableOptions): Promise<FilterTable
     prompt: `${asData('table', context)}\n\n${asData('request', opts.prompt)}`
   })
 
-  // Drop filters on unknown columns (hallucinations) or whose value still smells like
-  // a SQL expression — those would be sent as a literal and fail to cast.
-  const looksLikeExpression = /\b(now|current_date|current_timestamp|interval|date_trunc)\b|\(\)/i
-  const filters: RowFilter[] = response.filters.filter(
-    (f) => columnNames.has(f.column) && !(f.value && looksLikeExpression.test(f.value))
-  )
+  // Drops hallucinated columns and SQL-expression values, and snaps enum values
+  // onto the labels the engine will actually accept.
+  const { filters, notes } = repairFilters(response.filters, details.columns)
+
   const orderBy =
     response.orderBy && columnNames.has(response.orderBy) ? response.orderBy : undefined
 
   return {
     filters,
     orderBy,
-    orderDir: orderBy ? (response.orderDir ?? 'asc') : undefined
+    orderDir: orderBy ? (response.orderDir ?? 'asc') : undefined,
+    notes: notes.length ? notes : undefined
   }
 }

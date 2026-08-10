@@ -263,6 +263,12 @@ export interface FilterTableResult {
   filters: RowFilter[]
   orderBy?: string
   orderDir?: SortDirection
+  /**
+   * Conditions that could not be made executable and were dropped, phrased for
+   * the user. Present only when something was dropped - silently narrowing the
+   * request would return a wider result set that looks like an answer.
+   */
+  notes?: string[]
 }
 
 export interface ExplainTableOptions {
