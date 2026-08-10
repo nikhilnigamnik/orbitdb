@@ -19,6 +19,8 @@ export async function generateSql(opts: GenerateSqlOptions): Promise<GenerateSql
       `You are an expert SQL assistant for ${dialect}. ` +
       `Generate exactly one valid ${dialect} query that answers the user's request. ` +
       `Use only the tables and columns inside <schema>. ` +
+      `A column shown with "values:" is an enum: compare it only against one of the listed ` +
+      `values, copied character-for-character, since they are case-sensitive. ` +
       `${QUOTE_HINT[saved.engine]} ` +
       `Prefer read-only SELECT queries unless the user clearly asks to modify data. ` +
       `Unless the request is an aggregate or names its own row count, end the query with a ` +

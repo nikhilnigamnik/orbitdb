@@ -202,7 +202,8 @@ async function listTables(connectionId: string, schema: string): Promise<TableIn
   })
 }
 
-function normalizeUdtName(dataType: string, columnType: string): string {
+/** Exported for testing - pure, and now relied on by both introspection paths. */
+export function normalizeUdtName(dataType: string, columnType: string): string {
   const dt = dataType.toLowerCase()
   if (dt === 'json') return 'json'
   if (dt === 'tinyint' && columnType.toLowerCase() === 'tinyint(1)') return 'bool'
@@ -212,7 +213,8 @@ function normalizeUdtName(dataType: string, columnType: string): string {
   return dt
 }
 
-function parseEnumValues(columnType: string): string[] | null {
+/** Exported for testing - the quote-escaping rules have real edge cases. */
+export function parseEnumValues(columnType: string): string[] | null {
   const match = /^enum\((.*)\)$/i.exec(columnType)
   if (!match) return null
   // Labels are single-quoted; a literal quote inside a label is doubled ('').
@@ -684,6 +686,7 @@ async function getSchemaGraph(connectionId: string, schema: string): Promise<Sch
       `,
             column_name as name,
             data_type,
+            column_type,
             is_nullable,
             column_key
        from information_schema.columns
@@ -720,11 +723,15 @@ async function getSchemaGraph(connectionId: string, schema: string): Promise<Sch
   for (const row of columnsRows) {
     const tableName = String(row.table)
     const list = columnsByTable.get(tableName) ?? []
+    // column_type carries the enum's members; data_type is just "enum".
+    const columnType = String(row.column_type ?? row.data_type)
     list.push({
       name: String(row.name),
-      dataType: String(row.data_type),
+      dataType: columnType,
+      udtName: normalizeUdtName(String(row.data_type), columnType),
       isNullable: String(row.is_nullable).toUpperCase() === 'YES',
-      isPrimaryKey: String(row.column_key) === 'PRI'
+      isPrimaryKey: String(row.column_key) === 'PRI',
+      enumValues: parseEnumValues(columnType)
     })
     columnsByTable.set(tableName, list)
   }

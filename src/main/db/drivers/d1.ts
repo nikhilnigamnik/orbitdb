@@ -30,6 +30,7 @@ import {
   LIST_BASE_TABLES_SQL,
   LIST_TABLES_SQL,
   SQLITE_SCHEMA,
+  normalizeUdtName,
   quoteIdent,
   sqliteDdlDialect,
   sqliteFilterDialect,
@@ -622,8 +623,11 @@ async function getSchemaGraph(connectionId: string, schema: string): Promise<Sch
       columns: colEntry.results.map((c) => ({
         name: String(c.name),
         dataType: String(c.type || 'TEXT'),
+        udtName: normalizeUdtName(String(c.type || 'TEXT')),
         isNullable: Number(c.notnull) === 0,
-        isPrimaryKey: Number(c.pk) > 0
+        isPrimaryKey: Number(c.pk) > 0,
+        // SQLite has no enum type, and CHECK constraints are not parsed.
+        enumValues: null
       }))
     })
 
