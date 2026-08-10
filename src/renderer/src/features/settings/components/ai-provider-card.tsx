@@ -90,7 +90,7 @@ export function AiProviderCard({
               checked={isActive}
               // An off switch that is already off is the only pointless press here:
               // exactly one provider is active, so the active card cannot turn
-              // itself off — something else has to turn on.
+              // itself off - something else has to turn on.
               disabled={isActive || isBusy}
               onCheckedChange={(next) => next && onActivate()}
               aria-label={`Use ${spec.label}`}
@@ -103,7 +103,7 @@ export function AiProviderCard({
                 <div className="flex items-start gap-2.5 border-l-2 border-l-warning bg-warning/5 p-4">
                   <IconAlertTriangle size={14} className="mt-px shrink-0 text-warning" />
                   <p className="text-xs leading-relaxed text-warning">
-                    A key is stored but can&rsquo;t be decrypted on this machine — it was sealed
+                    A key is stored but can&rsquo;t be decrypted on this machine - it was sealed
                     under a different OS user or keychain. Enter it again to replace it.
                   </p>
                 </div>

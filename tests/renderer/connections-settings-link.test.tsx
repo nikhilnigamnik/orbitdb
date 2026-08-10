@@ -34,7 +34,7 @@ function mount() {
 describe('reaching Settings from the connections page', () => {
   it('is possible at all', async () => {
     // AppShell hides the sidebar on this route, so without this control there is
-    // no way into Settings before a connection exists — and the AI key lives there.
+    // no way into Settings before a connection exists - and the AI key lives there.
     mount()
     expect(await screen.findByLabelText('Settings')).toBeTruthy()
   })

@@ -22,8 +22,8 @@ export class MissingApiKeyError extends Error {
 }
 
 /**
- * One line per provider. Each SDK takes the same shape — a factory that closes
- * over the key and returns a model builder — so adding a provider is a row here
+ * One line per provider. Each SDK takes the same shape - a factory that closes
+ * over the key and returns a model builder - so adding a provider is a row here
  * plus a row in `AI_PROVIDERS`.
  */
 const FACTORY: Record<AiProviderId, (apiKey: string) => (model: string) => LanguageModel> = {
@@ -43,7 +43,7 @@ let cached: {
 } | null = null
 
 /**
- * Drops the built provider — and with it the copy of the key it closed over.
+ * Drops the built provider - and with it the copy of the key it closed over.
  * Called when the key changes so a removed key does not linger in memory.
  */
 export function resetModelCache(): void {
@@ -53,7 +53,7 @@ export function resetModelCache(): void {
 /**
  * A model for a *named* provider, using that provider's own saved key. `getModel`
  * is the active one; this is for testing a key on a card you are not using yet.
- * Not cached — it is pressed by hand, once.
+ * Not cached - it is pressed by hand, once.
  */
 export function buildModelFor(provider: string): LanguageModel {
   if (!isAiProviderId(provider)) throw new Error(`Unknown provider: ${provider}`)
@@ -84,7 +84,7 @@ type TextArgs = Omit<Parameters<typeof generateText>[0], 'model'>
 
 /**
  * The only way this app talks to a model. Everything goes through here so usage is
- * recorded once, in one place — a second path would silently under-count.
+ * recorded once, in one place - a second path would silently under-count.
  */
 export async function runText(feature: AiFeature, args: TextArgs, provider?: string) {
   const model = provider ? buildModelFor(provider) : getModel()
@@ -127,14 +127,14 @@ function extractJson(text: string): string {
 }
 
 /**
- * Some failures mean "the model's answer was the wrong shape" — worth a second,
+ * Some failures mean "the model's answer was the wrong shape" - worth a second,
  * plainer attempt. Others mean the request never landed: a rejected key, a rate
  * limit, a timeout. Retrying those buys a second round-trip and, in the rate
  * limit's case, makes the thing it is retrying worse.
  */
 function isWorthRetrying(err: unknown): boolean {
   if (APICallError.isInstance(err)) return false
-  // AbortSignal.timeout — the model was too slow, and it will be again.
+  // AbortSignal.timeout - the model was too slow, and it will be again.
   if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
     return false
   }
@@ -144,12 +144,12 @@ function isWorthRetrying(err: unknown): boolean {
 /**
  * Structured output in two layers.
  *
- * 1. `generateText` + `Output.object` — the SDK's supported path as of v6, which
+ * 1. `generateText` + `Output.object` - the SDK's supported path as of v6, which
  *    deprecated `generateObject`. Every model offered in Settings reports
  *    `supportsStructuredOutput`, so the Anthropic provider sends a native
  *    `output_config.format` carrying the schema rather than asking in prose.
  * 2. A plain-text retry, parsed defensively. `Output.object` takes no repair
- *    hook, so salvaging a fenced or preamble-wrapped reply means asking again —
+ *    hook, so salvaging a fenced or preamble-wrapped reply means asking again -
  *    which is why layer 1 failing for a *transport* reason must not land here.
  */
 export async function generateJson<T>(opts: {
@@ -175,7 +175,7 @@ export async function generateJson<T>(opts: {
   }
 
   const { text } = await runText(opts.feature, {
-    system: `${opts.system}\n\nRespond with raw JSON only — no prose, no markdown code fences.`,
+    system: `${opts.system}\n\nRespond with raw JSON only - no prose, no markdown code fences.`,
     prompt: opts.prompt,
     abortSignal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
   })

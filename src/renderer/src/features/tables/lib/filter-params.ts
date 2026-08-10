@@ -6,7 +6,7 @@ import { OPERATORS } from './filter-editor'
  *
  * Parsing is defensive by necessity: a URL is user-editable and can outlive the
  * schema it was written against. Anything malformed is dropped rather than
- * throwing — a stale link should open the table, not an error.
+ * throwing - a stale link should open the table, not an error.
  */
 
 export const FILTERS_PARAM = 'filters'

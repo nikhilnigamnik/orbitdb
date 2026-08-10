@@ -17,7 +17,7 @@ interface PaginationBarProps {
   offset: number
   pageSize: number
   loadedCount: number
-  /** Approximate, from table statistics — never used to navigate. */
+  /** Approximate, from table statistics - never used to navigate. */
   totalEstimate: number | null
   /** Real count for the current filters, once known. */
   totalExact: number | null
@@ -42,7 +42,7 @@ export function PaginationBar({
   // length is an exact multiple of the page size. The real count settles it.
   const hasNext = totalExact != null ? end < totalExact : loadedCount >= pageSize
   const currentPage = Math.floor(offset / pageSize) + 1
-  // Paging is only offered against a real count — jumping to a page derived from
+  // Paging is only offered against a real count - jumping to a page derived from
   // table statistics lands mid-table, or past the end.
   const totalPages = totalExact != null ? Math.max(1, Math.ceil(totalExact / pageSize)) : null
   const lastOffset = totalPages != null ? (totalPages - 1) * pageSize : null

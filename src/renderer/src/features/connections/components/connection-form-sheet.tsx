@@ -426,7 +426,7 @@ export function ConnectionFormSheet({
                   error={errors.database}
                   hint={
                     values.engine === 'mysql'
-                      ? 'Optional — leave empty to browse all databases.'
+                      ? 'Optional - leave empty to browse all databases.'
                       : undefined
                   }
                 >

@@ -3,7 +3,7 @@ import type { RowFilter } from '@renderer/types'
 export interface OperatorMeta {
   value: RowFilter['operator']
   label: string
-  /** Takes no value — the comparison is the whole filter. */
+  /** Takes no value - the comparison is the whole filter. */
   unary?: boolean
 }
 
@@ -36,7 +36,7 @@ export function usesWildcards(operator: RowFilter['operator']): boolean {
  * Turn what the editor holds into the filter to apply.
  *
  * `rawValue` is `null` only when the user picked the NULL suggestion, which is a
- * request for absence rather than for the empty string — `= ''` would match
+ * request for absence rather than for the empty string - `= ''` would match
  * nothing on a nullable column. Unary operators drop whatever value came with
  * them, since the comparison carries no operand.
  */

@@ -38,7 +38,7 @@ import type { TableDetails } from '@renderer/types'
 interface TableOverflowMenuProps {
   connectionId: string
   details: TableDetails
-  /** Rows to export — current selection if any, otherwise the current page. */
+  /** Rows to export - current selection if any, otherwise the current page. */
   exportRows: Record<string, unknown>[]
   exportColumns: string[]
   onRefresh: () => void
@@ -80,7 +80,7 @@ export function TableOverflowMenu({
     try {
       await navigator.clipboard.writeText(`${details.schema}.${details.name}`)
     } catch {
-      // Clipboard can fail in unfocused windows / without permission — ignore.
+      // Clipboard can fail in unfocused windows / without permission - ignore.
     }
   }
 

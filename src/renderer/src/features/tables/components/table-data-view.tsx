@@ -30,6 +30,11 @@ import {
   decodeJoin,
   encodeFilters
 } from '@renderer/features/tables/lib/filter-params'
+import {
+  loadErrorAction,
+  type FilterQueryState
+} from '@renderer/features/tables/lib/load-error-action'
+import { buildFilterSuggestions } from '@renderer/features/tables/lib/filter-suggestions'
 import { DEFAULT_PAGE_SIZE, UNDO_PROMPT_MS } from '@renderer/config/site'
 import { ROUTES, tableRouteWithFk } from '@renderer/config/routes'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
@@ -83,7 +88,7 @@ export function TableDataView({
   const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE)
   const [orderBy, setOrderBy] = React.useState<string | null>(null)
   const [orderDir, setOrderDir] = React.useState<SortDirection>('asc')
-  // Filters live in the URL so a filtered view can be linked and reopened —
+  // Filters live in the URL so a filtered view can be linked and reopened -
   // an FK deep link already worked that way while a hand-built filter did not.
   const [filters, setFiltersState] = React.useState<RowFilter[]>(() => {
     const fromUrl = decodeFilters(searchParams.get(FILTERS_PARAM))
@@ -153,6 +158,14 @@ export function TableDataView({
     [fkByColumn, navigate]
   )
 
+  // Built from introspection rather than the grid's columns: `details.columns`
+  // is where enumValues lives, and an enum label is the one example value we can
+  // offer without querying the rows.
+  const aiSuggestions = React.useMemo(
+    () => buildFilterSuggestions(details.columns),
+    [details.columns]
+  )
+
   const aiPrompt = useDisclosure(false)
   const seedDialog = useDisclosure(false)
   const [isAiFiltering, setIsAiFiltering] = React.useState(false)
@@ -195,6 +208,10 @@ export function TableDataView({
   // load that reloads whenever its own outcome changes never settles.
   const hasLoadedOnceRef = React.useRef(false)
   const loadRef = React.useRef<() => Promise<void>>(async () => {})
+  // The last filter set that actually loaded, so a load that breaks can offer to
+  // go back to it rather than a Refresh that re-runs the same failing query.
+  const lastGoodQueryRef = React.useRef<FilterQueryState | null>(null)
+  const revertRef = React.useRef<() => void>(() => {})
 
   const load = React.useCallback(async () => {
     const requestId = ++requestIdRef.current
@@ -222,6 +239,7 @@ export function TableDataView({
       setHasLoadedOnce(true)
       setIsLoading(false)
       setError(null)
+      lastGoodQueryRef.current = { filters, filterJoin }
     } else {
       prefetchCacheRef.current = null
       setIsLoading(true)
@@ -247,6 +265,7 @@ export function TableDataView({
         setRowSelection({})
         setHasLoadedOnce(true)
         hasLoadedOnceRef.current = true
+        lastGoodQueryRef.current = { filters, filterJoin }
       } catch (err) {
         if (requestId !== requestIdRef.current) return
         const message = err instanceof Error ? err.message : String(err)
@@ -254,9 +273,13 @@ export function TableDataView({
         // Only once a grid is on screen. Before that the full-area error state
         // is the whole view, and a toast on top of it would say it twice.
         if (hasLoadedOnceRef.current) {
+          const isFilterFault =
+            loadErrorAction({ filters, filterJoin }, lastGoodQueryRef.current) === 'undo'
           toast.error('Could not load rows', {
             description: message,
-            action: { label: 'Refresh', onClick: () => void loadRef.current() }
+            action: isFilterFault
+              ? { label: 'Undo filters', onClick: () => revertRef.current() }
+              : { label: 'Refresh', onClick: () => void loadRef.current() }
           })
         }
         return
@@ -300,7 +323,7 @@ export function TableDataView({
         )
         prefetchCacheRef.current = { key: nextKey, data: nextData }
       } catch {
-        // silent — prefetch failures shouldn't surface
+        // silent - prefetch failures shouldn't surface
       }
     })()
   }, [
@@ -317,6 +340,19 @@ export function TableDataView({
   ])
 
   loadRef.current = load
+
+  // Restores the last filter set that loaded. It must write the URL too -
+  // leaving the poisoned ?filters= behind would resurrect it on the next reload.
+  const revertToLastGood = React.useCallback(() => {
+    const lastGood = lastGoodQueryRef.current
+    if (!lastGood) return
+    setFiltersState(lastGood.filters)
+    setFilterJoinState(lastGood.filterJoin)
+    writeFilterParams(lastGood.filters, lastGood.filterJoin)
+    setOffset(0)
+  }, [writeFilterParams])
+
+  revertRef.current = revertToLastGood
 
   React.useEffect(() => {
     setOffset(0)
@@ -352,7 +388,7 @@ export function TableDataView({
         if (!cancelled) setTotalExact(total)
       })
       .catch(() => {
-        // A count is an enhancement — falling back to the estimate is fine.
+        // A count is an enhancement - falling back to the estimate is fine.
       })
     return () => {
       cancelled = true
@@ -360,7 +396,7 @@ export function TableDataView({
   }, [connectionId, details.schema, details.name, filters, filterJoin])
 
   // Signal the container once the first page lands, so it can reveal the header
-  // and grid together — a single loader instead of loader-then-loader.
+  // and grid together - a single loader instead of loader-then-loader.
   const onReadyRef = React.useRef(onReady)
   onReadyRef.current = onReady
   React.useEffect(() => {
@@ -391,14 +427,24 @@ export function TableDataView({
           prompt
         })
       )
+      // Every condition was dropped. Applying an empty filter set would widen the
+      // view to the whole table and read as an answer - say so and let the user
+      // rephrase instead.
+      if (result.filters.length === 0 && result.notes?.length) {
+        toast.warning('Could not build that filter', { description: result.notes.join('\n') })
+        return
+      }
       setFilters(result.filters)
       setOrderBy(result.orderBy ?? null)
       setOrderDir(result.orderDir ?? 'asc')
       setOffset(0)
       aiPrompt.close()
+      if (result.notes?.length) {
+        toast.warning('Some conditions were dropped', { description: result.notes.join('\n') })
+      }
     } catch (err) {
       const message = errorMessage(err)
-      // A missing key is a setup step, not a failure — say what to do about it.
+      // A missing key is a setup step, not a failure - say what to do about it.
       if (isMissingAiKeyError(message)) {
         toast.error('AI needs an Anthropic API key', {
           description: 'It stays encrypted on this machine.',
@@ -442,7 +488,7 @@ export function TableDataView({
 
   /**
    * The last committed cell edit, kept so it can be put back. A cell edit writes
-   * the moment you leave the cell, with no confirmation — this is the only way
+   * the moment you leave the cell, with no confirmation - this is the only way
    * back from a mistyped value.
    */
   const [lastEdit, setLastEdit] = React.useState<{
@@ -528,7 +574,7 @@ export function TableDataView({
     for (const key of details.primaryKey) pk[key] = row[key]
     const previousValue = row[column]
     // Patches the saved row in place with what the DB returned (covers
-    // triggers/defaults) instead of reloading — no grid flash, and the
+    // triggers/defaults) instead of reloading - no grid flash, and the
     // cell-editing session survives for Tab navigation.
     await writeCell(pk, column, value, row)
     setLastEdit({ pk, column, previousValue, newValue: value })
@@ -596,7 +642,17 @@ export function TableDataView({
     if (error) {
       return (
         <div className="p-4">
-          <ErrorState message={error} onRetry={load} />
+          <ErrorState
+            message={error}
+            onRetry={load}
+            // A deep link carrying a bad ?filters= fails here, where Retry can
+            // only fail again - clearing them is the only way out.
+            secondaryAction={
+              filters.length > 0
+                ? { label: 'Clear filters', onClick: () => setFilters([]) }
+                : undefined
+            }
+          />
         </div>
       )
     }
@@ -664,7 +720,7 @@ export function TableDataView({
 
       {!canMutate && details.type === 'table' && (
         <div className="border-b border-warning/20 bg-warning/5 px-3 py-2 text-xs text-warning">
-          This table has no primary key — rows cannot be edited or deleted from the UI.
+          This table has no primary key - rows cannot be edited or deleted from the UI.
         </div>
       )}
 
@@ -701,7 +757,7 @@ export function TableDataView({
         />
 
         {lastEdit && isUndoPromptVisible && selectedCount === 0 && (
-          // Sits where the selection bar sits, and only when that is absent —
+          // Sits where the selection bar sits, and only when that is absent -
           // two stacked floating bars would fight for the same corner.
           <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
             <div className="animate-slide-up-fade pointer-events-auto flex min-w-0 items-center gap-1 rounded-lg border border-border-strong/70 bg-surface/95 py-1 pl-3 pr-1 text-xs shadow-2xl shadow-black/60 backdrop-blur-xl">
@@ -814,11 +870,7 @@ export function TableDataView({
         onSubmit={handleAiFilter}
         isGenerating={isAiFiltering}
         placeholder={`Filter ${details.name}…`}
-        suggestions={[
-          'rows created in the last 7 days',
-          'where status is active',
-          'most recent 100 rows'
-        ]}
+        suggestions={aiSuggestions}
       />
 
       <SeedDataDialog

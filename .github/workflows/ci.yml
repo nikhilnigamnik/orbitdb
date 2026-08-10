@@ -1,6 +1,6 @@
 name: CI
 
-# Changes reach dev through a pull request, so pushes to dev are not a trigger —
+# Changes reach dev through a pull request, so pushes to dev are not a trigger -
 # the PR run is the gate.
 on:
   push:

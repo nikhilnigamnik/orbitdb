@@ -1,6 +1,6 @@
-import type { DatabaseEngine, TableDetails } from '../../shared/types'
+import type { ColumnInfo, DatabaseEngine, TableDetails } from '../../shared/types'
 import { getSchemaGraph, listSchemas } from '../db/manager'
-import { MAX_SCHEMA_TABLES } from './config'
+import { MAX_ENUM_LABELS, MAX_SCHEMA_TABLES } from './config'
 
 const SYSTEM_SCHEMAS: Record<DatabaseEngine, string[]> = {
   postgres: ['information_schema', 'pg_catalog', 'pg_toast'],
@@ -25,7 +25,7 @@ export const QUOTE_HINT: Record<DatabaseEngine, string> = {
 }
 
 /**
- * Fences untrusted content — schema identifiers, row values — inside a tag so the
+ * Fences untrusted content - schema identifiers, row values - inside a tag so the
  * model can tell data from instructions. Table and column names come from someone
  * else's database and can say anything, including "ignore the above"; a closing
  * tag inside the payload would end the fence early, so it is defanged first.
@@ -91,6 +91,37 @@ export async function buildSchemaContext(
   return lines.join('\n')
 }
 
+/**
+ * Postgres reports every enum, domain and composite as the literal string
+ * `USER-DEFINED` in `information_schema`; the real name only lives in `udtName`.
+ * MySQL's dataType is already `enum('a','b')`, so naming an enum by its udtName
+ * either way keeps the labels from being printed twice - and keeps MAX_ENUM_LABELS
+ * in charge of how many are shown.
+ */
+export function columnType(c: ColumnInfo): string {
+  if (c.enumValues?.length) return c.udtName
+  return c.dataType === 'USER-DEFINED' ? c.udtName : c.dataType
+}
+
+/**
+ * '' for non-enum columns. Without this the model has no way to know an enum's
+ * labels are capitalised and guesses a lowercase value the engine rejects.
+ *
+ * The `values:` marker is a contract with the system prompts in filter-table.ts
+ * and generate-seed.ts, which tell the model what a column carrying it may hold -
+ * change them together.
+ */
+export function enumSuffix(c: ColumnInfo): string {
+  const labels = c.enumValues
+  if (!labels?.length) return ''
+  const shown = labels
+    .slice(0, MAX_ENUM_LABELS)
+    .map((v) => `'${v}'`)
+    .join(' | ')
+  const rest = labels.length - MAX_ENUM_LABELS
+  return rest > 0 ? ` values: ${shown} (+${rest} more)` : ` values: ${shown}`
+}
+
 /** Detailed single-table description for table-scoped features. */
 export function buildTableContext(details: TableDetails): string {
   const lines: string[] = [`Table: ${details.schema}.${details.name} (${details.type})`]
@@ -104,7 +135,7 @@ export function buildTableContext(details: TableDetails): string {
     ]
       .filter(Boolean)
       .join(', ')
-    lines.push(`  - ${c.name} ${c.dataType}${flags ? ` (${flags})` : ''}`)
+    lines.push(`  - ${c.name} ${columnType(c)}${flags ? ` (${flags})` : ''}${enumSuffix(c)}`)
   }
 
   if (details.primaryKey.length) {

@@ -10,7 +10,7 @@ const runQuery = vi.fn()
 const generateSql = vi.fn()
 
 // The page only renders an editor once a connection is active, and the store
-// only becomes active by actually connecting — stub it rather than drive it.
+// only becomes active by actually connecting - stub it rather than drive it.
 vi.mock('@renderer/features/connections/store/connection-store', () => ({
   useConnection: () => ({
     active: {
@@ -130,7 +130,7 @@ describe('running a destructive query', () => {
 
 describe('generated SQL', () => {
   it('lands in the editor for review instead of running itself', async () => {
-    // The model is told to prefer SELECT, but that is a preference in a prompt —
+    // The model is told to prefer SELECT, but that is a preference in a prompt -
     // a misread request used to reach the database with nothing in between.
     generateSql.mockResolvedValue({
       success: true,
@@ -184,7 +184,7 @@ describe('generated SQL over an unsaved draft', () => {
     await waitFor(() => expect(editor().value).toBe('select 1'))
   }
 
-  it('offers a way back — the draft is persisted, and history only holds runs', async () => {
+  it('offers a way back - the draft is persisted, and history only holds runs', async () => {
     await generateOver('select * from half_written')
 
     fireEvent.click(await screen.findByText('Undo'))

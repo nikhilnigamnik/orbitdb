@@ -108,7 +108,7 @@ export function Sidebar() {
             </NavLink>
           </TooltipTrigger>
           <TooltipContent side="right">
-            {hasUpdate ? 'Settings — update available' : 'Settings'}
+            {hasUpdate ? 'Settings - update available' : 'Settings'}
           </TooltipContent>
         </Tooltip>
       </div>

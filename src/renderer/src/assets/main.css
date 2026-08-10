@@ -13,7 +13,7 @@
   --color-bg: #0e1013; /* window chrome, behind the floating panels */
   --color-surface: #131519; /* panels, sidebars, popovers */
   --color-surface-elevated: #1c2026; /* hover / selected rows */
-  --color-input: #15181c; /* text fields — reads as a well, not a raised chip */
+  --color-input: #15181c; /* text fields - reads as a well, not a raised chip */
   --color-surface-sunken: #0b0d10; /* code blocks, SQL editor, DDL preview */
 
   --color-border: #202429;
@@ -23,12 +23,12 @@
   --color-text-muted: #9aa1ac;
   --color-text-subtle: #6a7280;
 
-  /* #1249dc is a fill colour — 7.0:1 under white ink, but only 2.7:1 as text on
+  /* #1249dc is a fill colour - 7.0:1 under white ink, but only 2.7:1 as text on
      --color-bg. Anything that renders accent-coloured *text* uses accent-text. */
   --color-accent: #1249dc;
   --color-accent-fg: #ffffff;
   --color-accent-text: #5c8af5;
-  --color-accent-hover: #1b43b1; /* same hue, darker — buttons darken on hover */
+  --color-accent-hover: #1b43b1; /* same hue, darker - buttons darken on hover */
   --color-accent-shade: #143285; /* 2px inset bottom bevel under the fill */
 
   --color-success: #3fb950;

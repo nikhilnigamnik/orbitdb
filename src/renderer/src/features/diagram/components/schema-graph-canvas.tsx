@@ -276,8 +276,14 @@ function Flow({ graph, schema }: SchemaGraphCanvasProps) {
 
       const bounds = getNodesBounds(getNodes())
       const padding = 0.12
-      const imageWidth = Math.min(4096, Math.max(1200, Math.round(bounds.width * (1 + padding * 2))))
-      const imageHeight = Math.min(4096, Math.max(800, Math.round(bounds.height * (1 + padding * 2))))
+      const imageWidth = Math.min(
+        4096,
+        Math.max(1200, Math.round(bounds.width * (1 + padding * 2)))
+      )
+      const imageHeight = Math.min(
+        4096,
+        Math.max(800, Math.round(bounds.height * (1 + padding * 2)))
+      )
       const viewport = getViewportForBounds(bounds, imageWidth, imageHeight, 0.1, 4, padding)
 
       const options = {
@@ -331,7 +337,7 @@ function Flow({ graph, schema }: SchemaGraphCanvasProps) {
             <IconHierarchy2 size={15} />
           </ToolButton>
           <ToolButton
-            title={`Layout: ${direction === 'LR' ? 'horizontal' : 'vertical'} — click to flip`}
+            title={`Layout: ${direction === 'LR' ? 'horizontal' : 'vertical'} - click to flip`}
             onClick={toggleDirection}
           >
             {direction === 'LR' ? (

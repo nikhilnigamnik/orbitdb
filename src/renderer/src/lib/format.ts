@@ -14,7 +14,7 @@ function formatBytes(byteLength: number): string {
 /**
  * Render a Date for a column of `udtName`.
  *
- * A timestamptz is an absolute instant, so it keeps its UTC offset — without it
+ * A timestamptz is an absolute instant, so it keeps its UTC offset - without it
  * the displayed time silently reads as local, and saving the string back shifts
  * the value when the server timezone differs. (The type predicates live in
  * features/tables/lib/cell-value.ts; comparing here avoids a cycle.)
@@ -48,7 +48,7 @@ export function formatCellValue(value: unknown, udtName?: string): string {
 }
 
 /**
- * A string that renders as an empty cell — indistinguishable from any other
+ * A string that renders as an empty cell - indistinguishable from any other
  * blank one unless it is quoted.
  */
 export function isBlankString(value: unknown): value is string {

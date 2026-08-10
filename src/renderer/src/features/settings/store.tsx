@@ -15,9 +15,7 @@ const UpdateContext = React.createContext<UpdateContextValue | null>(null)
 
 function appApi() {
   if (typeof window === 'undefined' || !window.api?.app) {
-    throw new Error(
-      'App IPC bridge unavailable — restart the dev server so preload reloads.'
-    )
+    throw new Error('App IPC bridge unavailable - restart the dev server so preload reloads.')
   }
   return window.api.app
 }

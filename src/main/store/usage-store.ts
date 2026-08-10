@@ -3,6 +3,7 @@ import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { format, subDays } from 'date-fns'
 import type { AiFeature, AiModelId, AiProviderId } from '../../shared/ai-models'
+import { costOf } from '../../shared/ai-pricing'
 import type { UsageBreakdown, UsageSummary, UsageWindow } from '../../shared/types'
 
 const FILE_NAME = 'usage.json'
@@ -38,7 +39,7 @@ function storePath(): string {
   return join(dir, FILE_NAME)
 }
 
-/** Local, not UTC — "today" has to mean the user's today. */
+/** Local, not UTC - "today" has to mean the user's today. */
 function dayKey(date: Date): string {
   return format(date, 'yyyy-MM-dd')
 }
@@ -114,27 +115,37 @@ export function recordUsage(event: UsageEvent, now = new Date()): void {
 }
 
 function emptyWindow(): UsageWindow {
-  return { calls: 0, input: 0, output: 0, byModel: [], byFeature: [] }
+  return { calls: 0, input: 0, output: 0, cost: 0, unpricedCalls: 0, byModel: [], byFeature: [] }
 }
 
-function summarise(days: DayRows[]): UsageWindow {
+/**
+ * Takes `[dayKey, rows]` rather than bare rows because cost is priced per day:
+ * a rate can change partway through a window (Sonnet 5's launch discount ends
+ * 2026-08-31), and the rollup is already per-day, so pricing each day at its own
+ * rate is exact rather than an approximation.
+ */
+function summarise(days: [string, DayRows][]): UsageWindow {
   const byModel = new Map<string, UsageBreakdown>()
   const byFeature = new Map<string, UsageBreakdown>()
-  const total = { calls: 0, input: 0, output: 0 }
+  const total = { calls: 0, input: 0, output: 0, cost: 0, unpricedCalls: 0 }
 
-  for (const rows of days) {
+  for (const [day, rows] of days) {
     for (const [key, counts] of Object.entries(rows)) {
       const [provider, model, feature] = key.split('|')
+      const cost = costOf(model, counts.input, counts.output, day)
+
       total.calls += counts.calls
       total.input += counts.input
       total.output += counts.output
+      total.cost += cost ?? 0
+      if (cost == null) total.unpricedCalls += counts.calls
 
       const modelKey = `${provider}|${model}`
       const model_ = byModel.get(modelKey) ?? { provider, model, feature: '', ...zero() }
-      byModel.set(modelKey, add(model_, counts))
+      byModel.set(modelKey, add(model_, counts, cost))
 
       const feature_ = byFeature.get(feature) ?? { provider: '', model: '', feature, ...zero() }
-      byFeature.set(feature, add(feature_, counts))
+      byFeature.set(feature, add(feature_, counts, cost))
     }
   }
 
@@ -148,16 +159,17 @@ function summarise(days: DayRows[]): UsageWindow {
   }
 }
 
-function zero(): Counts {
-  return { calls: 0, input: 0, output: 0 }
+function zero(): Counts & { cost: number } {
+  return { calls: 0, input: 0, output: 0, cost: 0 }
 }
 
-function add(row: UsageBreakdown, counts: Counts): UsageBreakdown {
+function add(row: UsageBreakdown, counts: Counts, cost: number | null): UsageBreakdown {
   return {
     ...row,
     calls: row.calls + counts.calls,
     input: row.input + counts.input,
-    output: row.output + counts.output
+    output: row.output + counts.output,
+    cost: row.cost + (cost ?? 0)
   }
 }
 
@@ -168,9 +180,9 @@ export function getUsageSummary(now = new Date()): UsageSummary {
 
   const entries = Object.entries(days)
   return {
-    today: summarise(entries.filter(([day]) => day === today).map(([, rows]) => rows)),
-    last30: summarise(entries.filter(([day]) => day >= from30).map(([, rows]) => rows)),
-    allTime: summarise(entries.map(([, rows]) => rows)),
+    today: summarise(entries.filter(([day]) => day === today)),
+    last30: summarise(entries.filter(([day]) => day >= from30)),
+    allTime: summarise(entries),
     retentionDays: USAGE_RETENTION_DAYS
   }
 }
@@ -179,7 +191,7 @@ export function clearUsage(): void {
   write(emptyState())
 }
 
-/** Test seam — drops the cache so a fresh file is re-read. */
+/** Test seam - drops the cache so a fresh file is re-read. */
 export function resetUsageCache(): void {
   cache = null
 }

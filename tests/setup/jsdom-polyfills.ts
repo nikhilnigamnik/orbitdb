@@ -1,6 +1,6 @@
 /**
  * jsdom is missing a handful of DOM APIs that Radix's floating components call
- * unconditionally — without these, rendering a Select or Popover throws inside
+ * unconditionally - without these, rendering a Select or Popover throws inside
  * the component rather than failing an assertion.
  *
  * Applied to every spec; the guard makes it a no-op for the node-environment
@@ -10,7 +10,7 @@ import { configure } from '@testing-library/dom'
 
 if (typeof window !== 'undefined') {
   // Testing Library waits one second by default, which a few hundred rows in
-  // jsdom can outlast when workers compete for CPU — with a dev server running,
+  // jsdom can outlast when workers compete for CPU - with a dev server running,
   // or on a CI runner. That showed up as specs failing at random.
   //
   // It has to stay well under vitest's testTimeout: if a query can run for as

@@ -46,7 +46,7 @@ function isSameMessage(toast: Toast, options: ToastOptions): boolean {
 
 /**
  * Adds a toast, oldest dropped once the stack is full. A repeat of the message
- * already showing counts up in place instead of stacking — a failing loop would
+ * already showing counts up in place instead of stacking - a failing loop would
  * otherwise bury the screen in identical copies of one error.
  */
 export function pushToast(list: Toast[], options: ToastOptions, id: string): Toast[] {

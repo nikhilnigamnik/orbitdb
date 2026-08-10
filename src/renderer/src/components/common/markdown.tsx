@@ -14,8 +14,12 @@ export function MarkdownView({ children, className }: MarkdownViewProps) {
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
-          h1: (p) => <h1 className="mb-1.5 mt-3 text-xs font-semibold text-text first:mt-0" {...p} />,
-          h2: (p) => <h2 className="mb-1.5 mt-3 text-xs font-semibold text-text first:mt-0" {...p} />,
+          h1: (p) => (
+            <h1 className="mb-1.5 mt-3 text-xs font-semibold text-text first:mt-0" {...p} />
+          ),
+          h2: (p) => (
+            <h2 className="mb-1.5 mt-3 text-xs font-semibold text-text first:mt-0" {...p} />
+          ),
           h3: (p) => (
             <h3 className="mb-1 mt-2.5 text-xs font-semibold text-text first:mt-0" {...p} />
           ),
@@ -26,7 +30,12 @@ export function MarkdownView({ children, className }: MarkdownViewProps) {
           strong: (p) => <strong className="font-semibold text-text" {...p} />,
           em: (p) => <em className="italic" {...p} />,
           a: (p) => (
-            <a className="text-accent-text underline underline-offset-2" target="_blank" rel="noreferrer" {...p} />
+            <a
+              className="text-accent-text underline underline-offset-2"
+              target="_blank"
+              rel="noreferrer"
+              {...p}
+            />
           ),
           hr: (p) => <hr className="my-3 border-border" {...p} />,
           blockquote: (p) => (

@@ -155,7 +155,7 @@ export function RowEditorSheet({
                             { value: 'true', label: 'true' },
                             { value: 'false', label: 'false' }
                           ]}
-                          placeholder="—"
+                          placeholder="-"
                           disabled={field.isNull}
                           ariaLabel={col.name}
                           className="h-9 w-full"
@@ -168,7 +168,7 @@ export function RowEditorSheet({
                             value: option,
                             label: option
                           }))}
-                          placeholder={field.isNull ? 'NULL' : '—'}
+                          placeholder={field.isNull ? 'NULL' : '-'}
                           disabled={field.isNull}
                           ariaLabel={col.name}
                           className="h-9 w-full"

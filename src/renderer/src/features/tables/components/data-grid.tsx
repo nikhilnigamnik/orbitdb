@@ -166,7 +166,7 @@ export function DataGrid({
         nextRow -= 1
       }
       // At the edge of the loaded rows, stay put rather than ending the session
-      // without a signal — the commit already happened either way.
+      // without a signal - the commit already happened either way.
       if (nextRow < 0 || nextRow >= rows.length) return
       setEditingCell({ rowIndex: nextRow, columnId: dataColumnIds[nextCol] })
     },
@@ -523,7 +523,7 @@ export function DataGrid({
                   key={row.id}
                   className={cn(
                     // transition-colors would animate outline-color from currentColor
-                    // (white) on select — only transition the background
+                    // (white) on select - only transition the background
                     'group cursor-default transition-[background-color]',
                     isSelected
                       ? // tr can't render Tailwind ring (box-shadow); outline works in Chromium
@@ -580,7 +580,7 @@ export function DataGrid({
                         }
                         onMouseDown={
                           // While the editor popover is open its portal events bubble
-                          // through this td in the React tree — skip the handler so
+                          // through this td in the React tree - skip the handler so
                           // double-click text selection inside the editor still works.
                           isData && canEditCells && !isEditingThis
                             ? (e) => {

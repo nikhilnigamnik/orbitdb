@@ -17,7 +17,7 @@ describe('Postgres verbose spellings', () => {
 
 describe('placeholders that name no type', () => {
   it('shows an enum’s own name instead of USER-DEFINED', () => {
-    // USER-DEFINED is what information_schema says for enums and composites —
+    // USER-DEFINED is what information_schema says for enums and composites -
     // it is not a type name, and told the user nothing.
     expect(formatColumnType('USER-DEFINED', 'order_status')).toBe('order_status')
   })

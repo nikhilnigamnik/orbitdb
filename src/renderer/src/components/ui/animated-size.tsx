@@ -24,15 +24,8 @@ export function AnimatedSize({ children, className, durationMs = 250 }: Animated
 
   return (
     <div
-      style={
-        height != null
-          ? { height, transitionDuration: `${durationMs}ms` }
-          : undefined
-      }
-      className={cn(
-        'overflow-hidden transition-[height] ease-out will-change-[height]',
-        className
-      )}
+      style={height != null ? { height, transitionDuration: `${durationMs}ms` } : undefined}
+      className={cn('overflow-hidden transition-[height] ease-out will-change-[height]', className)}
     >
       <div ref={innerRef}>{children}</div>
     </div>

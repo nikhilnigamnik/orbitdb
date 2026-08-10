@@ -43,7 +43,7 @@ async function openSuggestions() {
 
 describe('an index the model suggested', () => {
   it('shows the statement it would run before you can run it', async () => {
-    // Every other DDL path previews first, and this one is a guess — README
+    // Every other DDL path previews first, and this one is a guess - README
     // promises "every statement is previewed before it runs".
     setup()
     await openSuggestions()

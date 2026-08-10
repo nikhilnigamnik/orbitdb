@@ -82,8 +82,8 @@ export function AiSettings() {
                 await testKey(view.id)
                 toast.success(`${aiProvider(view.id).label} key works`)
               } catch (err) {
-                // The provider's own message names the cause — expired, revoked,
-                // no credit — and is more use than anything we could write.
+                // The provider's own message names the cause - expired, revoked,
+                // no credit - and is more use than anything we could write.
                 toast.error(`${aiProvider(view.id).label} rejected the key`, {
                   description: errorMessage(err)
                 })

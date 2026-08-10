@@ -98,7 +98,7 @@ export function coerceCellValue(col: ColumnInfo, raw: string, isNull: boolean): 
     if (!NUMERIC_RE.test(trimmed)) {
       throw new Error(`Column "${col.name}": invalid number`)
     }
-    // Arbitrary-precision decimals are sent as strings — Number() would round them.
+    // Arbitrary-precision decimals are sent as strings - Number() would round them.
     return trimmed
   }
   // money accepts locale formats like `$1,234.56`; let the server parse it.

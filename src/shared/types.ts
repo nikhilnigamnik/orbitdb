@@ -148,7 +148,7 @@ export interface CountRowsOptions {
 
 /**
  * Above this many rows, an unfiltered COUNT(*) costs more than the precision is
- * worth and the estimate stands instead. A filtered count always runs — that is
+ * worth and the estimate stands instead. A filtered count always runs - that is
  * the case where the estimate is not merely imprecise but wrong.
  */
 export const MAX_EXACT_COUNT_ROWS = 1_000_000
@@ -197,7 +197,7 @@ export type DdlOperationKind = DdlOperation['kind']
 
 /**
  * The operations the DDL form can build. Truncate and drop are table-wide and
- * take no form input — they go through their own confirm flow, which shows the
+ * take no form input - they go through their own confirm flow, which shows the
  * SQL and names the consequence.
  */
 export type DdlFormKind = Exclude<DdlOperationKind, 'truncate-table' | 'drop-table'>
@@ -263,6 +263,12 @@ export interface FilterTableResult {
   filters: RowFilter[]
   orderBy?: string
   orderDir?: SortDirection
+  /**
+   * Conditions that could not be made executable and were dropped, phrased for
+   * the user. Present only when something was dropped - silently narrowing the
+   * request would return a wider result set that looks like an answer.
+   */
+  notes?: string[]
 }
 
 export interface ExplainTableOptions {
@@ -349,7 +355,7 @@ export interface QueryLogEntry {
 
 /**
  * What the renderer is told about the AI settings. The key itself never crosses
- * back — `keyHint` (the last four characters) is enough to show *which* key is
+ * back - `keyHint` (the last four characters) is enough to show *which* key is
  * saved, and useless to anything that gets hold of it.
  */
 export interface AiProviderView {
@@ -364,7 +370,7 @@ export interface AiProviderView {
 
 /**
  * Every provider's state at once, so the UI can show them side by side. No key
- * is ever included — only whether there is one, and its last four characters.
+ * is ever included - only whether there is one, and its last four characters.
  */
 export interface AiSettingsView {
   active: AiProviderId
@@ -379,17 +385,27 @@ export interface UsageBreakdown {
   calls: number
   input: number
   output: number
+  /** Estimated USD at published list prices. Excludes any unpriced model. */
+  cost: number
 }
 
 export interface UsageWindow {
   calls: number
   input: number
   output: number
+  /** Estimated USD across every priced row in the window. */
+  cost: number
+  /**
+   * Calls on models with no published rate in `ai-pricing.ts`. Non-zero means
+   * `cost` is short by an unknown amount, and the UI has to say so rather than
+   * present the figure as complete.
+   */
+  unpricedCalls: number
   byModel: UsageBreakdown[]
   byFeature: UsageBreakdown[]
 }
 
-/** Aggregated in main — the renderer receives numbers to show, not a log to fold. */
+/** Aggregated in main - the renderer receives numbers to show, not a log to fold. */
 export interface UsageSummary {
   today: UsageWindow
   last30: UsageWindow

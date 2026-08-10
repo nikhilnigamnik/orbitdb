@@ -42,7 +42,7 @@ export function useTableDestructiveActions({
           window.api.db.ddlPreview({ connectionId, schema, table, operation: operationFor(kind) })
         )
       } catch {
-        // Empty preview fallback — the confirm copy still explains the action.
+        // Empty preview fallback - the confirm copy still explains the action.
       }
       setPending({ kind, sql })
     },

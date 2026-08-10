@@ -47,7 +47,7 @@ function emptyState(): StoreShape {
 
 // Every AI call reads this, and unsealing a secret is a synchronous keychain
 // round-trip. Both the on-disk bytes and the decrypted view are cached until we
-// write — the same arrangement as connections-store.
+// write - the same arrangement as connections-store.
 let rawCache: StoreShape | null = null
 let decryptedCache: StoreShape | null = null
 /** Providers whose stored key exists but could not be unsealed on this host. */
@@ -81,7 +81,7 @@ function parseFile(): StoreShape {
 
   const state = emptyState()
   const legacy = ai as LegacyAi
-  // A v1 file names anthropic implicitly — it was the only provider.
+  // A v1 file names anthropic implicitly - it was the only provider.
   if (typeof legacy.apiKey === 'string' && !('keys' in ai)) {
     state.ai.keys.anthropic = legacy.apiKey
     if (isAiModelId('anthropic', legacy.model)) state.ai.models.anthropic = legacy.model
@@ -141,7 +141,7 @@ function read(): StoreShape {
       undecryptable.add(provider.id)
       console.error(
         `[settings-store] the stored ${provider.label} API key cannot be decrypted on this ` +
-          'machine — the ciphertext is kept on disk untouched. Re-enter it in Settings.'
+          'machine - the ciphertext is kept on disk untouched. Re-enter it in Settings.'
       )
     } else {
       keys[provider.id] = plain
@@ -153,8 +153,8 @@ function read(): StoreShape {
 }
 
 /**
- * Persist, sealing each key. A key we could not unseal reads back as '' — writing
- * that would destroy it — so the untouched ciphertext is kept unless the user
+ * Persist, sealing each key. A key we could not unseal reads back as '' - writing
+ * that would destroy it - so the untouched ciphertext is kept unless the user
  * typed a replacement. Connection secrets learned this the hard way.
  */
 function write(state: StoreShape): void {
@@ -242,7 +242,7 @@ export function setAiModel(provider: string, model: string): AiModelId {
   return model
 }
 
-/** Test seam — drops the caches so a fresh file is re-read. */
+/** Test seam - drops the caches so a fresh file is re-read. */
 export function resetSettingsCache(): void {
   rawCache = null
   decryptedCache = null

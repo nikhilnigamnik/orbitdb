@@ -211,7 +211,7 @@ export function DdlDialog({
                 </Field>
                 <Field
                   label="Data type"
-                  hint="Raw SQL type — e.g. text, varchar(255), integer, boolean"
+                  hint="Raw SQL type - e.g. text, varchar(255), integer, boolean"
                 >
                   <Input
                     value={dataType}
@@ -222,7 +222,7 @@ export function DdlDialog({
                 </Field>
                 <Field
                   label="Default value"
-                  hint="Optional raw expression — e.g. 0, 'active', now()"
+                  hint="Optional raw expression - e.g. 0, 'active', now()"
                 >
                   <Input
                     value={defaultValue}

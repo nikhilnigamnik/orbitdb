@@ -39,7 +39,7 @@ export function encryptString(plain: string): string {
 }
 
 /**
- * Unseal a stored secret. Returns `null` — never an empty string — when the
+ * Unseal a stored secret. Returns `null` - never an empty string - when the
  * ciphertext can't be read (no keychain, or it was sealed under a different OS
  * user/keychain), so callers can tell "no password" apart from "lost password"
  * and avoid writing the blank back over the ciphertext.

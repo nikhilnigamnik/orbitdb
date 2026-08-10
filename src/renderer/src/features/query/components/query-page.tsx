@@ -62,7 +62,7 @@ function writeJson(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value))
   } catch {
-    // private mode or quota — the draft just won't outlive the session
+    // private mode or quota - the draft just won't outlive the session
   }
 }
 
@@ -182,7 +182,7 @@ export function QueryPage() {
 
   /**
    * The only way a query reaches the database. Destructive statements stop for
-   * confirmation first — deleting a single row asks twice, so `delete from
+   * confirmation first - deleting a single row asks twice, so `delete from
    * users` should at least ask once.
    */
   function requestRun(text: string) {
@@ -215,13 +215,13 @@ export function QueryPage() {
         window.api.ai.generateSql({ connectionId: active.connectionId, prompt })
       )
       // Put it in the editor rather than running it. The model is told to
-      // prefer SELECT, but that is a preference in a prompt — a misread request
+      // prefer SELECT, but that is a preference in a prompt - a misread request
       // used to reach the database with nothing in between.
       const replaced = sql
       setSql(generated)
       setIsAiOpen(false)
       // The draft is persisted on every keystroke, so overwriting it puts the
-      // old text beyond reach — history only holds queries that were run.
+      // old text beyond reach - history only holds queries that were run.
       if (replaced.trim()) {
         toast.info('Replaced the editor contents', {
           action: { label: 'Undo', onClick: () => setSql(replaced) }

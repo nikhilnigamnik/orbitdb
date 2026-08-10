@@ -23,7 +23,7 @@ body:
     id: version
     attributes:
       label: OrbitDB version
-      placeholder: 0.2.2 — shown in Settings
+      placeholder: 0.2.2 - shown in Settings
     validations:
       required: true
   - type: input

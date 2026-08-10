@@ -43,7 +43,7 @@ export function ExportMenu({
       else if (format === 'csv') downloadCsv(filename, rows, columns)
       else await downloadXlsx(filename, rows, columns)
     } catch (err) {
-      // No toast surface yet — log so the export failure isn't fully silent.
+      // No toast surface yet - log so the export failure isn't fully silent.
       console.error(`Failed to export as ${format}:`, err)
     }
   }

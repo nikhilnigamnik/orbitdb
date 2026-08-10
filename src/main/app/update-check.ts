@@ -16,8 +16,12 @@ function stripV(tag: string): string {
 }
 
 function compareSemver(a: string, b: string): number {
-  const pa = stripV(a).split('.').map((n) => parseInt(n, 10) || 0)
-  const pb = stripV(b).split('.').map((n) => parseInt(n, 10) || 0)
+  const pa = stripV(a)
+    .split('.')
+    .map((n) => parseInt(n, 10) || 0)
+  const pb = stripV(b)
+    .split('.')
+    .map((n) => parseInt(n, 10) || 0)
   for (let i = 0; i < 3; i++) {
     const diff = (pa[i] ?? 0) - (pb[i] ?? 0)
     if (diff !== 0) return diff > 0 ? 1 : -1

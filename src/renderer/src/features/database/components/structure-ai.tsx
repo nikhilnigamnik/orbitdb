@@ -206,7 +206,7 @@ function IndexesSheet({
         if (cancelled) return
         setSuggestions(result.suggestions)
         // Every other DDL path in the app shows the statement before running it,
-        // and these are a model's guesses — the one place it matters most.
+        // and these are a model's guesses - the one place it matters most.
         // ddlPreview builds the SQL without touching the database.
         const previews = await Promise.all(
           result.suggestions.map(async (s) => {

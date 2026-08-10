@@ -168,7 +168,7 @@ async function callD1Raw<TRow = Record<string, unknown>>(
       signal: combined
     })
   } catch (err) {
-    // A user-initiated cancel is not a network failure — report it as itself.
+    // A user-initiated cancel is not a network failure - report it as itself.
     if (signal?.aborted) throw new QueryCancelledError()
     if (timeout.aborted) {
       throw new Error(`Cloudflare API did not respond within ${D1_REQUEST_TIMEOUT_MS / 1000}s`)
@@ -198,7 +198,7 @@ async function callD1Raw<TRow = Record<string, unknown>>(
     const message = envelope.errors?.map((e) => e.message).join('; ')
     throw new Error(message || 'D1 query failed')
   }
-  // D1 omits `results` for some statements — normalize once so every caller can
+  // D1 omits `results` for some statements - normalize once so every caller can
   // index it safely.
   return { ...entry, results: entry.results ?? [], meta: entry.meta ?? {} }
 }
@@ -244,12 +244,12 @@ async function describeActive(saved: SavedConnection): Promise<ActiveMeta> {
 }
 
 async function disconnectPool(connectionId: string): Promise<void> {
-  // D1 is stateless HTTP — nothing to close, but still flush cached schema.
+  // D1 is stateless HTTP - nothing to close, but still flush cached schema.
   invalidateTableDetailsForConnection(connectionId)
 }
 
 async function disconnectAll(): Promise<void> {
-  // Same — no-op.
+  // Same - no-op.
 }
 
 function loadSaved(connectionId: string): SavedConnection {
@@ -299,7 +299,7 @@ async function tableDetails(
   // PRAGMAs don't accept bind params; embed quoted identifier literally.
   const tableIdent = quoteIdent(table)
 
-  // Every pragma is a separate HTTP round-trip to Cloudflare — issue the
+  // Every pragma is a separate HTTP round-trip to Cloudflare - issue the
   // independent ones together instead of paying the latency three times over.
   const [colEntry, idxListEntry, fkEntry] = await Promise.all([
     callD1<TableInfoRow>(saved, `pragma table_info(${tableIdent})`),
@@ -393,7 +393,7 @@ async function countRows(opts: CountRowsOptions): Promise<number | null> {
     opts.filterJoin
   )
 
-  // SQLite keeps no row estimate, so there is no cheap total to fall back on —
+  // SQLite keeps no row estimate, so there is no cheap total to fall back on -
   // count unconditionally. D1 databases are small enough for that to be fine.
   const entry = await callD1<{ total: number }>(
     saved,
@@ -417,7 +417,7 @@ async function fetchByRowid(
     )
     return entry.results[0] ?? {}
   } catch {
-    // WITHOUT ROWID tables have no rowid column — nothing to read back.
+    // WITHOUT ROWID tables have no rowid column - nothing to read back.
     return {}
   }
 }
@@ -448,7 +448,7 @@ async function insertRow(opts: RowMutation): Promise<Record<string, unknown>> {
   }
 
   // The PK was assigned by the database. last_row_id is the rowid, which only
-  // doubles as the PK for an INTEGER PRIMARY KEY alias — so read the row back by
+  // doubles as the PK for an INTEGER PRIMARY KEY alias - so read the row back by
   // rowid instead of pretending the rowid is the key.
   if (entry.meta.last_row_id != null) {
     return fetchByRowid(saved, opts.table, entry.meta.last_row_id)

@@ -22,7 +22,7 @@ const DEFAULT_SUGGESTIONS = [
 
 /**
  * Floating natural-language → SQL prompt, built on the Dialog primitive.
- * Reused for SQL generation (query page) and table filtering (data view) —
+ * Reused for SQL generation (query page) and table filtering (data view) -
  * `placeholder`/`suggestions` let each surface tailor the copy.
  */
 export function AiPrompt({
@@ -52,8 +52,6 @@ export function AiPrompt({
       setOpen={onOpenChange}
       content={
         <>
-          <div className="absolute inset-x-0 top-0 h-px bg-accent/40" />
-
           <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-3">
             {isGenerating ? (
               <Spinner size={16} className="text-accent-text" />

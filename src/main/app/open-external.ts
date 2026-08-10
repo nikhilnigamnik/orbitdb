@@ -3,8 +3,8 @@
  * `file:`, `smb:` or custom-scheme URL can open an application rather than a
  * page. Every path out of the app goes through this check.
  *
- * It matters because the renderer displays content the app does not author —
- * database identifiers, and AI output grounded in them — and a link in that
+ * It matters because the renderer displays content the app does not author -
+ * database identifiers, and AI output grounded in them - and a link in that
  * content reaches `setWindowOpenHandler` via `target="_blank"`.
  */
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:'])

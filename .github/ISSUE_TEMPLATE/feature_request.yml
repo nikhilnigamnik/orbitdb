@@ -6,7 +6,7 @@ body:
     id: problem
     attributes:
       label: What are you trying to do
-      description: The problem you're hitting, rather than the solution you have in mind — it often leads somewhere better.
+      description: The problem you're hitting, rather than the solution you have in mind - it often leads somewhere better.
     validations:
       required: true
   - type: textarea

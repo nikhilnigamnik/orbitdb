@@ -10,7 +10,7 @@ function token(name: string): string {
   return match[1]
 }
 
-/** Rough perceived brightness — enough to order greys on one hue ramp. */
+/** Rough perceived brightness - enough to order greys on one hue ramp. */
 function luminance(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
   return 0.2126 * r + 0.7152 * g + 0.0722 * b

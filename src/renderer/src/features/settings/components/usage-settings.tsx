@@ -10,7 +10,7 @@ import { formatNumber } from '@renderer/lib/format'
 import { cn } from '@renderer/lib/utils'
 import { errorMessage } from '@renderer/lib/errors'
 import { unwrap } from '@renderer/lib/ipc'
-import { aiFeatureLabel, aiModelLabel, aiProvider } from '@renderer/config/site'
+import { aiFeatureLabel, aiModelLabel, aiProvider, formatCost } from '@renderer/config/site'
 import type { AiProviderId, UsageBreakdown, UsageSummary, UsageWindow } from '@renderer/types'
 import { SettingFooter, SettingsCard } from './settings-card'
 
@@ -69,6 +69,8 @@ export function UsageSettings() {
     calls: 0,
     input: 0,
     output: 0,
+    cost: 0,
+    unpricedCalls: 0,
     byModel: [],
     byFeature: []
   }
@@ -88,13 +90,16 @@ export function UsageSettings() {
             <span className="font-mono text-text-muted">
               {formatNumber(window_.input + window_.output)}
             </span>{' '}
-            tokens
+            tokens ·{' '}
+            <span className="font-mono text-text" title="Estimated at published list prices">
+              ~{formatCost(window_.cost)}
+            </span>
           </span>
         </div>
 
         {!hasAny ? (
           <p className="px-4 pb-4 text-xs text-text-subtle">
-            Nothing recorded yet — run an AI feature and it will show up here.
+            Nothing recorded yet - run an AI feature and it will show up here.
           </p>
         ) : window_.calls === 0 ? (
           <p className="px-4 pb-4 text-xs text-text-subtle">
@@ -124,7 +129,16 @@ export function UsageSettings() {
 
         <SettingFooter>
           <span className="text-xs text-text-subtle">
-            Counted on this machine, kept for {summary?.retentionDays ?? 90} days.
+            Counted on this machine, kept for {summary?.retentionDays ?? 90} days. Cost is an
+            estimate at published list prices - your invoice is what counts.
+            {window_.unpricedCalls > 0 && (
+              <>
+                {' '}
+                {formatNumber(window_.unpricedCalls)}{' '}
+                {window_.unpricedCalls === 1 ? 'call is' : 'calls are'} on a model with no rate
+                here, so the total is short by that much.
+              </>
+            )}
           </span>
           <Button
             size="sm"
@@ -164,12 +178,12 @@ function UsageTable({
   if (rows.length === 0) return null
   // A real grid, so digits line up down the column. Dot-separated numbers in one
   // string cannot be compared by eye, which is the only thing this table is for.
-  const columns = 'grid grid-cols-[1fr_4.5rem_5.5rem_5.5rem] items-center gap-x-3 px-4'
+  const columns = 'grid grid-cols-[1fr_4rem_5rem_5rem_5rem] items-center gap-x-3 px-4'
   return (
     <div className="border-t border-border">
       <div className={cn(columns, 'pt-3 pb-1.5')}>
         <span className="text-xs font-medium text-text">{heading}</span>
-        {['Calls', 'Input', 'Output'].map((label) => (
+        {['Calls', 'Input', 'Output', 'Cost'].map((label) => (
           <span
             key={label}
             className="text-right text-[10px] tracking-wide text-text-subtle uppercase"
@@ -190,6 +204,9 @@ function UsageTable({
                 {formatNumber(value)}
               </span>
             ))}
+            <span className="text-right font-mono tabular-nums text-text-muted">
+              {formatCost(row.cost)}
+            </span>
           </div>
         ))}
       </div>

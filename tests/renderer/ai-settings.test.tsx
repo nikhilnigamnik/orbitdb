@@ -60,7 +60,7 @@ function setup(initial: AiSettingsView = DEFAULT, overrides: Record<string, unkn
   return { api, state }
 }
 
-/** A provider's card — a labelled region, so this asks the way a reader would. */
+/** A provider's card - a labelled region, so this asks the way a reader would. */
 async function card(label: string): Promise<HTMLElement> {
   return screen.findByRole('region', { name: label })
 }
@@ -111,7 +111,7 @@ describe('the active toggle', () => {
   })
 
   it('cannot be turned off on the active card', async () => {
-    // Exactly one provider is active, so switching this off would leave none —
+    // Exactly one provider is active, so switching this off would leave none -
     // something else has to be switched on instead.
     setup()
     const toggle = (await screen.findByLabelText('Use Anthropic')) as HTMLButtonElement

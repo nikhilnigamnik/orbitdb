@@ -5,7 +5,7 @@
 ## How it was verified
 
 <!-- Which tests cover it. If you broke the thing on purpose to check the test
-     fails, say so — that's the useful signal. -->
+     fails, say so - that's the useful signal. -->
 
 - [ ] `pnpm test`
 - [ ] `pnpm typecheck`

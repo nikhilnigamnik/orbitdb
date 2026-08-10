@@ -19,7 +19,7 @@ interface SettingRowProps {
   description?: React.ReactNode
   /** The control. Sits right, and never shrinks below what it needs. */
   children?: React.ReactNode
-  /** Puts the control on its own line — for anything wider than a label allows. */
+  /** Puts the control on its own line - for anything wider than a label allows. */
   isStacked?: boolean
 }
 
