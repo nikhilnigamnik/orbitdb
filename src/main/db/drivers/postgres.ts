@@ -200,6 +200,41 @@ async function listTables(connectionId: string, schema: string): Promise<TableIn
   }))
 }
 
+/**
+ * Enum labels for every `USER-DEFINED` column in `rows`, keyed `schema.type`.
+ *
+ * Shared by tableDetails and getSchemaGraph so the two cannot disagree about
+ * what a column's type is - they did, and the whole-database map was the one
+ * still handing the model the bare `USER-DEFINED` placeholder.
+ *
+ * One extra round-trip, and only when the table actually has such a column.
+ */
+async function enumLabelsFor(
+  pool: Pool,
+  rows: { data_type: string; udt_schema: string; udt_name: string }[]
+): Promise<Map<string, string[]>> {
+  const byType = new Map<string, string[]>()
+  const userDefinedTypes = [
+    ...new Set(
+      rows.filter((r) => r.data_type === 'USER-DEFINED').map((r) => `${r.udt_schema}.${r.udt_name}`)
+    )
+  ]
+  if (userDefinedTypes.length === 0) return byType
+
+  const enumRes = await pool.query<{ type_key: string; labels: string[] }>(
+    `select n.nspname || '.' || t.typname as type_key,
+            array_agg(e.enumlabel::text order by e.enumsortorder) as labels
+       from pg_type t
+       join pg_namespace n on n.oid = t.typnamespace
+       join pg_enum e on e.enumtypid = t.oid
+      where n.nspname || '.' || t.typname = any($1)
+      group by n.nspname, t.typname`,
+    [userDefinedTypes]
+  )
+  for (const r of enumRes.rows) byType.set(r.type_key, r.labels)
+  return byType
+}
+
 async function tableDetails(
   connectionId: string,
   schema: string,
@@ -263,27 +298,7 @@ async function tableDetails(
     [schema, table]
   )
 
-  const userDefinedTypes = [
-    ...new Set(
-      colsRes.rows
-        .filter((r) => r.data_type === 'USER-DEFINED')
-        .map((r) => `${r.udt_schema}.${r.udt_name}`)
-    )
-  ]
-  const enumLabelsByType = new Map<string, string[]>()
-  if (userDefinedTypes.length > 0) {
-    const enumRes = await pool.query<{ type_key: string; labels: string[] }>(
-      `select n.nspname || '.' || t.typname as type_key,
-              array_agg(e.enumlabel::text order by e.enumsortorder) as labels
-         from pg_type t
-         join pg_namespace n on n.oid = t.typnamespace
-         join pg_enum e on e.enumtypid = t.oid
-        where n.nspname || '.' || t.typname = any($1)
-        group by n.nspname, t.typname`,
-      [userDefinedTypes]
-    )
-    for (const r of enumRes.rows) enumLabelsByType.set(r.type_key, r.labels)
-  }
+  const enumLabelsByType = await enumLabelsFor(pool, colsRes.rows)
 
   const pkSet = new Set(primaryKey)
   const columns: ColumnInfo[] = colsRes.rows.map((r) => ({
@@ -682,11 +697,15 @@ async function getSchemaGraph(connectionId: string, schema: string): Promise<Sch
     table: string
     name: string
     data_type: string
+    udt_schema: string
+    udt_name: string
     is_nullable: string
   }>(
     `select table_name as table,
             column_name as name,
             data_type,
+            udt_schema,
+            udt_name,
             is_nullable
        from information_schema.columns
       where table_schema = $1
@@ -740,6 +759,8 @@ async function getSchemaGraph(connectionId: string, schema: string): Promise<Sch
     edgesPromise
   ])
 
+  const enumLabelsByType = await enumLabelsFor(pool, columnsRes.rows)
+
   const pkSet = new Set(pksRes.rows.map((r) => `${r.table}.${r.column}`))
   const columnsByTable = new Map<string, SchemaGraphTable['columns']>()
   for (const row of columnsRes.rows) {
@@ -747,8 +768,10 @@ async function getSchemaGraph(connectionId: string, schema: string): Promise<Sch
     list.push({
       name: row.name,
       dataType: row.data_type,
+      udtName: row.udt_name,
       isNullable: row.is_nullable === 'YES',
-      isPrimaryKey: pkSet.has(`${row.table}.${row.name}`)
+      isPrimaryKey: pkSet.has(`${row.table}.${row.name}`),
+      enumValues: enumLabelsByType.get(`${row.udt_schema}.${row.udt_name}`) ?? null
     })
     columnsByTable.set(row.table, list)
   }

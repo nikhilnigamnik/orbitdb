@@ -64,7 +64,9 @@ export async function buildSchemaContext(
           const flags = [c.isPrimaryKey ? 'PK' : '', c.isNullable ? '' : 'NOT NULL']
             .filter(Boolean)
             .join(' ')
-          return `${c.name} ${c.dataType}${flags ? ' ' + flags : ''}`
+          // Same renderer as the single-table context: an enum has to arrive as
+          // its type name plus its labels, or generated SQL guesses the value.
+          return `${c.name} ${columnType(c)}${flags ? ' ' + flags : ''}${enumSuffix(c)}`
         })
         .join(', ')
       lines.push(`${table.schema}.${table.name}(${cols})`)
@@ -92,13 +94,21 @@ export async function buildSchemaContext(
 }
 
 /**
+ * The parts of a column these helpers need. Structural rather than `ColumnInfo`
+ * so the whole-database graph (`SchemaGraphColumn`) renders through exactly the
+ * same code as a single table's details - the two builders drifting apart is
+ * what left the Query page describing enums as `USER-DEFINED`.
+ */
+type TypedColumn = Pick<ColumnInfo, 'dataType' | 'udtName' | 'enumValues'>
+
+/**
  * Postgres reports every enum, domain and composite as the literal string
  * `USER-DEFINED` in `information_schema`; the real name only lives in `udtName`.
  * MySQL's dataType is already `enum('a','b')`, so naming an enum by its udtName
  * either way keeps the labels from being printed twice - and keeps MAX_ENUM_LABELS
  * in charge of how many are shown.
  */
-export function columnType(c: ColumnInfo): string {
+export function columnType(c: TypedColumn): string {
   if (c.enumValues?.length) return c.udtName
   return c.dataType === 'USER-DEFINED' ? c.udtName : c.dataType
 }
@@ -111,7 +121,7 @@ export function columnType(c: ColumnInfo): string {
  * and generate-seed.ts, which tell the model what a column carrying it may hold -
  * change them together.
  */
-export function enumSuffix(c: ColumnInfo): string {
+export function enumSuffix(c: TypedColumn): string {
   const labels = c.enumValues
   if (!labels?.length) return ''
   const shown = labels

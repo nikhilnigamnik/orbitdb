@@ -90,8 +90,15 @@ export interface TableDetails {
 export interface SchemaGraphColumn {
   name: string
   dataType: string
+  /**
+   * The engine's own type name. Postgres reports `dataType` as `USER-DEFINED`
+   * for an enum, so without this the type is unidentifiable from the graph.
+   */
+  udtName: string
   isNullable: boolean
   isPrimaryKey: boolean
+  /** Allowed values for enum columns; null otherwise. Mirrors `ColumnInfo`. */
+  enumValues: string[] | null
 }
 
 export interface SchemaGraphTable {
