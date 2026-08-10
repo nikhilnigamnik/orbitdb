@@ -12,7 +12,7 @@ function ok<T>(data: T) {
 }
 
 function emptyWindow(): UsageWindow {
-  return { calls: 0, input: 0, output: 0, byModel: [], byFeature: [] }
+  return { calls: 0, input: 0, output: 0, cost: 0, unpricedCalls: 0, byModel: [], byFeature: [] }
 }
 
 const BUSY: UsageSummary = {
@@ -20,6 +20,8 @@ const BUSY: UsageSummary = {
     calls: 2,
     input: 3000,
     output: 400,
+    cost: 0.01,
+    unpricedCalls: 0,
     byModel: [
       {
         provider: 'anthropic',
@@ -27,17 +29,28 @@ const BUSY: UsageSummary = {
         feature: '',
         calls: 2,
         input: 3000,
-        output: 400
+        output: 400,
+        cost: 0.01
       }
     ],
     byFeature: [
-      { provider: '', model: '', feature: 'generate-sql', calls: 2, input: 3000, output: 400 }
+      {
+        provider: '',
+        model: '',
+        feature: 'generate-sql',
+        calls: 2,
+        input: 3000,
+        output: 400,
+        cost: 0.01
+      }
     ]
   },
   last30: {
     calls: 12,
     input: 45000,
     output: 6100,
+    cost: 0.154,
+    unpricedCalls: 0,
     byModel: [
       {
         provider: 'anthropic',
@@ -45,16 +58,49 @@ const BUSY: UsageSummary = {
         feature: '',
         calls: 9,
         input: 40000,
-        output: 5000
+        output: 5000,
+        cost: 0.13
       },
-      { provider: 'openai', model: 'gpt-5.2', feature: '', calls: 3, input: 5000, output: 1100 }
+      {
+        provider: 'openai',
+        model: 'gpt-5.2',
+        feature: '',
+        calls: 3,
+        input: 5000,
+        output: 1100,
+        cost: 0.024
+      }
     ],
     byFeature: [
-      { provider: '', model: '', feature: 'generate-seed', calls: 4, input: 30000, output: 4000 },
-      { provider: '', model: '', feature: 'generate-sql', calls: 8, input: 15000, output: 2100 }
+      {
+        provider: '',
+        model: '',
+        feature: 'generate-seed',
+        calls: 4,
+        input: 30000,
+        output: 4000,
+        cost: 0.1
+      },
+      {
+        provider: '',
+        model: '',
+        feature: 'generate-sql',
+        calls: 8,
+        input: 15000,
+        output: 2100,
+        cost: 0.054
+      }
     ]
   },
-  allTime: { calls: 12, input: 45000, output: 6100, byModel: [], byFeature: [] },
+  allTime: {
+    calls: 12,
+    input: 45000,
+    output: 6100,
+    cost: 0.154,
+    unpricedCalls: 0,
+    byModel: [],
+    byFeature: []
+  },
   retentionDays: 90
 }
 
@@ -109,7 +155,8 @@ describe('what is shown', () => {
             feature: '',
             calls: 3,
             input: 2610,
-            output: 515
+            output: 515,
+            cost: 0.005
           }
         ]
       }

@@ -9,7 +9,7 @@ export const AI_PROVIDERS = [
     label: 'Anthropic',
     keyPlaceholder: 'sk-ant-…',
     models: [
-      { id: 'claude-sonnet-5', label: 'Sonnet 5', hint: 'Balanced — the default' },
+      { id: 'claude-sonnet-5', label: 'Sonnet 5', hint: 'Balanced - the default' },
       { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', hint: 'Fastest and cheapest' },
       { id: 'claude-opus-5', label: 'Opus 5', hint: 'Strongest on complex SQL' }
     ]
@@ -19,9 +19,13 @@ export const AI_PROVIDERS = [
     label: 'OpenAI',
     keyPlaceholder: 'sk-…',
     models: [
-      { id: 'gpt-5.2', label: 'GPT-5.2', hint: 'Balanced — the default' },
-      { id: 'gpt-5-mini', label: 'GPT-5 mini', hint: 'Fastest and cheapest' },
-      { id: 'gpt-5.2-pro', label: 'GPT-5.2 Pro', hint: 'Strongest on complex SQL' }
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', hint: 'Balanced - the default' },
+      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', hint: 'Fastest and cheapest' },
+      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', hint: 'Strongest on complex SQL' },
+      { id: 'gpt-5.5', label: 'GPT-5.5', hint: 'Previous flagship' },
+      { id: 'gpt-5.2', label: 'GPT-5.2', hint: 'Older, still capable' },
+      { id: 'gpt-5.2-pro', label: 'GPT-5.2 Pro', hint: 'Older reasoning tier - costly' },
+      { id: 'gpt-5-mini', label: 'GPT-5 mini', hint: 'Older, very cheap' }
     ]
   },
   {
@@ -29,9 +33,14 @@ export const AI_PROVIDERS = [
     label: 'Google',
     keyPlaceholder: 'AIza…',
     models: [
-      { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', hint: 'Balanced — the default' },
-      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Cheapest, widely available' },
-      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', hint: 'Strongest — preview model' }
+      { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', hint: 'Balanced - the default' },
+      { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', hint: 'Fast and cheap' },
+      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', hint: 'Strongest - preview model' },
+      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', hint: 'Previous Flash' },
+      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', hint: 'Older, cheaper still' },
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', hint: 'Older reasoning tier' },
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Older, widely available' },
+      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite', hint: 'Cheapest offered' }
     ]
   }
 ] as const
@@ -84,7 +93,7 @@ export function isAiModelId(provider: AiProviderId, value: unknown): value is Ai
   return isAiProviderId(provider) && aiProvider(provider).models.some((m) => m.id === value)
 }
 
-/** The short name for a model id — `claude-haiku-4-5-20251001` reads as noise. */
+/** The short name for a model id - `claude-haiku-4-5-20251001` reads as noise. */
 export function aiModelLabel(provider: string, id: string): string {
   if (!isAiProviderId(provider)) return id
   return aiProvider(provider).models.find((m) => m.id === id)?.label ?? id

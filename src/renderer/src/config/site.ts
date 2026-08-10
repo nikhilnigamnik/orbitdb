@@ -12,6 +12,8 @@ export {
   aiProvider
 } from '../../../shared/ai-models'
 
+export { formatCost, isPricedModel, rateFor } from '../../../shared/ai-pricing'
+
 export const APP_NAME = 'OrbitDB'
 export const APP_TAGLINE = 'Postgres + MySQL, made friendly'
 export const APP_VERSION = '0.1.0'
@@ -24,7 +26,7 @@ export const MAX_PAGE_SIZE = 1000
 
 /**
  * How long the undo prompt (and the marker on the row it belongs to) stays up
- * after a cell edit. The undo itself outlives it — this is only the hint.
+ * after a cell edit. The undo itself outlives it - this is only the hint.
  */
 export const UNDO_PROMPT_MS = 7_000
 

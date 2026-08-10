@@ -38,7 +38,7 @@ function event(overrides: Partial<UsageEvent> = {}): UsageEvent {
   } as UsageEvent
 }
 
-// Fixed points in time — the tests must not depend on when they run. TZ is pinned
+// Fixed points in time - the tests must not depend on when they run. TZ is pinned
 // to Asia/Kolkata in vitest.config, so a UTC-derived day key would be wrong here
 // for anything late in the evening, which is exactly what we want to catch.
 const EVENING = new Date('2026-08-10T20:30:00Z') // 2026-08-11 01:30 local
@@ -140,6 +140,67 @@ describe('the windows', () => {
     const summary = store.getUsageSummary(NOON)
     expect(summary.allTime.calls).toBe(0)
     expect(summary.allTime.byModel).toEqual([])
+  })
+})
+
+describe('cost', () => {
+  // 2026-09-05 local - past Sonnet 5's 2026-08-31 launch discount, and still
+  // inside the 90-day retention window from NOON.
+  const SEPTEMBER = new Date('2026-09-05T06:30:00Z')
+
+  it('prices a call at its model rate', () => {
+    // Opus 5 is $5/$25 per MTok, so 1M in + 1M out is $30.
+    store.recordUsage(
+      event({ model: 'claude-opus-5', inputTokens: 1_000_000, outputTokens: 1_000_000 }),
+      NOON
+    )
+
+    expect(store.getUsageSummary(NOON).today.cost).toBeCloseTo(30, 10)
+  })
+
+  it('prices each day at the rate in effect that day', () => {
+    // The rollup is per-day precisely so a mid-window rate change is exact:
+    // Sonnet 5 runs at $2/MTok through August, $3 from September.
+    store.recordUsage(event({ inputTokens: 1_000_000, outputTokens: 0 }), NOON)
+    store.recordUsage(event({ inputTokens: 1_000_000, outputTokens: 0 }), SEPTEMBER)
+
+    const summary = store.getUsageSummary(SEPTEMBER)
+    expect(summary.today.cost, 'September prices at the standard rate').toBeCloseTo(3, 10)
+    expect(summary.last30.cost, 'the window spans both rates').toBeCloseTo(5, 10)
+  })
+
+  it('breaks cost down the same way it breaks tokens down', () => {
+    store.recordUsage(
+      event({
+        model: 'claude-opus-5',
+        feature: 'generate-sql',
+        inputTokens: 1_000_000,
+        outputTokens: 0
+      }),
+      NOON
+    )
+
+    const summary = store.getUsageSummary(NOON)
+    expect(summary.today.byModel[0].cost).toBeCloseTo(5, 10)
+    expect(summary.today.byFeature[0].cost).toBeCloseTo(5, 10)
+  })
+
+  it('counts an unpriced model rather than costing it at zero', () => {
+    // A zero would look like a free call and quietly understate the total.
+    store.recordUsage(
+      event({ model: 'some-model-added-later', inputTokens: 1_000_000, outputTokens: 0 }),
+      NOON
+    )
+
+    const summary = store.getUsageSummary(NOON)
+    expect(summary.today.cost).toBe(0)
+    expect(summary.today.unpricedCalls).toBe(1)
+    expect(summary.today.calls, 'still counted as usage').toBe(1)
+  })
+
+  it('leaves unpricedCalls at zero when every model is priced', () => {
+    store.recordUsage(event(), NOON)
+    expect(store.getUsageSummary(NOON).today.unpricedCalls).toBe(0)
   })
 })
 
