@@ -22,11 +22,19 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
+  applyLayout,
+  clearLayout,
+  loadLayout,
+  positionsOf,
+  saveLayout
+} from '../lib/diagram-layout'
+import {
   IconArrowsHorizontal,
   IconArrowsMaximize,
   IconArrowsVertical,
   IconHierarchy2,
-  IconPhoto
+  IconPhoto,
+  IconRestore
 } from '@tabler/icons-react'
 import { toPng, toSvg } from 'html-to-image'
 import type { SchemaGraph } from '@renderer/types'
@@ -42,6 +50,8 @@ const ACCENT = 'var(--color-accent-text, #5c8af5)'
 interface SchemaGraphCanvasProps {
   graph: SchemaGraph
   schema: string
+  /** Scopes the saved layout. Without it the arrangement is not remembered. */
+  connectionId?: string
 }
 
 interface EdgeData {
@@ -164,12 +174,21 @@ function ToolButton({ title, onClick, children }: ToolButtonProps) {
   )
 }
 
-function Flow({ graph, schema }: SchemaGraphCanvasProps) {
+function Flow({ graph, schema, connectionId = '' }: SchemaGraphCanvasProps) {
   const navigate = useNavigate()
   const { fitView, getNodes } = useReactFlow()
 
-  const [direction, setDirection] = React.useState<LayoutDirection>('LR')
-  const initial = React.useMemo(() => buildGraph(graph, direction), [graph, direction])
+  // Read once, before the first layout: it decides the direction too, and a
+  // saved horizontal arrangement rendered vertically first would flash.
+  const saved = React.useMemo(() => loadLayout(connectionId, schema), [connectionId, schema])
+  const [direction, setDirection] = React.useState<LayoutDirection>(saved?.direction ?? 'LR')
+  const initial = React.useMemo(() => {
+    const built = buildGraph(graph, direction)
+    return saved ? { ...built, nodes: applyLayout(built.nodes, saved.positions) } : built
+    // `saved` is the arrangement to restore on arrival; re-applying it after a
+    // relayout would undo the relayout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph, direction])
   const [nodes, setNodes] = React.useState<Node[]>(initial.nodes)
   const [edges, setEdges] = React.useState<Edge[]>(initial.edges)
   const [focusId, setFocusId] = React.useState<string | null>(null)
@@ -188,6 +207,27 @@ function Flow({ graph, schema }: SchemaGraphCanvasProps) {
     (changes: NodeChange[]) => setNodes((curr) => applyNodeChanges(changes, curr)),
     []
   )
+
+  // Saved when a drag ends rather than on every change: dragging one node emits
+  // a position change per frame, and this writes to storage.
+  const persistLayout = React.useCallback(
+    (next: Node[], dir: LayoutDirection) => {
+      if (!connectionId) return
+      saveLayout(connectionId, schema, { positions: positionsOf(next), direction: dir })
+    },
+    [connectionId, schema]
+  )
+
+  const onNodeDragStop = React.useCallback(
+    () => persistLayout(getNodes(), direction),
+    [getNodes, direction, persistLayout]
+  )
+
+  const resetLayout = React.useCallback(() => {
+    clearLayout(connectionId, schema)
+    setNodes(buildGraph(graph, direction).nodes)
+    window.setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 50)
+  }, [connectionId, schema, graph, direction, fitView])
   const onEdgesChange = React.useCallback(
     (changes: EdgeChange[]) => setEdges((curr) => applyEdgeChanges(changes, curr)),
     []
@@ -240,10 +280,14 @@ function Flow({ graph, schema }: SchemaGraphCanvasProps) {
 
   const relayout = React.useCallback(
     (dir: LayoutDirection) => {
-      setNodes((curr) => layoutNodes(curr, edges, dir))
+      setNodes((curr) => {
+        const next = layoutNodes(curr, edges, dir)
+        persistLayout(next, dir)
+        return next
+      })
       window.setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 50)
     },
-    [edges, fitView]
+    [edges, fitView, persistLayout]
   )
 
   const toggleDirection = React.useCallback(() => {
@@ -316,6 +360,7 @@ function Flow({ graph, schema }: SchemaGraphCanvasProps) {
       onEdgesChange={onEdgesChange}
       onNodeClick={onNodeClick}
       onNodeDoubleClick={onNodeDoubleClick}
+      onNodeDragStop={onNodeDragStop}
       onPaneClick={() => setFocusId(null)}
       onEdgeMouseEnter={(_, edge) => setHoveredEdge(edge.id)}
       onEdgeMouseLeave={() => setHoveredEdge(null)}
@@ -335,6 +380,9 @@ function Flow({ graph, schema }: SchemaGraphCanvasProps) {
           </ToolButton>
           <ToolButton title="Re-run auto layout" onClick={() => relayout(direction)}>
             <IconHierarchy2 size={15} />
+          </ToolButton>
+          <ToolButton title="Forget the saved arrangement" onClick={resetLayout}>
+            <IconRestore size={15} />
           </ToolButton>
           <ToolButton
             title={`Layout: ${direction === 'LR' ? 'horizontal' : 'vertical'} - click to flip`}
@@ -359,11 +407,11 @@ function Flow({ graph, schema }: SchemaGraphCanvasProps) {
   )
 }
 
-export function SchemaGraphCanvas({ graph, schema }: SchemaGraphCanvasProps) {
+export function SchemaGraphCanvas({ graph, schema, connectionId }: SchemaGraphCanvasProps) {
   return (
     <div className="orbit-flow h-full w-full">
       <ReactFlowProvider>
-        <Flow graph={graph} schema={schema} />
+        <Flow graph={graph} schema={schema} connectionId={connectionId} />
       </ReactFlowProvider>
     </div>
   )
