@@ -163,7 +163,10 @@ export function ReferencedBy({ connectionId, schema, table, row, onNavigate }: R
 
 function Panel({ count, children }: { count?: number; children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated/20">
+    // `shrink-0` because this renders inside a scrolling flex column: its own
+    // `overflow-hidden` drops its automatic minimum size to zero, so without it
+    // the panel collapses and clips its links rather than letting them scroll.
+    <div className="shrink-0 overflow-hidden rounded-lg border border-border bg-surface-elevated/20">
       <div className="flex items-center gap-1.5 border-b border-border px-3 py-1.5">
         <IconLink size={11} className="text-text-subtle" />
         <span className="text-[10px] font-semibold tracking-wide text-text-muted uppercase">
