@@ -45,6 +45,7 @@ async function freshStore(): Promise<Store> {
 
 function fileOnDisk(): {
   ai: { provider: string; keys: Record<string, string>; models: Record<string, string> }
+  gateway: { accountId: string; gatewayId: string }
 } {
   return JSON.parse(readFileSync(join(stub.userDataDir, 'settings.json'), 'utf8'))
 }
@@ -278,5 +279,75 @@ describe('a settings file written by the single-provider version', () => {
 
     store.setAiProvider('openai')
     expect(store.getAiSettings().apiKey).toBe('')
+  })
+})
+
+const TOKEN = 'cf-aig-token-wxyz'
+
+describe('the Cloudflare provider', () => {
+  it('keeps its token with the other keys, sealed the same way', () => {
+    store.setAiApiKey('cloudflare', TOKEN)
+
+    expect(fileOnDisk().ai.keys.cloudflare).toBe(sealed(TOKEN))
+    expect(store.getProviderSettings('cloudflare').apiKey).toBe(TOKEN)
+    expect(store.getAiKeyHint('cloudflare')).toBe('…wxyz')
+  })
+
+  it('stores its two ids in the clear, since they identify rather than authorise', () => {
+    store.setGatewaySettings({ accountId: 'acct-1', gatewayId: 'orbitdb' })
+
+    expect(fileOnDisk().gateway).toEqual({ accountId: 'acct-1', gatewayId: 'orbitdb' })
+  })
+
+  it('trims what was pasted, so a stray space is not baked into the URL', () => {
+    store.setGatewaySettings({ accountId: '  acct-1 ', gatewayId: ' orbitdb  ' })
+
+    expect(store.getGatewaySettings()).toEqual({ accountId: 'acct-1', gatewayId: 'orbitdb' })
+  })
+
+  it('lets the ids be blanked, which is how it is un-configured', () => {
+    // Unlike a key, empty means empty here rather than "leave it alone".
+    store.setGatewaySettings({ accountId: 'acct-1', gatewayId: 'orbitdb' })
+    store.setGatewaySettings({ accountId: '', gatewayId: '' })
+
+    expect(store.getGatewaySettings()).toEqual({ accountId: '', gatewayId: '' })
+  })
+
+  it('defaults to a catalog slug, not one of our own model ids', () => {
+    expect(store.getProviderSettings('cloudflare').model).toBe('anthropic/claude-sonnet-5')
+  })
+
+  it('refuses a model that is not in the catalog list', () => {
+    // `claude-sonnet-5` is a real model but not a real Cloudflare slug.
+    expect(() => store.setAiModel('cloudflare', 'claude-sonnet-5')).toThrow(/Unknown model/)
+  })
+
+  it('survives a relaunch, ids and token together', async () => {
+    store.setGatewaySettings({ accountId: 'acct-1', gatewayId: 'orbitdb' })
+    store.setAiApiKey('cloudflare', TOKEN)
+    store = await freshStore()
+
+    expect(store.getGatewaySettings()).toEqual({ accountId: 'acct-1', gatewayId: 'orbitdb' })
+    expect(store.getProviderSettings('cloudflare').apiKey).toBe(TOKEN)
+  })
+})
+
+describe('a settings file written before Cloudflare was a provider', () => {
+  it('reads with an unconfigured gateway, keeping the keys it already had', async () => {
+    writeFile({
+      version: 2,
+      ai: {
+        provider: 'openai',
+        keys: { anthropic: sealed(KEY), openai: '', google: '' },
+        models: { anthropic: 'claude-opus-5', openai: 'gpt-5.2', google: 'gemini-3.6-flash' }
+      }
+    })
+    store = await freshStore()
+
+    expect(store.getGatewaySettings()).toEqual({ accountId: '', gatewayId: '' })
+    expect(store.getProviderSettings('anthropic').apiKey).toBe(KEY)
+    expect(store.getActiveProvider()).toBe('openai')
+    // The new provider slot exists but is empty rather than absent.
+    expect(store.getProviderSettings('cloudflare').apiKey).toBe('')
   })
 })

@@ -9,7 +9,8 @@ export {
   MISSING_AI_KEY_MESSAGE,
   aiFeatureLabel,
   aiModelLabel,
-  aiProvider
+  aiProvider,
+  needsGatewayIds
 } from '../../../shared/ai-models'
 
 export { formatCost, isPricedModel, rateFor } from '../../../shared/ai-pricing'

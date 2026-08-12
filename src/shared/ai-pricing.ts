@@ -59,7 +59,23 @@ const PRICING: Record<string, ModelPricing> = {
   'gemini-3.1-flash-lite': { input: 0.25, output: 1.5 },
   'gemini-2.5-pro': { input: 1.25, output: 10 },
   'gemini-2.5-flash': { input: 0.3, output: 2.5 },
-  'gemini-2.5-flash-lite': { input: 0.1, output: 0.4 }
+  'gemini-2.5-flash-lite': { input: 0.1, output: 0.4 },
+
+  // Cloudflare AI Gateway - developers.cloudflare.com/ai-gateway/features/unified-billing
+  // Inference is passed through at each vendor's own rate with no markup, so
+  // these mirror the rows above. The 5% fee is charged when credits are bought,
+  // not per call, so it cannot be priced per token here.
+  'anthropic/claude-opus-5': { input: 5, output: 25 },
+  'anthropic/claude-sonnet-5': {
+    input: 3,
+    output: 15,
+    promo: { input: 2, output: 10, through: '2026-08-31' }
+  },
+  'anthropic/claude-haiku-4-5-20251001': { input: 1, output: 5 },
+  'openai/gpt-5.6-terra': { input: 2, output: 12 },
+  'openai/gpt-5.6-luna': { input: 0.2, output: 1.2 },
+  'google/gemini-3.6-flash': { input: 1.5, output: 7.5 },
+  'google/gemini-2.5-flash': { input: 0.3, output: 2.5 }
 }
 
 /**

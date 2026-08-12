@@ -36,15 +36,18 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 - **Natural language → filters** on the current table.
 - **Explain a table**, **suggest indexes**, and **generate seed data** - the model returns values, and the inserts are built in code with engine-correct quoting.
 
-Bring your own API key - **Anthropic**, **OpenAI** or **Google** - paste it in **Settings → AI**, and pick a model:
+Bring your own API key - **Anthropic**, **OpenAI**, **Google** or a **Cloudflare AI Gateway** - paste it in **Settings → AI**, and pick a model:
 
-| Provider  | Models                                               |
-| --------- | ---------------------------------------------------- |
-| Anthropic | Sonnet 5 · Haiku 4.5 · Opus 5                        |
-| OpenAI    | GPT-5.2 · GPT-5 mini · GPT-5.2 Pro                   |
-| Google    | Gemini 3.6 Flash · Gemini 2.5 Flash · Gemini 3.1 Pro |
+| Provider   | Models                                               |
+| ---------- | ---------------------------------------------------- |
+| Anthropic  | Sonnet 5 · Haiku 4.5 · Opus 5                        |
+| OpenAI     | GPT-5.2 · GPT-5 mini · GPT-5.2 Pro                   |
+| Google     | Gemini 3.6 Flash · Gemini 2.5 Flash · Gemini 3.1 Pro |
+| Cloudflare | Any of the above, through your own gateway           |
 
 **Usage** - Settings shows tokens by provider, model and feature for today, the last 30 days, and all time. Counted from what the API reports, kept on your machine for 90 days, and clearable.
+
+**Cloudflare AI Gateway** is a provider like the others, except that it reaches Claude, GPT and Gemini through your own gateway - so you get caching, rate limiting and per-call logs in the Cloudflare dashboard. Give it your account id, gateway id, and a token if the gateway is authenticated. The upstream keys stay on Cloudflare's side, as stored provider keys or Unified Billing credits, so none of them need to be in the app. Inference is passed through at each vendor's own rate, so the cost estimates match.
 
 Each provider keeps its own key and model, so switching between them costs nothing. Keys are encrypted on your machine with the OS keychain and sent only to the provider you chose. Everything else in the app works without one.
 
@@ -76,7 +79,7 @@ Download the latest installer from the [Releases page](https://github.com/nikhil
 
 ## Where your credentials go
 
-Connection details live in `connections.json`, and your Anthropic API key in `settings.json`, both in Electron's `userData` directory:
+Connection details live in `connections.json`, and your AI provider keys in `settings.json`, both in Electron's `userData` directory:
 
 | Platform | Location                                 |
 | -------- | ---------------------------------------- |
@@ -86,7 +89,9 @@ Connection details live in `connections.json`, and your Anthropic API key in `se
 
 Passwords, database API tokens and AI provider keys are encrypted at rest with Electron `safeStorage`, backed by the OS keychain (Keychain on macOS, DPAPI on Windows, libsecret on Linux). If no keychain is available the app says so and falls back to plaintext.
 
-Nothing is sent anywhere except to the databases you connect to - and, if you add an AI key, your schema (table and column names, not row data) to the provider you selected.
+Nothing is sent anywhere except to the databases you connect to - and, if you add an AI key, your schema (table and column names, not row data) to the provider you selected, or to Cloudflare first if you turn the gateway on.
+
+One thing to know about the gateway token: Cloudflare's AI Gateway permissions cannot be scoped to a single gateway, so the token you save here can reach every gateway on that account.
 
 ## Development
 

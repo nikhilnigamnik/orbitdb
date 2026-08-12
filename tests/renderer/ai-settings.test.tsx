@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AiSettings } from '@renderer/features/settings/components/ai-settings'
 import { ToastProvider } from '@renderer/components/ui/toast'
-import type { AiProviderView, AiSettingsView } from '@renderer/types'
+import type { AiGatewayIds, AiProviderView, AiSettingsView } from '@renderer/types'
 
 afterEach(cleanup)
 
@@ -22,15 +22,20 @@ function providerView(overrides: Partial<AiProviderView> & Pick<AiProviderView, 
 }
 
 /** All three providers, with only the named one's fields overridden. */
-function view(overrides: Partial<AiProviderView> & Pick<AiProviderView, 'id'>): AiSettingsView {
+function view(
+  overrides: Partial<AiProviderView> & Pick<AiProviderView, 'id'>,
+  gateway: AiGatewayIds = { accountId: '', gatewayId: '' }
+): AiSettingsView {
   const base = [
     providerView({ id: 'anthropic' }),
     providerView({ id: 'openai', model: 'gpt-5.2' }),
-    providerView({ id: 'google', model: 'gemini-3.6-flash' })
+    providerView({ id: 'google', model: 'gemini-3.6-flash' }),
+    providerView({ id: 'cloudflare', model: 'anthropic/claude-sonnet-5' })
   ]
   return {
     active: 'anthropic',
-    providers: base.map((p) => (p.id === overrides.id ? { ...p, ...overrides } : p))
+    providers: base.map((p) => (p.id === overrides.id ? { ...p, ...overrides } : p)),
+    gateway
   }
 }
 
@@ -49,6 +54,8 @@ function setup(initial: AiSettingsView = DEFAULT, overrides: Record<string, unkn
     clearAiKey: vi.fn(() => ok(undefined)),
     setAiModel: vi.fn(() => ok('claude-opus-5')),
     testAi: vi.fn(() => ok(undefined)),
+    setGateway: vi.fn(() => ok(undefined)),
+    clearGatewayToken: vi.fn(() => ok(undefined)),
     ...overrides
   }
   Object.assign(window, { api: { settings: api } })
@@ -256,5 +263,92 @@ describe('folding', () => {
 
     expect(within(openai).getByText('Model')).toBeTruthy()
     expect(api.setAiProvider, 'expanding is not choosing').not.toHaveBeenCalled()
+  })
+})
+
+describe('the Cloudflare provider card', () => {
+  const CLOUDFLARE = 'Cloudflare AI Gateway'
+
+  function withGateway(gateway: Partial<AiGatewayIds> = {}) {
+    return {
+      ...view({ id: 'cloudflare', model: 'anthropic/claude-sonnet-5' }),
+      gateway: { accountId: '', gatewayId: '', ...gateway }
+    }
+  }
+
+  it('sits in the same list as the others, with the same Active switch', async () => {
+    setup()
+    const section = await card(CLOUDFLARE)
+
+    expect(within(section).getByLabelText(`Use ${CLOUDFLARE}`)).toBeTruthy()
+  })
+
+  it('opens itself while the ids are missing, since folded they are invisible', async () => {
+    setup()
+    expect(within(await card(CLOUDFLARE)).getByText('Account ID')).toBeTruthy()
+  })
+
+  it('saves the two ids', async () => {
+    const { api } = setup()
+    const section = await card(CLOUDFLARE)
+
+    fireEvent.change(within(section).getByLabelText('Cloudflare account ID'), {
+      target: { value: 'acct-1' }
+    })
+    fireEvent.change(within(section).getByLabelText('Cloudflare gateway ID'), {
+      target: { value: 'orbitdb' }
+    })
+    fireEvent.click(within(section).getAllByText('Save')[0])
+
+    await waitFor(() =>
+      expect(api.setGateway).toHaveBeenCalledWith({ accountId: 'acct-1', gatewayId: 'orbitdb' })
+    )
+  })
+
+  it('calls its credential a gateway token and says what it authorises', async () => {
+    // On the unified endpoint the Cloudflare token *is* the credential - it is
+    // what releases the stored provider keys or the billing credits - so the
+    // copy must not describe it as a bolt-on for authenticated gateways.
+    setup()
+    const section = await card(CLOUDFLARE)
+
+    expect(within(section).getByText('Gateway token')).toBeTruthy()
+    expect(within(section).getByText(/stored provider keys or credits/)).toBeTruthy()
+  })
+
+  it('cannot be tested until both ids are there', async () => {
+    setup(withGateway({ accountId: 'acct-1' }))
+    const section = await card(CLOUDFLARE)
+
+    const test = within(section).getByText('Test key').closest('button')
+    expect(test?.getAttribute('disabled')).not.toBeNull()
+  })
+
+  it('can be tested with the ids alone, no token needed', async () => {
+    // Configured and not active, so it folds like any other settled card.
+    setup(withGateway({ accountId: 'acct-1', gatewayId: 'orbitdb' }))
+    const section = await openCard(CLOUDFLARE)
+
+    const test = within(section).getByText('Test key').closest('button')
+    expect(test?.getAttribute('disabled')).toBeNull()
+  })
+
+  it('offers catalog slugs as its models, not our own model ids', async () => {
+    setup({ ...withGateway(), active: 'cloudflare' })
+    fireEvent.click(within(await card(CLOUDFLARE)).getByLabelText(`${CLOUDFLARE} model`))
+
+    const list = await screen.findByRole('listbox')
+    expect(within(list).getByText('Gemini 3.6 Flash')).toBeTruthy()
+    expect(within(list).getByText('Google - balanced')).toBeTruthy()
+  })
+})
+
+describe('the other providers', () => {
+  it('keep asking for an API key, not a gateway id', async () => {
+    setup()
+    const anthropic = await card('Anthropic')
+
+    expect(within(anthropic).getByText('API key')).toBeTruthy()
+    expect(within(anthropic).queryByText('Account ID')).toBeNull()
   })
 })

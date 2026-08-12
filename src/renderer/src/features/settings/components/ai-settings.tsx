@@ -10,7 +10,8 @@ import { SettingRow, SettingsCard } from './settings-card'
 
 export function AiSettings() {
   const toast = useToast()
-  const { settings, isLoading, setProvider, saveKey, clearKey, setModel, testKey } = useAiSettings()
+  const { settings, isLoading, setProvider, saveKey, clearKey, setModel, testKey, setGateway } =
+    useAiSettings()
   const [testing, setTesting] = React.useState<AiProviderId | null>(null)
   // Per provider, not global: saving one key should not freeze the other cards.
   const [busy, setBusy] = React.useState<AiProviderId | null>(null)
@@ -53,7 +54,14 @@ export function AiSettings() {
           view={view}
           isActive={settings.active === view.id}
           isBusy={busy === view.id}
+          gateway={settings.gateway}
           isTesting={testing === view.id}
+          onSaveGateway={(ids) =>
+            run(view.id, 'gateway could not be saved', async () => {
+              await setGateway(ids)
+              toast.success('AI Gateway saved')
+            })
+          }
           onActivate={() =>
             void run(view.id, 'could not be activated', async () => {
               await setProvider(view.id)

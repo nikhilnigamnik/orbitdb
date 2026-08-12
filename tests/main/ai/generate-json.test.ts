@@ -15,7 +15,14 @@ const calls = vi.hoisted(() => ({
 }))
 
 vi.mock('../../../src/main/store/settings-store', () => ({
-  getAiSettings: () => ({ ...settings })
+  getAiSettings: () => ({ ...settings }),
+  getGatewaySettings: () => ({
+    isEnabled: false,
+    accountId: '',
+    gatewayId: '',
+    token: '',
+    keySource: 'app'
+  })
 }))
 
 const stubSdk = () => () => (model: string) => ({ id: model })

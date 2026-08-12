@@ -446,12 +446,24 @@ export interface AiProviderView {
 }
 
 /**
+ * The Cloudflare account and gateway ids. Unlike a key these cross the boundary
+ * in full and in both directions: they identify rather than authorise, and both
+ * appear in every dashboard URL.
+ */
+export interface AiGatewayIds {
+  accountId: string
+  gatewayId: string
+}
+
+/**
  * Every provider's state at once, so the UI can show them side by side. No key
  * is ever included - only whether there is one, and its last four characters.
  */
 export interface AiSettingsView {
   active: AiProviderId
   providers: AiProviderView[]
+  /** Only meaningful for the Cloudflare provider, which needs them in its URL. */
+  gateway: AiGatewayIds
 }
 
 /** One row of the usage breakdown. Unused dimensions are the empty string. */
