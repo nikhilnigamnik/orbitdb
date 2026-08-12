@@ -120,7 +120,7 @@ export function DatabasePage() {
             onChangeTab={setActiveTab}
           />
         ) : (
-          <ConnectionOverview connectionId={active.connectionId} />
+          <ConnectionOverview connectionId={active.connectionId} schema={schema} />
         )}
       </main>
     </>

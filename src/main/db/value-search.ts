@@ -17,26 +17,6 @@ import {
  * here so they can be tested without a server.
  */
 
-/**
- * Ids the user has asked to abandon. A sweep cannot be cancelled the way a
- * query can - it is many small queries, not one long one - so it is polled
- * between tables instead, and the work already done is still returned.
- */
-const cancelledSearches = new Set<string>()
-
-export function requestSearchCancel(searchId: string): void {
-  cancelledSearches.add(searchId)
-}
-
-export function isSearchCancelled(searchId?: string): boolean {
-  return searchId ? cancelledSearches.has(searchId) : false
-}
-
-/** Called when a sweep finishes, so an id cannot poison a later reuse. */
-export function clearSearchCancel(searchId?: string): void {
-  if (searchId) cancelledSearches.delete(searchId)
-}
-
 export interface ValueSearchDialect extends FilterDialect {
   qualifiedTable(schema: string, table: string): string
   /** `col::text` in Postgres, `cast(col as char)` in MySQL, `cast(col as text)` in SQLite. */

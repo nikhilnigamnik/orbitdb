@@ -21,7 +21,8 @@ import type {
   RunQueryOptions,
   SavedQueryPatch,
   SuggestIndexesOptions,
-  ValueSearchOptions
+  ValueSearchOptions,
+  CheckReferencesOptions
 } from '../../shared/types'
 import { generateSql } from '../ai/generate-sql'
 import { explainTable } from '../ai/explain-table'
@@ -67,6 +68,7 @@ import {
   executeDdl,
   generateDdl,
   cancelValueSearch,
+  checkReferences,
   getColumnDistinct,
   getOverview,
   getRows,
@@ -215,6 +217,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'db:search-value',
     wrap(async (opts: ValueSearchOptions) => searchValue(opts))
+  )
+  ipcMain.handle(
+    'db:check-references',
+    wrap(async (opts: CheckReferencesOptions) => checkReferences(opts))
   )
   ipcMain.handle(
     'db:search-cancel',

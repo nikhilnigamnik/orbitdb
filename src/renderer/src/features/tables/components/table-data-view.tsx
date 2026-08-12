@@ -28,6 +28,8 @@ import {
   JOIN_PARAM,
   decodeFilters,
   decodeJoin,
+  filterParamsKey,
+  readFilterParamsKey,
   encodeFilters
 } from '@renderer/features/tables/lib/filter-params'
 import {
@@ -128,8 +130,16 @@ export function TableDataView({
     decodeJoin(searchParams.get(JOIN_PARAM))
   )
 
+  // The last params this component put in the URL. Anything else appearing
+  // there arrived from outside - a value-search hit, an FK jump, the back
+  // button - and has to be adopted. Comparing against our own last write rather
+  // than against current state avoids fighting the render where one has updated
+  // and the other has not.
+  const lastWrittenParamsRef = React.useRef(readFilterParamsKey(searchParams))
+
   const writeFilterParams = React.useCallback(
     (next: RowFilter[], join: FilterJoin) => {
+      lastWrittenParamsRef.current = filterParamsKey(next, join)
       setSearchParams(
         (prev) => {
           const params = new URLSearchParams(prev)
@@ -161,6 +171,24 @@ export function TableDataView({
     },
     [filters, writeFilterParams]
   )
+
+  /**
+   * Adopt filters that arrived in the URL from somewhere else.
+   *
+   * `filters` is seeded from the URL by a lazy initialiser, which runs once. The
+   * container keys this component by `schema.table`, so landing on a table you
+   * are *already* looking at - which is what a value-search hit on the open
+   * table does - never remounts it, and the new filters were simply ignored.
+   */
+  React.useEffect(() => {
+    const key = readFilterParamsKey(searchParams)
+    if (key === lastWrittenParamsRef.current) return
+    lastWrittenParamsRef.current = key
+    setFiltersState(decodeFilters(searchParams.get(FILTERS_PARAM)))
+    setFilterJoinState(decodeJoin(searchParams.get(JOIN_PARAM)))
+    // Page 1: the row that matched is unlikely to be at the old offset.
+    setOffset(0)
+  }, [searchParams])
 
   const fkByColumn = React.useMemo(() => {
     const map = new Map<string, { schema: string; table: string; column: string }>()

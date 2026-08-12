@@ -20,14 +20,16 @@ import type {
   TableInfo,
   TestConnectionResult,
   ValueSearchOptions,
-  ValueSearchResult
+  ValueSearchResult,
+  CheckReferencesOptions,
+  CheckReferencesResult
 } from '../../shared/types'
 import { getConnection } from '../store/connections-store'
 import type { ActiveMeta, DatabaseDriver } from './drivers/types'
 import { postgresDriver } from './drivers/postgres'
 import { mysqlDriver } from './drivers/mysql'
 import { d1Driver } from './drivers/d1'
-import { clearSearchCancel, requestSearchCancel } from './value-search'
+import { clearSweepCancel, requestSweepCancel } from './sweep-cancel'
 
 function driverFor(engine: DatabaseEngine): DatabaseDriver {
   if (engine === 'mysql') return mysqlDriver
@@ -144,10 +146,20 @@ export async function searchValue(opts: ValueSearchOptions): Promise<ValueSearch
   try {
     return await driverForConnection(opts.connectionId).searchValue(opts)
   } finally {
-    clearSearchCancel(opts.searchId)
+    clearSweepCancel(opts.searchId)
   }
 }
 
 export function cancelValueSearch(searchId: string): void {
-  requestSearchCancel(searchId)
+  requestSweepCancel(searchId)
+}
+
+export async function checkReferences(
+  opts: CheckReferencesOptions
+): Promise<CheckReferencesResult> {
+  try {
+    return await driverForConnection(opts.connectionId).checkReferences(opts)
+  } finally {
+    clearSweepCancel(opts.sweepId)
+  }
 }

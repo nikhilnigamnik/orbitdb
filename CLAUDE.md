@@ -239,6 +239,18 @@ Cancellation cannot work the way `cancelQuery` does, since a sweep is many small
 
 The UI is `features/database/components/value-search-dialog.tsx`, opened with `Mod+Shift+F` from `database-page.tsx` (plain `Mod+F` would be mistaken for filtering the current table). Hits link through `tableRouteWithFilters`, so a result opens the table already filtered.
 
+### Finding broken references
+
+`db:check-references` (`src/main/db/broken-refs.ts`) looks for rows whose reference points at a parent that is not there. Same shape as the value search - pure decisions here, a `ValueSearchDialect` and a runner from each driver - and it shares the cancellation registry in `sweep-cancel.ts`, which was pulled out of `value-search.ts` so both sweeps poll the same flag.
+
+Two kinds of reference are checked and the distinction is the point. An **undeclared** one (`posts.author_id` with no constraint) is where orphans usually come from. A **declared** one should be impossible to break, but SQLite ships with `foreign_keys` off - so D1 does - and MySQL's older engines accept the syntax and ignore it. A declared reference with orphans behind it therefore means the database was never enforcing it, which is the worse finding: they sort first regardless of count and are chipped `Not enforced`.
+
+Inference is deliberately timid. `foreignKeyBase()` takes `author_id`/`authorId` to `author`, `referencedNameGuesses()` proposes exact/plural/`-ies`, and nothing is reported unless a table by that name exists **and** the column types match. That type check is load-bearing: joining `user_id integer` against `users.id uuid` is rejected outright by Postgres and answered by SQLite with "every row is an orphan". `parent_id` gets one special case - its own table, tried last - because it names a relationship rather than a table and is the commonest self-reference there is.
+
+`buildOrphanSql()` takes **no parameters**: every identifier comes from the engine's own catalogue and is quoted by the dialect, and there is no user input to bind. A NULL child is not an orphan, the same rule `referencing.ts` applies when it declines to link on one. Capped at `REFERENCE_CHECK_PAIR_LIMIT` and run one pair at a time - each is a join across two whole tables, heavier than the value search.
+
+UI is `features/database/components/broken-refs-dialog.tsx`, triggered from `ConnectionOverview`, which is the one screen about the connection rather than a table.
+
 ### Connection overview
 
 Replaces the "select a table" empty state (`db:overview` → one driver method each). Every size is nullable rather than zero: D1 exposes no size at all over the query API, and a Postgres role without the grant for `pg_database_size` should degrade to a null rather than fail the page. D1 substitutes real `count(*)` per table, affordable only because the list is capped at `OVERVIEW_TABLE_LIMIT`.

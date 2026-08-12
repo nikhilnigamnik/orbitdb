@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TableDataView } from '@renderer/features/tables/components/table-data-view'
 import { ToastProvider } from '@renderer/components/ui/toast'
 import { loadViewPrefs } from '@renderer/features/tables/lib/view-prefs'
+import { tableRouteWithFilters } from '@renderer/features/tables/lib/filter-params'
 import type { ColumnInfo, TableDetails } from '@renderer/types'
 
 function column(name: string): ColumnInfo {
@@ -227,5 +228,106 @@ describe('pinning a column', () => {
     fireEvent.click(columnRow('secret'))
 
     await waitFor(() => expect(loadViewPrefs('c1', 'public', 'users').frozenColumns).toEqual([]))
+  })
+})
+
+/** Navigates without unmounting the view, the way an in-app link does. */
+function Jump({ to }: { to: string }) {
+  const navigate = useNavigate()
+  return (
+    <button type="button" onClick={() => navigate(to)}>
+      jump
+    </button>
+  )
+}
+
+describe('filters arriving in the URL while the table is already open', () => {
+  it('adopts them instead of ignoring the navigation', async () => {
+    // The container keys this component by schema.table, so landing on the
+    // table you are already looking at never remounts it - and the lazy
+    // initialiser that seeds `filters` from the URL runs only on mount. A
+    // value-search hit on the open table silently did nothing.
+    render(
+      <MemoryRouter initialEntries={['/database/table?schema=public&table=users']}>
+        <ToastProvider>
+          <Jump
+            to={tableRouteWithFilters('public', 'users', [
+              { column: 'name', operator: 'ilike', value: '%Ada%' }
+            ])}
+          />
+          <TableDataView connectionId="c1" details={details} />
+        </ToastProvider>
+      </MemoryRouter>
+    )
+    await waitFor(() => expect(getRows).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByText('jump'))
+
+    await waitFor(() =>
+      expect(lastGetRowsCall().filters).toEqual([
+        { column: 'name', operator: 'ilike', value: '%Ada%' }
+      ])
+    )
+  })
+
+  it('goes back to the first page, since the match is not at the old offset', async () => {
+    render(
+      <MemoryRouter initialEntries={['/database/table?schema=public&table=users']}>
+        <ToastProvider>
+          <Jump
+            to={tableRouteWithFilters('public', 'users', [
+              { column: 'name', operator: '=', value: 'Ada' }
+            ])}
+          />
+          <TableDataView connectionId="c1" details={details} />
+        </ToastProvider>
+      </MemoryRouter>
+    )
+    await waitFor(() => expect(getRows).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByText('jump'))
+
+    await waitFor(() => expect(lastGetRowsCall().offset).toBe(0))
+  })
+
+  it('leaves a filter the view itself wrote alone', async () => {
+    // The component writes these params as well as reading them. Treating its
+    // own write as an incoming change would revert every edit made in the
+    // filter bar. Asserted on the filters rather than on a call count, because
+    // the page prefetcher issues its own getRows and would make counting flaky.
+    mount(
+      tableRouteWithFilters('public', 'users', [{ column: 'name', operator: '=', value: 'Ada' }])
+    )
+
+    await waitFor(() =>
+      expect(lastGetRowsCall().filters).toEqual([{ column: 'name', operator: '=', value: 'Ada' }])
+    )
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(lastGetRowsCall().filters, 'not reverted by its own URL write').toEqual([
+      { column: 'name', operator: '=', value: 'Ada' }
+    ])
+  })
+
+  it('adopts a join that changed even when the filters did not', async () => {
+    // Comparing only the filters param missed this: the same two filters
+    // rejoined with OR is a different query.
+    const twoFilters = [
+      { column: 'name', operator: '=' as const, value: 'Ada' },
+      { column: 'secret', operator: '=' as const, value: 'x' }
+    ]
+    render(
+      <MemoryRouter initialEntries={[tableRouteWithFilters('public', 'users', twoFilters)]}>
+        <ToastProvider>
+          <Jump to={`${tableRouteWithFilters('public', 'users', twoFilters)}&join=or`} />
+          <TableDataView connectionId="c1" details={details} />
+        </ToastProvider>
+      </MemoryRouter>
+    )
+    await waitFor(() => expect(getRows).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByText('jump'))
+
+    await waitFor(() => expect(lastGetRowsCall().filterJoin).toBe('or'))
   })
 })

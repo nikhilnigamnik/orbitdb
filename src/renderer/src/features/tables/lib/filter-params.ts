@@ -47,6 +47,24 @@ export function decodeJoin(raw: string | null): FilterJoin {
 }
 
 /**
+ * Both filter params as one comparable string, so a component that reads *and*
+ * writes them can tell its own last write apart from one that arrived from
+ * outside (a search hit, an FK jump, the back button).
+ *
+ * `and` normalises to empty because it is never written - only `or` is, and
+ * only when there is more than one filter to join. Without that, a hand-edited
+ * `join=and` would read as a change forever.
+ */
+export function filterParamsKey(filters: RowFilter[], join: FilterJoin): string {
+  const encoded = encodeFilters(filters) ?? ''
+  return `${encoded}|${join === 'or' && filters.length > 1 ? 'or' : ''}`
+}
+
+export function readFilterParamsKey(params: URLSearchParams): string {
+  return `${params.get(FILTERS_PARAM) ?? ''}|${params.get(JOIN_PARAM) === 'or' ? 'or' : ''}`
+}
+
+/**
  * A table route already narrowed to some rows. Uses the filters param rather
  * than the single-column `fkColumn`/`fkValue` pair, so a composite key links as
  * precisely as a simple one.
