@@ -11,6 +11,7 @@ import { ROUTES, tableRoute } from '@renderer/config/routes'
 import { pushRecent } from '@renderer/features/database/lib/table-prefs'
 import type { DdlOperation, DdlFormKind, TableDetails } from '@renderer/types'
 import { SchemaTree } from './schema-tree'
+import { ValueSearchDialog } from './value-search-dialog'
 import { TableHeader } from './table-header'
 import { TableStructure } from './table-structure'
 import { StructureAi } from './structure-ai'
@@ -38,6 +39,20 @@ export function DatabasePage() {
   const schema = searchParams.get('schema') ?? ''
   const table = searchParams.get('table') ?? ''
   const view = searchParams.get('view')
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false)
+
+  // Mod+Shift+F rather than Mod+F: plain Mod+F is the filter people expect
+  // inside the current table, and a whole-database sweep is not that.
+  React.useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setIsSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
   const [activeTab, setActiveTab] = React.useState<'data' | 'structure'>(
     view === 'structure' ? 'structure' : 'data'
   )
@@ -85,6 +100,12 @@ export function DatabasePage() {
 
   return (
     <>
+      <ValueSearchDialog
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        connectionId={active.connectionId}
+        schema={schema}
+      />
       <aside className="flex h-full w-56 shrink-0 flex-col overflow-hidden rounded-xl bg-surface shadow-lg shadow-black/20">
         <SchemaTreeContainer connectionId={active.connectionId} />
       </aside>

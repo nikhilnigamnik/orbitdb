@@ -28,6 +28,7 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 
 - **Query editor** - CodeMirror with SQL highlighting, line numbers and completion for your own tables and columns. Resizable results pane, a draft that survives navigating away, and destructive statements ask before running.
 - **Query library** - every run is kept per connection; star one to name it and keep it out of the history cap. Stored alongside your connections rather than in browser storage.
+- **Find a value anywhere** - `Mod+Shift+F` sweeps every searchable column of every table for a value and shows where it appears, with counts. Click a result to open that table already filtered. Useful for undeclared foreign keys and tracking down stray data.
 - **Query log** - every statement the app issues, filterable to just the ones you ran.
 
 **AI (optional)**

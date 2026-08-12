@@ -17,7 +17,9 @@ import type {
   SchemaInfo,
   TableDetails,
   TableInfo,
-  TestConnectionResult
+  TestConnectionResult,
+  ValueSearchOptions,
+  ValueSearchResult
 } from '../../../shared/types'
 
 export interface ActiveMeta {
@@ -58,4 +60,6 @@ export interface DatabaseDriver {
   runQuery(opts: RunQueryOptions): Promise<QueryResult>
   cancelQuery(connectionId: string, queryId: string): Promise<void>
   getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]>
+  /** Every searchable column of every table in the schema. Expensive by nature. */
+  searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult>
 }

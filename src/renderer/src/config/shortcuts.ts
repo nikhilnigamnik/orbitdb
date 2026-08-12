@@ -21,6 +21,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: 'Anywhere',
     shortcuts: [
       { keys: 'Mod+K', description: 'Search tables, connections and actions' },
+      { keys: 'Mod+Shift+F', description: 'Find a value in every table' },
       { keys: '?', description: 'Show this list' }
     ]
   },

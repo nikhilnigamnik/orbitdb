@@ -224,6 +224,21 @@ The Columns control is a **Popover of plain buttons**, not a `DropdownMenu`. It 
 
 `config/shortcuts.ts` is the single list; `ShortcutsOverlay` renders it. The keys are implemented elsewhere, which is the usual way a help screen goes stale, so the list is data read by both and `tests/renderer/shortcuts-overlay.test.tsx` asserts every entry renders. `isTyping()` guards with `instanceof HTMLElement` rather than a cast - a keydown can be dispatched at the document, which has neither `tagName` nor `closest`.
 
+### Finding a value anywhere
+
+`db:search-value` sweeps every searchable column of every table in a schema and reports where a value appears. The decisions live in `src/main/db/value-search.ts` and are shared by all three engines; the drivers supply only a `ValueSearchDialect` (quoting, placeholder, `castText`) and a way to run a query, the same arrangement as `ddl.ts`.
+
+Four things about it are deliberate:
+
+- **One query per table, not per column.** `sum(case when … then 1 else 0 end)` per candidate column, so a table is scanned once and reports every column at the same time. `count(*) filter (where …)` would read better but MySQL does not have it.
+- **Numerics are excluded from `contains`.** Casting a bigint so `42` can match `1420` buries the real hit and forfeits any index. They are searched on `exact` when the term parses as a number, where the answer is unambiguous. Enums count as textual, found via `enumValues` rather than the type name, since Postgres reports them as `USER-DEFINED`.
+- **Smallest tables first, capped at `VALUE_SEARCH_TABLE_LIMIT`.** A null row estimate sorts _last_ - unknown is treated as large, because guessing small is the expensive mistake. When the cap bites it therefore drops the most expensive tables, and `tablesSkipped` makes the UI admit the sweep was partial.
+- **Tables are searched one at a time.** This is already the heaviest thing the app asks a database to do; firing every table at once turns a slow feature into an outage. A table that fails is recorded in `failures` and the sweep continues - reporting no hits when it never actually looked is worse than saying so.
+
+Cancellation cannot work the way `cancelQuery` does, since a sweep is many small queries rather than one long one. `db:search-cancel` sets a flag polled between tables, and the work already done is still returned with `wasCancelled` set. The flag is cleared in `manager.ts` rather than the drivers, because it is set by a different IPC call than the one that reads it.
+
+The UI is `features/database/components/value-search-dialog.tsx`, opened with `Mod+Shift+F` from `database-page.tsx` (plain `Mod+F` would be mistaken for filtering the current table). Hits link through `tableRouteWithFilters`, so a result opens the table already filtered.
+
 ### Connection overview
 
 Replaces the "select a table" empty state (`db:overview` → one driver method each). Every size is nullable rather than zero: D1 exposes no size at all over the query API, and a Postgres role without the grant for `pg_database_size` should degrade to a null rather than fail the page. D1 substitutes real `count(*)` per table, affordable only because the list is capped at `OVERVIEW_TABLE_LIMIT`.

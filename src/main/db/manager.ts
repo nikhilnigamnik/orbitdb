@@ -18,13 +18,16 @@ import type {
   SchemaInfo,
   TableDetails,
   TableInfo,
-  TestConnectionResult
+  TestConnectionResult,
+  ValueSearchOptions,
+  ValueSearchResult
 } from '../../shared/types'
 import { getConnection } from '../store/connections-store'
 import type { ActiveMeta, DatabaseDriver } from './drivers/types'
 import { postgresDriver } from './drivers/postgres'
 import { mysqlDriver } from './drivers/mysql'
 import { d1Driver } from './drivers/d1'
+import { clearSearchCancel, requestSearchCancel } from './value-search'
 
 function driverFor(engine: DatabaseEngine): DatabaseDriver {
   if (engine === 'mysql') return mysqlDriver
@@ -130,4 +133,21 @@ export function cancelQuery(connectionId: string, queryId: string): Promise<void
 
 export function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
   return driverForConnection(opts.connectionId).getColumnDistinct(opts)
+}
+
+/**
+ * The cancel flag is cleared here rather than in the drivers: it is set from a
+ * different IPC call than the one that reads it, so whichever sweep owns the id
+ * has to retire it however it ends.
+ */
+export async function searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult> {
+  try {
+    return await driverForConnection(opts.connectionId).searchValue(opts)
+  } finally {
+    clearSearchCancel(opts.searchId)
+  }
+}
+
+export function cancelValueSearch(searchId: string): void {
+  requestSearchCancel(searchId)
 }

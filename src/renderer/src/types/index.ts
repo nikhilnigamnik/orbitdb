@@ -57,5 +57,9 @@ export type {
   UpdateCheckResult,
   UsageBreakdown,
   UsageSummary,
-  UsageWindow
+  UsageWindow,
+  ValueSearchHit,
+  ValueSearchMode,
+  ValueSearchOptions,
+  ValueSearchResult
 } from '../../../shared/types'

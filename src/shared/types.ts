@@ -276,6 +276,52 @@ export interface ConnectionOverview {
 /** Enough to see where the weight is without turning the page into a report. */
 export const OVERVIEW_TABLE_LIMIT = 10
 
+/**
+ * How a searched value is matched. `exact` can use an index and is what finding
+ * an id wants; `contains` cannot, and is a full scan of every column it touches.
+ */
+export type ValueSearchMode = 'exact' | 'contains'
+
+export interface ValueSearchOptions {
+  connectionId: string
+  schema: string
+  term: string
+  mode: ValueSearchMode
+  /** Echoed to `db:search-cancel`, since a sweep can outlast the user's patience. */
+  searchId?: string
+}
+
+export interface ValueSearchHit {
+  schema: string
+  table: string
+  column: string
+  count: number
+}
+
+export interface ValueSearchResult {
+  /** Most hits first. */
+  hits: ValueSearchHit[]
+  tablesSearched: number
+  /** Tables past `VALUE_SEARCH_TABLE_LIMIT`, so the UI can admit the sweep was partial. */
+  tablesSkipped: number
+  columnsSearched: number
+  /**
+   * Tables whose query failed - a permission, an exotic type, a view over
+   * something unreadable. Named rather than swallowed: a search reporting no
+   * hits when it never actually looked is worse than one that says so.
+   */
+  failures: { table: string; error: string }[]
+  /** True when the user cancelled, so partial results are not read as complete. */
+  wasCancelled: boolean
+}
+
+/**
+ * A sweep touches every table, so it is capped rather than allowed to run away
+ * on a database with thousands of them. Ordered by the planner's row estimate
+ * ascending, so the cap drops the most expensive tables rather than arbitrary ones.
+ */
+export const VALUE_SEARCH_TABLE_LIMIT = 200
+
 export const MAX_QUERY_RESULT_ROWS = 10_000
 
 export interface QueryResult {

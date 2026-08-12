@@ -31,13 +31,16 @@ import {
   type SchemaInfo,
   type TableDetails,
   type TableInfo,
-  type TestConnectionResult
+  type TestConnectionResult,
+  ValueSearchOptions,
+  ValueSearchResult
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
 import { toCount } from '../coerce'
 import { buildOrderBySql } from '../order-by'
 import { buildFilterSql, type FilterDialect } from '../filters'
+import { isSearchCancelled, sweepTables, type ValueSearchDialect } from '../value-search'
 import { recordQuery } from '../query-log'
 import { detectCommand, isSchemaChanging } from '../sql-command'
 import type { ActiveMeta, DatabaseDriver } from './types'
@@ -474,6 +477,28 @@ const filterDialect: FilterDialect = {
   supportsIlike: false
 }
 
+const searchDialect: ValueSearchDialect = {
+  ...filterDialect,
+  qualifiedTable,
+  // MySQL has no `text` cast target; `char` is the portable one.
+  castText: (expr) => `cast(${expr} as char)`
+}
+
+async function searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult> {
+  const pool = getPool(opts.connectionId)
+  return sweepTables(opts.schema, opts.term, opts.mode, {
+    dialect: searchDialect,
+    listTables: () => listTables(opts.connectionId, opts.schema),
+    columnsFor: async (table) =>
+      (await tableDetails(opts.connectionId, opts.schema, table)).columns,
+    run: async (sql, params) => {
+      const [rows] = await pool.query<RowDataPacket[]>(sql, params)
+      return rows[0] as Record<string, unknown> | undefined
+    },
+    isCancelled: () => isSearchCancelled(opts.searchId)
+  })
+}
+
 async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
@@ -880,5 +905,6 @@ export const mysqlDriver: DatabaseDriver = {
   runQuery,
   cancelQuery,
   getColumnDistinct,
+  searchValue,
   getOverview
 }
