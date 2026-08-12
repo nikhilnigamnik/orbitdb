@@ -1,6 +1,14 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconDatabase, IconTable, IconEye, IconStack2, IconArrowRight } from '@tabler/icons-react'
+import {
+  IconDatabase,
+  IconTable,
+  IconEye,
+  IconStack2,
+  IconArrowRight,
+  IconUnlink
+} from '@tabler/icons-react'
+import { Button } from '@renderer/components/ui/button'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { useAsync } from '@renderer/hooks/use-async'
@@ -8,11 +16,14 @@ import { unwrap } from '@renderer/lib/ipc'
 import { formatBytes, formatNumber } from '@renderer/lib/format'
 import { cn } from '@renderer/lib/utils'
 import { ROUTES, tableRoute } from '@renderer/config/routes'
+import { BrokenRefsDialog } from './broken-refs-dialog'
 import { collapseSql } from '@renderer/features/query/lib/query-library'
 import type { ConnectionOverview as Overview, SavedQuery, TableSize } from '@renderer/types'
 
 interface ConnectionOverviewProps {
   connectionId: string
+  /** Which schema a database-wide check runs against. Empty until one is known. */
+  schema: string
 }
 
 /**
@@ -23,7 +34,8 @@ interface ConnectionOverviewProps {
  * have opened before, and its shape - how many tables, how big, which ones
  * carry the weight - is the first thing worth knowing.
  */
-export function ConnectionOverview({ connectionId }: ConnectionOverviewProps) {
+export function ConnectionOverview({ connectionId, schema }: ConnectionOverviewProps) {
+  const [isCheckingRefs, setIsCheckingRefs] = React.useState(false)
   const { data, error, isLoading, refresh } = useAsync<Overview>(
     async () => unwrap(window.api.db.overview(connectionId)),
     [connectionId]
@@ -68,6 +80,35 @@ export function ConnectionOverview({ connectionId }: ConnectionOverviewProps) {
             </p>
           )}
         </header>
+
+        {/* A database-wide check belongs on the database-wide page, and this is
+            the one screen that is about the connection rather than a table. */}
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-elevated/20 px-4 py-3">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-xs font-medium text-text">Check references</span>
+            <span className="text-[11px] text-text-subtle">
+              Find rows pointing at parents that no longer exist, including columns with no foreign
+              key.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="shrink-0 text-text-muted hover:bg-surface-elevated hover:text-text"
+            onClick={() => setIsCheckingRefs(true)}
+            disabled={!schema}
+          >
+            <IconUnlink size={12} />
+            Check
+          </Button>
+        </div>
+
+        <BrokenRefsDialog
+          isOpen={isCheckingRefs}
+          onClose={() => setIsCheckingRefs(false)}
+          connectionId={connectionId}
+          schema={schema}
+        />
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat

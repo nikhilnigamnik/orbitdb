@@ -33,14 +33,18 @@ import {
   type TableInfo,
   type TestConnectionResult,
   ValueSearchOptions,
-  ValueSearchResult
+  ValueSearchResult,
+  CheckReferencesOptions,
+  CheckReferencesResult
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
 import { toCount } from '../coerce'
 import { buildOrderBySql } from '../order-by'
 import { buildFilterSql, type FilterDialect } from '../filters'
-import { isSearchCancelled, sweepTables, type ValueSearchDialect } from '../value-search'
+import { sweepTables, type ValueSearchDialect } from '../value-search'
+import { sweepReferences } from '../broken-refs'
+import { isSweepCancelled } from '../sweep-cancel'
 import { recordQuery } from '../query-log'
 import { detectCommand, isSchemaChanging } from '../sql-command'
 import type { ActiveMeta, DatabaseDriver } from './types'
@@ -495,7 +499,7 @@ async function searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult>
       const [rows] = await pool.query<RowDataPacket[]>(sql, params)
       return rows[0] as Record<string, unknown> | undefined
     },
-    isCancelled: () => isSearchCancelled(opts.searchId)
+    isCancelled: () => isSweepCancelled(opts.searchId)
   })
 }
 
@@ -773,6 +777,27 @@ async function cancelQuery(connectionId: string, queryId: string): Promise<void>
   }
 }
 
+async function checkReferences(opts: CheckReferencesOptions): Promise<CheckReferencesResult> {
+  const pool = getPool(opts.connectionId)
+  return sweepReferences(opts.schema, {
+    dialect: searchDialect,
+    loadTables: async () => {
+      const tables = await listTables(opts.connectionId, opts.schema)
+      const details: TableDetails[] = []
+      for (const table of tables) {
+        if (table.type !== 'table') continue
+        details.push(await tableDetails(opts.connectionId, opts.schema, table.name))
+      }
+      return details
+    },
+    run: async (sql) => {
+      const [rows] = await pool.query<RowDataPacket[]>(sql)
+      return rows[0] as Record<string, unknown> | undefined
+    },
+    isCancelled: () => isSweepCancelled(opts.sweepId)
+  })
+}
+
 async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   if (!details.columns.some((c) => c.name === opts.column)) {
@@ -906,5 +931,6 @@ export const mysqlDriver: DatabaseDriver = {
   cancelQuery,
   getColumnDistinct,
   searchValue,
+  checkReferences,
   getOverview
 }

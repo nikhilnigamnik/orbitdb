@@ -322,6 +322,45 @@ export interface ValueSearchResult {
  */
 export const VALUE_SEARCH_TABLE_LIMIT = 200
 
+/**
+ * A column pointing at rows that are not there. `isDeclared` separates the two
+ * kinds, and both are worth reporting: an undeclared one is the common case, but
+ * a *declared* constraint with orphans behind it means the database was not
+ * enforcing it - SQLite ships with foreign keys off, and MySQL's older engines
+ * ignore them entirely.
+ */
+export interface BrokenReference {
+  schema: string
+  table: string
+  column: string
+  referencedTable: string
+  referencedColumn: string
+  isDeclared: boolean
+  count: number
+}
+
+export interface CheckReferencesOptions {
+  connectionId: string
+  schema: string
+  /** Echoed to `db:sweep-cancel`, since this reads every table it can pair up. */
+  sweepId?: string
+}
+
+export interface CheckReferencesResult {
+  /** Most orphans first. */
+  broken: BrokenReference[]
+  pairsChecked: number
+  /** Pairs past `REFERENCE_CHECK_PAIR_LIMIT`, so the UI can admit it was partial. */
+  pairsSkipped: number
+  /** Column pairs found, whether or not they turned out to have orphans. */
+  pairsFound: number
+  failures: { table: string; error: string }[]
+  wasCancelled: boolean
+}
+
+/** Each pair is a join across two whole tables, so the sweep is bounded. */
+export const REFERENCE_CHECK_PAIR_LIMIT = 150
+
 export const MAX_QUERY_RESULT_ROWS = 10_000
 
 export interface QueryResult {

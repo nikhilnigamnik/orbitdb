@@ -25,7 +25,9 @@ import {
   type TableInfo,
   type TestConnectionResult,
   ValueSearchOptions,
-  ValueSearchResult
+  ValueSearchResult,
+  CheckReferencesOptions,
+  CheckReferencesResult
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl } from '../ddl'
@@ -49,7 +51,9 @@ import {
   type IndexListRow,
   type TableInfoRow
 } from '../sqlite-shared'
-import { isSearchCancelled, sweepTables, type ValueSearchDialect } from '../value-search'
+import { sweepTables, type ValueSearchDialect } from '../value-search'
+import { sweepReferences } from '../broken-refs'
+import { isSweepCancelled } from '../sweep-cancel'
 import { recordQuery } from '../query-log'
 import { detectCommand, isSchemaChanging } from '../sql-command'
 import type { ActiveMeta, DatabaseDriver } from './types'
@@ -594,7 +598,28 @@ async function searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult>
       const entry = await callD1<Record<string, unknown>>(saved, sql, params)
       return entry.results[0]
     },
-    isCancelled: () => isSearchCancelled(opts.searchId)
+    isCancelled: () => isSweepCancelled(opts.searchId)
+  })
+}
+
+async function checkReferences(opts: CheckReferencesOptions): Promise<CheckReferencesResult> {
+  const saved = loadSaved(opts.connectionId)
+  return sweepReferences(SQLITE_SCHEMA, {
+    dialect: searchDialect,
+    loadTables: async () => {
+      const tables = await listTables(opts.connectionId, SQLITE_SCHEMA)
+      const details: TableDetails[] = []
+      for (const table of tables) {
+        if (table.type !== 'table') continue
+        details.push(await tableDetails(opts.connectionId, SQLITE_SCHEMA, table.name))
+      }
+      return details
+    },
+    run: async (sql) => {
+      const entry = await callD1<Record<string, unknown>>(saved, sql, [])
+      return entry.results[0]
+    },
+    isCancelled: () => isSweepCancelled(opts.sweepId)
   })
 }
 
@@ -788,5 +813,6 @@ export const d1Driver: DatabaseDriver = {
   cancelQuery,
   getColumnDistinct,
   searchValue,
+  checkReferences,
   getOverview
 }

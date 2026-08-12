@@ -61,5 +61,8 @@ export type {
   ValueSearchHit,
   ValueSearchMode,
   ValueSearchOptions,
-  ValueSearchResult
+  ValueSearchResult,
+  BrokenReference,
+  CheckReferencesOptions,
+  CheckReferencesResult
 } from '../../../shared/types'

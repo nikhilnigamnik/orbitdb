@@ -43,7 +43,9 @@ import type {
   TestConnectionResult,
   UpdateCheckResult,
   ValueSearchOptions,
-  ValueSearchResult
+  ValueSearchResult,
+  CheckReferencesOptions,
+  CheckReferencesResult
 } from '../shared/types'
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<OperationResult<T>> {
@@ -86,6 +88,8 @@ const api = {
     columnDistinct: (opts: DistinctValuesOptions) => invoke<unknown[]>('db:column-distinct', opts),
     searchValue: (opts: ValueSearchOptions) => invoke<ValueSearchResult>('db:search-value', opts),
     cancelSearch: (searchId: string) => invoke<void>('db:search-cancel', searchId),
+    checkReferences: (opts: CheckReferencesOptions) =>
+      invoke<CheckReferencesResult>('db:check-references', opts),
     listLogs: () => invoke<QueryLogEntry[]>('db:logs-list'),
     clearLogs: () => invoke<void>('db:logs-clear')
   },

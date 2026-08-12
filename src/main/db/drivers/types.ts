@@ -19,7 +19,9 @@ import type {
   TableInfo,
   TestConnectionResult,
   ValueSearchOptions,
-  ValueSearchResult
+  ValueSearchResult,
+  CheckReferencesOptions,
+  CheckReferencesResult
 } from '../../../shared/types'
 
 export interface ActiveMeta {
@@ -62,4 +64,6 @@ export interface DatabaseDriver {
   getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]>
   /** Every searchable column of every table in the schema. Expensive by nature. */
   searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult>
+  /** Rows whose reference points at a parent that is not there. */
+  checkReferences(opts: CheckReferencesOptions): Promise<CheckReferencesResult>
 }
