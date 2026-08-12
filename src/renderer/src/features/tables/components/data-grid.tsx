@@ -27,6 +27,7 @@ import { Checkbox } from '@renderer/components/ui/checkbox'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { CellInlineEditor } from './cell-inline-editor'
 import { useGridCursor, type CopyFormat } from '../hooks/use-grid-cursor'
+import { revealDelta, stickyWidth } from '../lib/reveal-cell'
 import { frozenOffsets, frozenWidth, orderColumns } from '../lib/frozen-columns'
 import type { InsertTarget } from '../lib/clipboard-format'
 import type { ColumnInfo, SortDirection } from '@renderer/types'
@@ -209,6 +210,7 @@ export function DataGrid({
   )
 
   const gridRef = React.useRef<HTMLDivElement>(null)
+  const cursorCellRef = React.useRef<HTMLTableCellElement>(null)
   const {
     cursor,
     selectCell,
@@ -227,6 +229,32 @@ export function DataGrid({
     onCopied,
     onCopyFailed
   })
+
+  /**
+   * Keep the cursor on screen.
+   *
+   * Arrow keys moved the cursor without moving the view, so stepping right off
+   * the visible edge left it behind the sticky columns with nothing to show
+   * where it had gone.
+   */
+  React.useEffect(() => {
+    const container = gridRef.current
+    const cell = cursorCellRef.current
+    if (!container || !cell) return
+
+    const row = cell.parentElement
+    const insets = {
+      left: row ? stickyWidth(row.querySelectorAll('[data-sticky="left"]')) : 0,
+      right: row ? stickyWidth(row.querySelectorAll('[data-sticky="right"]')) : 0,
+      top: container.querySelector('thead')?.getBoundingClientRect().height ?? 0
+    }
+    const { left, top } = revealDelta(
+      container.getBoundingClientRect(),
+      cell.getBoundingClientRect(),
+      insets
+    )
+    if (left !== 0 || top !== 0) container.scrollBy({ left, top })
+  }, [cursor?.rowIndex, cursor?.columnIndex])
 
   const tableColumns = React.useMemo<ColumnDef<Row>[]>(() => {
     const helper = createColumnHelper<Row>()
@@ -691,7 +719,18 @@ export function DataGrid({
                     return (
                       <td
                         key={cell.id}
+                        ref={isCursor ? cursorCellRef : undefined}
                         aria-selected={isCursor || isRangeCell || undefined}
+                        // Read by the reveal maths: these overlay the scroll
+                        // area rather than shrink it, so a cell brought to the
+                        // edge would otherwise land underneath them.
+                        data-sticky={
+                          isActions
+                            ? 'right'
+                            : (isAnyFrozen && (isSelect || isIndex)) || sticky
+                              ? 'left'
+                              : undefined
+                        }
                         style={
                           sticky ??
                           (width !== undefined
