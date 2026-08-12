@@ -147,6 +147,74 @@ Exposed as `usage:summary` / `usage:clear` → `window.api.usage.*`. Aggregation
 
 Two things make the per-day rollup load-bearing rather than incidental. A rate can change partway through a window - Claude Sonnet 5 carries a launch discount (`promo`) through 2026-08-31 - so `summarise()` takes `[dayKey, rows]` and prices each day at the rate in effect _that_ day, which is exact rather than an approximation. And a model with no pricing row returns `null` from `costOf()` rather than `0`: it accumulates into `UsageWindow.unpricedCalls` so the UI can say the total is short, instead of showing a free-looking call. `tests/shared/ai-pricing.test.ts` asserts every model in `AI_PROVIDERS` has a rate, so adding one to the picker without a price fails the suite.
 
+### Query persistence
+
+`src/main/store/queries-store.ts` writes `queries.json` into `userData` - plain JSON, unencrypted for the same reason as `usage.json`: a query names tables, not secrets, and `crypto.ts` costs a keychain round-trip on a file read on every query-page mount.
+
+It holds run history **and** saved queries in one list, because they are the same thing at different ages. `isStarred` is the only distinction, and it carries two consequences at once: a starred entry is exempt from `MAX_HISTORY_PER_CONNECTION` (100, counted per connection so a busy connection cannot evict a quiet one's history), and it is the only kind that may carry a `name`. Unstarring therefore clears the name - a named entry the pruner can still delete is a promise the store cannot keep.
+
+Re-running identical SQL folds into the existing unstarred entry rather than appending, so iterating on one query does not push everything else off the cap. A **starred** copy is never folded into: it keeps the timing of the run the user kept, and the re-run starts a fresh history entry beside it.
+
+Exposed under the `queries:` namespace → `window.api.queries.*`. The renderer keeps only the editor **draft** in `localStorage` (`orbitdb:query-draft:<id>`) - that is one window's unsaved text and has no meaning elsewhere. History used to live there too, which made it the one piece of user state that never reached `userData`.
+
+### Relationship navigation
+
+Foreign keys are followable in both directions.
+
+Outwards was already there: `table-data-view.tsx` builds `fkByColumn` from `TableDetails.foreignKeys` and `data-grid.tsx` renders a jump arrow on those cells.
+
+Inwards needs `db:referencing-keys` → `driver.referencingKeys()`, because `TableDetails` only knows the constraints a table _holds_. Postgres and MySQL run the same catalogue query as `tableDetails` filtered on the referenced side; SQLite has no reverse FK catalogue at all, so D1 sweeps `pragma foreign_key_list` over every table and filters. It is deliberately **not** folded into `tableDetails`: that result is cached per table and opened constantly, while this scans the whole database and is asked for once per row opened.
+
+`ReferencedBy` (`features/tables/components/referenced-by.tsx`) renders it inside the row editor, counting each child with `db:rows-count`. Two rules live in `lib/referencing.ts` and are the reason it is a separate testable module: a NULL on the parent side yields **no** link rather than a count (`col = NULL` is never true, so zero would read as a real answer), and links go through `tableRouteWithFilters` - the `filters` URL param, not the single-column `fkColumn`/`fkValue` pair - so a composite key links as precisely as a simple one.
+
+### The grid's keyboard, and remembered views
+
+`useGridCursor` (`features/tables/hooks/`) owns a cell cursor, a rectangular selection extended with shift, and copy. It is deliberately separate from the row checkboxes: those select whole rows to _act_ on (delete, export), this selects a region to _read out_. `Cmd+C` gives TSV (with a header only when more than one cell is selected, since Excel's quoting rules are what make a multi-line JSON column paste as one field), `Cmd+Shift+C` gives JSON with the values still typed. The maths lives in `lib/grid-cursor.ts` and the formatting in `lib/clipboard-format.ts`, both pure.
+
+Arrow keys clamp at the edges rather than wrapping - `CellInlineEditor`'s Tab wraps because it is walking a sequence of fields, but an arrow key names a direction.
+
+`toInsertSql` builds SQL in the **renderer**, which the seed feature deliberately does not. The difference is where it goes: this lands on the clipboard for a person to read, while a seed executes unseen. Quoting is still engine-correct (MySQL backticks, and backslash escaping inside literals, which Postgres must _not_ do), hence the `engine` on `InsertTarget` - passed down from `database-page.tsx` because `TableDataView` cannot call `useConnection()` without a provider the tests do not mount.
+
+`lib/view-prefs.ts` persists sort, page size, hidden columns and column widths per connection+table in `localStorage`. Unlike saved queries this stays out of `userData`: it is view state, and losing it costs a re-drag. Widths commit on mouse **up**, not per frame. Writes happen at each mutation point rather than from an effect over the state - an effect would still be holding the previous table's sort when the table changes and would save it under the new table's key.
+
+`toggleHiddenColumn` refuses to hide the last visible column, because an empty grid has no control left to bring anything back. Hidden columns are still selected and fetched; hiding is a view concern.
+
+**A trap this uncovered:** `TableDataView`'s "reset on table change" effect only ever ran on mount, since `database-page.tsx` keys the container by `${schema}.${table}` and a switch remounts. On mount it called `setFilters([])`, throwing away the filters a deep link arrived with - which is exactly what an FK jump is. It is now guarded by a ref so the first run is skipped; `tests/renderer/table-view-prefs.test.tsx` pins it.
+
+### The SQL editor
+
+`sql-editor.tsx` is a hand-rolled CodeMirror 6 wrapper - no `@uiw` binding, matching how the stores are hand-rolled. Three things about it are load-bearing:
+
+The view is built **once**, in an effect with an empty dependency list. Anything that can change afterwards goes through a `Compartment` (language, editable) or a ref (`onChange`, `onSubmit`), because rebuilding the view would throw away the document, the undo history and the cursor every time the schema finished loading.
+
+The `value` effect only dispatches when the prop and the document have actually diverged. Echoing every keystroke back would reset the cursor to the end of the document on each character.
+
+`onSubmit` receives **the document**, not the `value` prop. Typing and pressing Cmd+Enter in the same tick would otherwise run the text React had before its re-render - which is exactly what a test caught.
+
+Colours come from the app's CSS variables rather than a packaged theme, so the editor cannot drift when a token changes. Completion is fed by `useSqlSchema`, which reuses `db:schema-graph` (one call per schema, versus one per table for `tableDetails`) and fails silently: completion is an enhancement, and a schema the user cannot introspect should not put an error on a page that still runs queries.
+
+`buildSqlSchema` registers each table twice, qualified and bare, because real queries are written unqualified - and the default schema wins the bare name when two collide.
+
+### Frozen columns, and the Columns popover
+
+A sticky column needs an explicit `left` offset, which is the summed width of everything pinned before it - so freezing **pins a width** (`FROZEN_DEFAULT_WIDTH`) if the column has not been dragged to one, or the offsets drift as auto-sized columns re-measure. `orderColumns` moves pinned columns to the front inside `DataGrid` rather than at the call site, so the cursor and the clipboard both see the order on screen. The leading checkbox and row-number columns pin too, or a frozen data column slides over them at `left: 0`.
+
+The Columns control is a **Popover of plain buttons**, not a `DropdownMenu`. It started as the latter, and the pin nested inside a `DropdownMenuItem` toggled the column's visibility as well as pinning it: a menu item owns its whole row's activation, and `stopPropagation` on the child does not stop Radix's `onSelect`. Two sibling buttons cannot fight over a click. It also matches the filter picker's `SlidingHoverList`, which is the other list of columns in that bar.
+
+### Shortcuts overlay
+
+`config/shortcuts.ts` is the single list; `ShortcutsOverlay` renders it. The keys are implemented elsewhere, which is the usual way a help screen goes stale, so the list is data read by both and `tests/renderer/shortcuts-overlay.test.tsx` asserts every entry renders. `isTyping()` guards with `instanceof HTMLElement` rather than a cast - a keydown can be dispatched at the document, which has neither `tagName` nor `closest`.
+
+### Connection overview
+
+Replaces the "select a table" empty state (`db:overview` → one driver method each). Every size is nullable rather than zero: D1 exposes no size at all over the query API, and a Postgres role without the grant for `pg_database_size` should degrade to a null rather than fail the page. D1 substitutes real `count(*)` per table, affordable only because the list is capped at `OVERVIEW_TABLE_LIMIT`.
+
+`toCount` lives in `db/coerce.ts` because pg returns bigints as strings and mysql2 returns either.
+
+### Diagram layout
+
+Node positions are saved per connection+schema in `localStorage` and applied over a fresh auto-layout, so a table added since is left where auto-layout put it rather than stacked at the origin. Saved on drag **stop**, not on change - dragging emits a position change per frame. A layout with no usable positions reads as no layout at all, since restoring an empty one would stack every table on the origin.
+
 ### Connection persistence
 
 `src/main/store/connections-store.ts` writes a plain JSON file (`connections.json`) into Electron's `userData` directory. There is no `electron-store` dependency - it's hand-rolled. Sensitive fields (`password`, `apiToken`) are encrypted at rest via Electron `safeStorage` (`src/main/store/crypto.ts`) with an `enc:v1:` prefix; plaintext values are migrated to encrypted on read. If `safeStorage` is unavailable on the host (no OS keychain/DPAPI), it logs a warning and falls back to plaintext.

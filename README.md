@@ -11,15 +11,23 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 - **Multi-engine connections** - saved profiles per engine, credentials encrypted at rest via the OS keychain, testable before you connect.
 - **Schema browser** - schemas, tables, views, columns, indexes and foreign keys in a sidebar tree, with pinned tables and per-table actions.
 - **Data grid** - paginated rows with sorting, resizable columns, multi-row selection and foreign-key jumps. Row counts are exact rather than estimated wherever counting is affordable.
+- **Relationships both ways** - follow a foreign key out to its parent from any cell, and see from the row editor which rows in other tables reference the one you are editing, counted, with cascading deletes flagged.
+- **Connection overview** - connecting lands on the shape of the database: table and view counts, size, the largest tables, and your recent queries.
+- **Record view** - one row read top to bottom, with long values wrapped rather than truncated, links out along foreign keys, and the rows that reference it.
+- **Frozen columns** - pin up to three columns to the left edge so they stay put while a wide table scrolls.
+- **Keyboard and clipboard** - a cell cursor driven by the arrow keys, shift to extend a block, Enter to edit, and `Cmd+C` to copy it as spreadsheet-ready text (`Cmd+Shift+C` for JSON). Selected rows can be copied as JSON or as `INSERT` statements from the export menu.
+- **A view that stays put** - sort, page size, hidden columns, frozen columns and column widths are remembered per table.
+- **Shortcuts** - press `?` anywhere for the full list.
 - **Inline cell editing** - edit in place with type-aware editors (dropdowns for enums and booleans, a date picker for dates, an expanding pane for JSON and long text), keyboard navigation across cells, and undo on a committed edit.
 - **Filters** - pick a column, then build the predicate. Filters combine with AND or OR, live in the URL so a filtered view can be shared, and suggest real values from the column.
 - **Structure editing** - add, rename and drop columns, create and drop indexes, rename and truncate tables. Every statement is previewed before it runs.
-- **ERD diagram** - foreign-key relationships as a graph.
+- **ERD diagram** - foreign-key relationships as a graph, exportable as PNG or SVG. Drag the tables where you want them and the arrangement is remembered.
 - **Export** - the current view or a query result to JSON, CSV or Excel.
 
 **SQL**
 
-- **Query editor** - run ad-hoc SQL with a resizable results pane, per-connection history, and a draft that survives navigating away. Destructive statements ask before running.
+- **Query editor** - CodeMirror with SQL highlighting, line numbers and completion for your own tables and columns. Resizable results pane, a draft that survives navigating away, and destructive statements ask before running.
+- **Query library** - every run is kept per connection; star one to name it and keep it out of the history cap. Stored alongside your connections rather than in browser storage.
 - **Query log** - every statement the app issues, filterable to just the ones you ran.
 
 **AI (optional)**
