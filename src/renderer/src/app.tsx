@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@renderer/components/layout/app-shell'
+import { ShortcutsOverlay } from '@renderer/components/common/shortcuts-overlay'
 import { ToastProvider } from '@renderer/components/ui/toast'
 import { ConnectionProvider } from '@renderer/features/connections/store/connection-store'
 import { CommandPaletteProvider } from '@renderer/features/command-palette/store'
@@ -30,6 +31,7 @@ function App() {
                 <Route path="*" element={<Navigate to={ROUTES.connections} replace />} />
               </Routes>
             </AppShell>
+            <ShortcutsOverlay />
           </CommandPaletteProvider>
         </UpdateCheckProvider>
       </ConnectionProvider>
