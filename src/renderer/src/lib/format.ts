@@ -5,10 +5,13 @@ export function isBinaryValue(value: unknown): value is Uint8Array {
   return value instanceof Uint8Array
 }
 
-function formatBytes(byteLength: number): string {
+export function formatBytes(byteLength: number): string {
   if (byteLength < 1024) return `${byteLength} B`
   if (byteLength < 1024 * 1024) return `${(byteLength / 1024).toFixed(1)} kB`
-  return `${(byteLength / (1024 * 1024)).toFixed(1)} MB`
+  if (byteLength < 1024 ** 3) return `${(byteLength / 1024 ** 2).toFixed(1)} MB`
+  // Databases run past a gigabyte routinely, where "13312.0 MB" is unreadable.
+  if (byteLength < 1024 ** 4) return `${(byteLength / 1024 ** 3).toFixed(1)} GB`
+  return `${(byteLength / 1024 ** 4).toFixed(1)} TB`
 }
 
 /**

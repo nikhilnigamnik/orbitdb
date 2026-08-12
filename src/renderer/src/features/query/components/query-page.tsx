@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  IconClock,
   IconGripHorizontal,
   IconHistory,
   IconPlayerPlay,
@@ -10,7 +9,6 @@ import {
   IconTrash,
   IconSparkles
 } from '@tabler/icons-react'
-import { formatDistanceToNow } from 'date-fns'
 import { Button } from '@renderer/components/ui/button'
 import { Kbd } from '@renderer/components/ui/kbd'
 import { Sheet } from '@renderer/components/ui/sheet'
@@ -24,29 +22,19 @@ import { DEFAULT_QUERY } from '@renderer/config/site'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { findDestructiveStatements } from '@renderer/lib/sql-danger'
 import { CmdKHint } from '@renderer/features/command-palette/components/cmdk-hint'
-import type { QueryResult } from '@renderer/types'
+import { errorMessage } from '@renderer/lib/errors'
+import type { QueryResult, SavedQuery, SavedQueryPatch } from '@renderer/types'
 import { SqlEditor } from './sql-editor'
 import { QueryResults } from './query-results'
 import { AiPrompt } from './ai-prompt'
-
-interface HistoryEntry {
-  id: string
-  sql: string
-  ranAt: string
-  durationMs: number
-  success: boolean
-}
+import { QueryLibrarySheet } from './query-library-sheet'
+import { useSqlSchema } from '../hooks/use-sql-schema'
 
 const MIN_PANEL_PCT = 15
 const MAX_PANEL_PCT = 85
-const MAX_HISTORY = 50
 
 function draftKey(connectionId: string): string {
   return `orbitdb:query-draft:${connectionId}`
-}
-
-function historyKey(connectionId: string): string {
-  return `orbitdb:query-history:${connectionId}`
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -73,10 +61,11 @@ export function QueryPage() {
   const engine = current?.engine ?? 'postgres'
   const toast = useToast()
   const [sql, setSql] = React.useState('')
+  const completionSchema = useSqlSchema(connectionId)
   const [result, setResult] = React.useState<QueryResult | null>(null)
   const [isRunning, setIsRunning] = React.useState(false)
   const runningQueryIdRef = React.useRef<string | null>(null)
-  const [history, setHistory] = React.useState<HistoryEntry[]>([])
+  const [queries, setQueries] = React.useState<SavedQuery[]>([])
   const [pendingRun, setPendingRun] = React.useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [isAiOpen, setIsAiOpen] = React.useState(false)
@@ -85,12 +74,12 @@ export function QueryPage() {
   const [isDragging, setIsDragging] = React.useState(false)
   const splitRef = React.useRef<HTMLDivElement>(null)
 
-  // Both used to live only in component state, so switching tabs threw away the
-  // query you were writing and everything you had run.
+  // The draft stays in localStorage: it is the unsaved text of one window, and
+  // has no meaning outside the session that typed it. History does not - it
+  // lives in main, next to the other stores.
   React.useEffect(() => {
     if (!connectionId) return
     setSql(readJson(draftKey(connectionId), DEFAULT_QUERY[engine]))
-    setHistory(readJson<HistoryEntry[]>(historyKey(connectionId), []))
   }, [connectionId, engine])
 
   React.useEffect(() => {
@@ -98,10 +87,18 @@ export function QueryPage() {
     writeJson(draftKey(connectionId), sql)
   }, [connectionId, sql])
 
-  React.useEffect(() => {
+  const loadQueries = React.useCallback(async () => {
     if (!connectionId) return
-    writeJson(historyKey(connectionId), history)
-  }, [connectionId, history])
+    try {
+      setQueries(await unwrap(window.api.queries.list(connectionId)))
+    } catch (err) {
+      console.error('Failed to read saved queries', err)
+    }
+  }, [connectionId])
+
+  React.useEffect(() => {
+    void loadQueries()
+  }, [loadQueries])
 
   React.useEffect(() => {
     if (!isDragging) return
@@ -151,18 +148,7 @@ export function QueryPage() {
         window.api.db.runQuery({ connectionId: active!.connectionId, sql: trimmed, queryId })
       )
       setResult(queryResult)
-      setHistory((prev) =>
-        [
-          {
-            id: crypto.randomUUID(),
-            sql: trimmed,
-            ranAt: new Date().toISOString(),
-            durationMs: queryResult.durationMs,
-            success: queryResult.success
-          },
-          ...prev
-        ].slice(0, MAX_HISTORY)
-      )
+      await recordRun(trimmed, queryResult.durationMs, queryResult.success)
     } catch (err) {
       setResult({
         success: false,
@@ -177,6 +163,45 @@ export function QueryPage() {
     } finally {
       setIsRunning(false)
       runningQueryIdRef.current = null
+    }
+  }
+
+  /** Bookkeeping must never cost the user their result, so a failed write is logged and dropped. */
+  async function recordRun(sql: string, durationMs: number, success: boolean) {
+    try {
+      await unwrap(
+        window.api.queries.record({ connectionId: active!.connectionId, sql, durationMs, success })
+      )
+      await loadQueries()
+    } catch (err) {
+      console.error('Failed to record query', err)
+    }
+  }
+
+  async function patchQuery(query: SavedQuery, patch: SavedQueryPatch) {
+    try {
+      await unwrap(window.api.queries.update(query.id, patch))
+      await loadQueries()
+    } catch (err) {
+      toast.error('Could not update the query', { description: errorMessage(err) })
+    }
+  }
+
+  async function removeQuery(query: SavedQuery) {
+    try {
+      await unwrap(window.api.queries.delete(query.id))
+      await loadQueries()
+    } catch (err) {
+      toast.error('Could not delete the query', { description: errorMessage(err) })
+    }
+  }
+
+  async function clearHistory() {
+    try {
+      await unwrap(window.api.queries.clearHistory(active!.connectionId))
+      await loadQueries()
+    } catch (err) {
+      toast.error('Could not clear history', { description: errorMessage(err) })
     }
   }
 
@@ -275,66 +300,17 @@ export function QueryPage() {
             side="right"
             sheetContentClassName="bg-surface"
             content={
-              <div className="flex h-full min-h-0 flex-col">
-                <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2 pr-12">
-                  <div className="flex items-center gap-1.5">
-                    <IconHistory size={12} className="text-text-subtle" />
-                    <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-                      History
-                    </span>
-                    {history.length > 0 && (
-                      <span className="rounded bg-surface-elevated px-1 py-0 font-mono text-xs text-text-subtle">
-                        {history.length}
-                      </span>
-                    )}
-                  </div>
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    className="text-text-subtle hover:bg-surface-elevated hover:text-danger"
-                    onClick={() => setHistory([])}
-                    disabled={history.length === 0}
-                    aria-label="Clear history"
-                  >
-                    <IconTrash size={12} />
-                  </Button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-auto">
-                  {history.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-                      <IconClock size={18} className="text-text-subtle/60" />
-                      <p className="text-xs text-text-subtle">No history yet</p>
-                    </div>
-                  ) : (
-                    history.map((entry) => (
-                      <button
-                        key={entry.id}
-                        onClick={() => {
-                          setSql(entry.sql)
-                          setHistoryOpen(false)
-                        }}
-                        className="group/entry block w-full cursor-pointer border-b border-border/60 px-3 py-2 text-left transition-colors hover:bg-surface-elevated/50"
-                      >
-                        <p
-                          className={cn(
-                            'line-clamp-2 font-mono text-xs leading-snug',
-                            entry.success ? 'text-text' : 'text-danger'
-                          )}
-                        >
-                          {entry.sql}
-                        </p>
-                        <div className="mt-1 flex items-center gap-2 text-xs text-text-subtle">
-                          <span className="font-mono">{entry.durationMs} ms</span>
-                          <span className="text-text-subtle/60">·</span>
-                          <span>
-                            {formatDistanceToNow(new Date(entry.ranAt), { addSuffix: true })}
-                          </span>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
+              <QueryLibrarySheet
+                queries={queries}
+                onPick={(picked) => {
+                  setSql(picked)
+                  setHistoryOpen(false)
+                }}
+                onToggleStar={(query) => void patchQuery(query, { isStarred: !query.isStarred })}
+                onRename={(query, name) => void patchQuery(query, { name })}
+                onDelete={(query) => void removeQuery(query)}
+                onClearHistory={() => void clearHistory()}
+              />
             }
           >
             <Button
@@ -346,10 +322,10 @@ export function QueryPage() {
               )}
             >
               <IconHistory size={12} />
-              History
-              {history.length > 0 && (
+              Queries
+              {queries.length > 0 && (
                 <span className="ml-0.5 rounded bg-surface px-1 py-0 font-mono text-xs text-text-subtle">
-                  {history.length}
+                  {queries.length}
                 </span>
               )}
             </Button>
@@ -388,7 +364,14 @@ export function QueryPage() {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div ref={splitRef} className="flex min-w-0 flex-1 flex-col">
           <div className="min-h-0 overflow-hidden" style={{ height: `${editorPct}%` }}>
-            <SqlEditor value={sql} onChange={setSql} onSubmit={runQuery} disabled={isRunning} />
+            <SqlEditor
+              value={sql}
+              onChange={setSql}
+              onSubmit={(text) => requestRun(text)}
+              disabled={isRunning}
+              engine={engine}
+              schema={completionSchema}
+            />
           </div>
 
           <div

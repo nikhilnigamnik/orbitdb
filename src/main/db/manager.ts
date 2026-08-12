@@ -1,11 +1,13 @@
 import type {
   ConnectionInput,
+  ConnectionOverview,
   CountRowsOptions,
   DatabaseEngine,
   DdlRequest,
   DistinctValuesOptions,
   GetRowsOptions,
   QueryResult,
+  ReferencingKeyInfo,
   RowDelete,
   RowMutation,
   RowUpdate,
@@ -72,6 +74,18 @@ export function tableDetails(
   table: string
 ): Promise<TableDetails> {
   return driverForConnection(connectionId).tableDetails(connectionId, schema, table)
+}
+
+export function getOverview(connectionId: string): Promise<ConnectionOverview> {
+  return driverForConnection(connectionId).getOverview(connectionId)
+}
+
+export function referencingKeys(
+  connectionId: string,
+  schema: string,
+  table: string
+): Promise<ReferencingKeyInfo[]> {
+  return driverForConnection(connectionId).referencingKeys(connectionId, schema, table)
 }
 
 export function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {

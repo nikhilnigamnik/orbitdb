@@ -18,6 +18,7 @@ import {
   isNumericType,
   stringifyValue
 } from '../lib/cell-value'
+import { ReferencedBy } from './referenced-by'
 
 type Mode = 'insert' | 'edit'
 
@@ -28,6 +29,10 @@ interface RowEditorSheetProps {
   columns: ColumnInfo[]
   initialValues?: Record<string, unknown> | null
   onSubmit: (values: Record<string, unknown>) => Promise<void>
+  /** Identifies the row well enough to look up what references it. Edit mode only. */
+  connectionId?: string
+  schema?: string
+  table?: string
 }
 
 interface FieldState {
@@ -58,7 +63,10 @@ export function RowEditorSheet({
   mode,
   columns,
   initialValues,
-  onSubmit
+  onSubmit,
+  connectionId,
+  schema,
+  table
 }: RowEditorSheetProps) {
   const [fields, setFields] = React.useState<Record<string, FieldState>>(() =>
     buildInitialFields(columns, initialValues)
@@ -205,6 +213,17 @@ export function RowEditorSheet({
               <p className="rounded-lg border border-danger/30 bg-danger/10 p-2 font-mono text-xs text-danger">
                 {error}
               </p>
+            )}
+
+            {/* Insert has no row yet, so nothing can reference it. */}
+            {mode === 'edit' && connectionId && schema && table && initialValues && (
+              <ReferencedBy
+                connectionId={connectionId}
+                schema={schema}
+                table={table}
+                row={initialValues}
+                onNavigate={onClose}
+              />
             )}
           </div>
 

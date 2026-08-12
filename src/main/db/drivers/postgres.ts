@@ -4,6 +4,8 @@ import { detectCommand, isSchemaChanging } from '../sql-command'
 import {
   MAX_EXACT_COUNT_ROWS,
   MAX_QUERY_RESULT_ROWS,
+  OVERVIEW_TABLE_LIMIT,
+  type ConnectionOverview,
   type CountRowsOptions,
   type ColumnInfo,
   type ConnectionInput,
@@ -13,6 +15,7 @@ import {
   type GetRowsOptions,
   type IndexInfo,
   type QueryResult,
+  type ReferencingKeyInfo,
   type RowDelete,
   type RowMutation,
   type RowUpdate,
@@ -29,6 +32,7 @@ import {
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
+import { toCount } from '../coerce'
 import { buildOrderBySql } from '../order-by'
 import { buildFilterSql, type FilterDialect } from '../filters'
 import type { ActiveMeta, DatabaseDriver } from './types'
@@ -412,6 +416,76 @@ async function tableDetails(
   return result
 }
 
+/**
+ * The same constraint catalogue as `tableDetails`, filtered on the referenced
+ * side instead of the referencing one, so it finds the children pointing here.
+ * Not folded into `tableDetails`: that result is cached per table and this scans
+ * every constraint in the database, which is a cost the data grid should not pay
+ * on every table it opens.
+ */
+async function referencingKeys(
+  connectionId: string,
+  schema: string,
+  table: string
+): Promise<ReferencingKeyInfo[]> {
+  const pool = getPool(connectionId)
+  const res = await pool.query<{
+    name: string
+    child_schema: string
+    child_table: string
+    columns: string[]
+    referenced_columns: string[]
+    on_delete: string
+    on_update: string
+  }>(
+    `select con.conname as name,
+            n.nspname as child_schema,
+            c.relname as child_table,
+            array_agg(a.attname::text order by k.ord) as columns,
+            array_agg(ra.attname::text order by k.ord) as referenced_columns,
+            case con.confdeltype
+              when 'a' then 'NO ACTION'
+              when 'r' then 'RESTRICT'
+              when 'c' then 'CASCADE'
+              when 'n' then 'SET NULL'
+              when 'd' then 'SET DEFAULT'
+              else 'NO ACTION'
+            end as on_delete,
+            case con.confupdtype
+              when 'a' then 'NO ACTION'
+              when 'r' then 'RESTRICT'
+              when 'c' then 'CASCADE'
+              when 'n' then 'SET NULL'
+              when 'd' then 'SET DEFAULT'
+              else 'NO ACTION'
+            end as on_update
+       from pg_constraint con
+       join pg_class c on c.oid = con.conrelid
+       join pg_namespace n on n.oid = c.relnamespace
+       join pg_class rc on rc.oid = con.confrelid
+       join pg_namespace rn on rn.oid = rc.relnamespace
+       join lateral unnest(con.conkey) with ordinality as k(attnum, ord) on true
+       join pg_attribute a on a.attrelid = con.conrelid and a.attnum = k.attnum
+       join lateral unnest(con.confkey) with ordinality as rk(attnum, ord) on rk.ord = k.ord
+       join pg_attribute ra on ra.attrelid = con.confrelid and ra.attnum = rk.attnum
+      where con.contype = 'f' and rn.nspname = $1 and rc.relname = $2
+      group by con.conname, n.nspname, c.relname, con.confdeltype, con.confupdtype
+      order by n.nspname, c.relname, con.conname`,
+    [schema, table]
+  )
+  return res.rows.map((r) => ({
+    name: r.name,
+    schema: r.child_schema,
+    table: r.child_table,
+    columns: r.columns,
+    referencedSchema: schema,
+    referencedTable: table,
+    referencedColumns: r.referenced_columns,
+    onDelete: r.on_delete,
+    onUpdate: r.on_update
+  }))
+}
+
 function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`
 }
@@ -681,6 +755,65 @@ async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]
   return res.rows.map((r) => r.value)
 }
 
+async function getOverview(connectionId: string): Promise<ConnectionOverview> {
+  const pool = getPool(connectionId)
+  const systemFilter = SYSTEM_SCHEMAS.map((_, i) => `$${i + 1}`).join(', ')
+
+  const [meta, counts, tables] = await Promise.all([
+    pool.query<{ database: string; version: string; size: string | null }>(
+      // pg_database_size needs CONNECT on the database, which the current user
+      // has by definition - but a restricted role can still be refused, so it
+      // is read separately from the counts and allowed to be null.
+      `select current_database() as database,
+              version() as version,
+              pg_database_size(current_database())::text as size`
+    ),
+    pool.query<{ schemas: string; tables: string; views: string }>(
+      `select count(distinct n.nspname)::text as schemas,
+              count(*) filter (where c.relkind in ('r','p'))::text as tables,
+              count(*) filter (where c.relkind in ('v','m'))::text as views
+         from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname not in (${systemFilter})
+          and n.nspname not like 'pg_temp_%'
+          and c.relkind in ('r','p','v','m')`,
+      SYSTEM_SCHEMAS
+    ),
+    pool.query<{ schema: string; name: string; bytes: string; estimated_rows: string | null }>(
+      `select n.nspname as schema,
+              c.relname as name,
+              pg_total_relation_size(c.oid)::text as bytes,
+              case when c.reltuples >= 0 then c.reltuples::bigint::text else null end
+                as estimated_rows
+         from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname not in (${systemFilter})
+          and n.nspname not like 'pg_temp_%'
+          and c.relkind in ('r','p')
+        order by pg_total_relation_size(c.oid) desc
+        limit ${OVERVIEW_TABLE_LIMIT}`,
+      SYSTEM_SCHEMAS
+    )
+  ])
+
+  const row = meta.rows[0]
+  const countRow = counts.rows[0]
+  return {
+    databaseName: row?.database ?? '',
+    serverVersion: row?.version ?? '',
+    schemaCount: toCount(countRow?.schemas),
+    tableCount: toCount(countRow?.tables),
+    viewCount: toCount(countRow?.views),
+    totalBytes: row?.size == null ? null : toCount(row.size),
+    largestTables: tables.rows.map((t) => ({
+      schema: t.schema,
+      name: t.name,
+      bytes: toCount(t.bytes),
+      estimatedRows: t.estimated_rows == null ? null : toCount(t.estimated_rows)
+    }))
+  }
+}
+
 async function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
   const pool = getPool(connectionId)
 
@@ -799,6 +932,7 @@ export const postgresDriver: DatabaseDriver = {
   listSchemas,
   listTables,
   tableDetails,
+  referencingKeys,
   getSchemaGraph,
   getRows,
   countRows,
@@ -809,5 +943,6 @@ export const postgresDriver: DatabaseDriver = {
   executeDdl,
   runQuery,
   cancelQuery,
-  getColumnDistinct
+  getColumnDistinct,
+  getOverview
 }

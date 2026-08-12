@@ -1,10 +1,12 @@
 import type {
   ConnectionInput,
+  ConnectionOverview,
   DdlRequest,
   DistinctValuesOptions,
   CountRowsOptions,
   GetRowsOptions,
   QueryResult,
+  ReferencingKeyInfo,
   RowDelete,
   RowMutation,
   RowUpdate,
@@ -30,9 +32,17 @@ export interface DatabaseDriver {
   disconnectPool(connectionId: string): Promise<void>
   disconnectAll(): Promise<void>
 
+  /** A glance at the whole connection: counts, size, and where the weight is. */
+  getOverview(connectionId: string): Promise<ConnectionOverview>
   listSchemas(connectionId: string): Promise<SchemaInfo[]>
   listTables(connectionId: string, schema: string): Promise<TableInfo[]>
   tableDetails(connectionId: string, schema: string, table: string): Promise<TableDetails>
+  /** Foreign keys pointing *at* this table, i.e. the children that depend on its rows. */
+  referencingKeys(
+    connectionId: string,
+    schema: string,
+    table: string
+  ): Promise<ReferencingKeyInfo[]>
   getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph>
 
   getRows(opts: GetRowsOptions): Promise<RowsResult>

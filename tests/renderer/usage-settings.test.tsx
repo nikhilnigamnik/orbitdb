@@ -195,12 +195,12 @@ describe('the timeframe', () => {
 describe('with nothing recorded', () => {
   it('says so instead of showing a table of zeros', async () => {
     setup(EMPTY)
-    expect(await screen.findByText(/Nothing recorded yet/)).toBeTruthy()
+    expect(await screen.findByText(/No AI usage yet/)).toBeTruthy()
   })
 
   it('offers nothing to clear', async () => {
     setup(EMPTY)
-    await screen.findByText(/Nothing recorded yet/)
+    await screen.findByText(/No AI usage yet/)
 
     expect(screen.getByText('Clear').closest('button')!.disabled).toBe(true)
   })

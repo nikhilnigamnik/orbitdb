@@ -1,3 +1,4 @@
+import { tableRoute } from '@renderer/config/routes'
 import type { FilterJoin, RowFilter } from '@renderer/types'
 import { OPERATORS } from './filter-editor'
 
@@ -43,4 +44,15 @@ export function decodeFilters(raw: string | null): RowFilter[] {
 
 export function decodeJoin(raw: string | null): FilterJoin {
   return raw === 'or' ? 'or' : 'and'
+}
+
+/**
+ * A table route already narrowed to some rows. Uses the filters param rather
+ * than the single-column `fkColumn`/`fkValue` pair, so a composite key links as
+ * precisely as a simple one.
+ */
+export function tableRouteWithFilters(schema: string, table: string, filters: RowFilter[]): string {
+  const encoded = encodeFilters(filters)
+  if (!encoded) return tableRoute(schema, table)
+  return `${tableRoute(schema, table)}&${FILTERS_PARAM}=${encodeURIComponent(encoded)}`
 }

@@ -13,10 +13,12 @@ import type {
   GenerateSeedOptions,
   GenerateSqlOptions,
   GetRowsOptions,
+  RecordQueryRun,
   RowDelete,
   RowMutation,
   RowUpdate,
   RunQueryOptions,
+  SavedQueryPatch,
   SuggestIndexesOptions
 } from '../../shared/types'
 import { generateSql } from '../ai/generate-sql'
@@ -28,6 +30,13 @@ import { resetModelCache } from '../ai/client'
 import { testAiKey } from '../ai/test-key'
 import { AI_PROVIDERS } from '../../shared/ai-models'
 import { clearUsage, getUsageSummary } from '../store/usage-store'
+import {
+  clearQueryHistory,
+  deleteQuery,
+  listQueries,
+  recordQueryRun,
+  updateQuery
+} from '../store/queries-store'
 import {
   clearAiApiKey,
   getActiveProvider,
@@ -54,11 +63,13 @@ import {
   executeDdl,
   generateDdl,
   getColumnDistinct,
+  getOverview,
   getRows,
   getSchemaGraph,
   insertRow,
   listSchemas,
   listTables,
+  referencingKeys,
   runQuery,
   tableDetails,
   testConnection,
@@ -126,6 +137,10 @@ export function registerIpcHandlers(): void {
     })
   )
   ipcMain.handle(
+    'db:overview',
+    wrap(async (connectionId: string) => getOverview(connectionId))
+  )
+  ipcMain.handle(
     'db:list-schemas',
     wrap(async (connectionId: string) => listSchemas(connectionId))
   )
@@ -137,6 +152,12 @@ export function registerIpcHandlers(): void {
     'db:table-details',
     wrap(async (connectionId: string, schema: string, table: string) =>
       tableDetails(connectionId, schema, table)
+    )
+  )
+  ipcMain.handle(
+    'db:referencing-keys',
+    wrap(async (connectionId: string, schema: string, table: string) =>
+      referencingKeys(connectionId, schema, table)
     )
   )
   ipcMain.handle(
@@ -269,6 +290,31 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'settings:test-ai',
     wrap(async (provider: string) => testAiKey(provider))
+  )
+
+  ipcMain.handle(
+    'queries:list',
+    wrap(async (connectionId: string) => listQueries(connectionId))
+  )
+  ipcMain.handle(
+    'queries:record',
+    wrap(async (input: RecordQueryRun) => recordQueryRun(input))
+  )
+  ipcMain.handle(
+    'queries:update',
+    wrap(async (id: string, patch: SavedQueryPatch) => updateQuery(id, patch))
+  )
+  ipcMain.handle(
+    'queries:delete',
+    wrap(async (id: string) => {
+      deleteQuery(id)
+    })
+  )
+  ipcMain.handle(
+    'queries:clear-history',
+    wrap(async (connectionId: string) => {
+      clearQueryHistory(connectionId)
+    })
   )
 
   ipcMain.handle(

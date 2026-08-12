@@ -35,11 +35,20 @@ import {
   type FilterQueryState
 } from '@renderer/features/tables/lib/load-error-action'
 import { buildFilterSuggestions } from '@renderer/features/tables/lib/filter-suggestions'
-import { DEFAULT_PAGE_SIZE, UNDO_PROMPT_MS } from '@renderer/config/site'
+import {
+  MAX_FROZEN_COLUMNS,
+  loadViewPrefs,
+  saveViewPrefs,
+  toggleFrozenColumn,
+  toggleHiddenColumn,
+  type TableViewPrefs
+} from '@renderer/features/tables/lib/view-prefs'
+import { UNDO_PROMPT_MS } from '@renderer/config/site'
 import { ROUTES, tableRouteWithFk } from '@renderer/config/routes'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import type {
   ColumnInfo,
+  DatabaseEngine,
   FilterJoin,
   RowFilter,
   RowsResult,
@@ -52,10 +61,15 @@ import { TableOverflowMenu } from './table-overflow-menu'
 import { FiltersBar } from './filters-bar'
 import { PaginationBar } from './pagination-bar'
 import { RowEditorSheet } from './row-editor-sheet'
+import { RecordViewSheet } from './record-view-sheet'
+import { ColumnVisibilityMenu } from './column-visibility-menu'
+import type { CopyFormat } from '../hooks/use-grid-cursor'
 
 interface TableDataViewProps {
   connectionId: string
   details: TableDetails
+  /** Decides the quoting used by `copy as INSERT`. */
+  engine?: DatabaseEngine
   /** Opens the DDL rename dialog (table-only); surfaced in the overflow menu. */
   onRenameTable?: () => void
   /** Fires once the first page of rows has loaded, so the container can reveal chrome. */
@@ -64,9 +78,16 @@ interface TableDataViewProps {
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
+const COPY_FORMAT_LABEL: Record<CopyFormat, string> = {
+  tsv: 'text',
+  json: 'JSON',
+  sql: 'SQL'
+}
+
 export function TableDataView({
   connectionId,
   details,
+  engine = 'postgres',
   onRenameTable,
   onReady
 }: TableDataViewProps) {
@@ -85,9 +106,14 @@ export function TableDataView({
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [offset, setOffset] = React.useState(0)
-  const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE)
-  const [orderBy, setOrderBy] = React.useState<string | null>(null)
-  const [orderDir, setOrderDir] = React.useState<SortDirection>('asc')
+  // Sort, page size, hidden columns and widths are remembered per table, so a
+  // view you set up is still set up next time you open it.
+  const [prefs, setPrefs] = React.useState<TableViewPrefs>(() =>
+    loadViewPrefs(connectionId, details.schema, details.name)
+  )
+  const [pageSize, setPageSize] = React.useState(prefs.pageSize)
+  const [orderBy, setOrderBy] = React.useState<string | null>(prefs.orderBy)
+  const [orderDir, setOrderDir] = React.useState<SortDirection>(prefs.orderDir)
   // Filters live in the URL so a filtered view can be linked and reopened -
   // an FK deep link already worked that way while a hand-built filter did not.
   const [filters, setFiltersState] = React.useState<RowFilter[]>(() => {
@@ -183,6 +209,8 @@ export function TableDataView({
   }, [openAiPrompt])
   const insertModal = useDisclosure(false)
   const editModal = useDisclosure(false)
+  const recordView = useDisclosure(false)
+  const [inspectingRow, setInspectingRow] = React.useState<Record<string, unknown> | null>(null)
   const deleteConfirm = useDisclosure(false)
   const bulkDeleteConfirm = useDisclosure(false)
   const [editingRow, setEditingRow] = React.useState<Record<string, unknown> | null>(null)
@@ -354,17 +382,29 @@ export function TableDataView({
 
   revertRef.current = revertToLastGood
 
+  // Only on an actual table change. The container keys this component by table,
+  // so in practice a switch remounts and this never fires - but it must not fire
+  // on mount either, because clearing the filters there throws away the ones a
+  // deep link arrived with, and an FK jump is exactly that.
+  const loadedForRef = React.useRef(`${details.schema}.${details.name}`)
   React.useEffect(() => {
+    const tableKey = `${details.schema}.${details.name}`
+    if (loadedForRef.current === tableKey) return
+    loadedForRef.current = tableKey
+
+    const restored = loadViewPrefs(connectionId, details.schema, details.name)
+    setPrefs(restored)
     setOffset(0)
-    setOrderBy(null)
-    setOrderDir('asc')
+    setOrderBy(restored.orderBy)
+    setOrderDir(restored.orderDir)
+    setPageSize(restored.pageSize)
     setFilters([])
     setRows([])
     setRowSelection({})
     setHasLoadedOnce(false)
     hasLoadedOnceRef.current = false
     prefetchCacheRef.current = null
-  }, [details.schema, details.name])
+  }, [connectionId, details.schema, details.name])
 
   React.useEffect(() => {
     void load()
@@ -403,18 +443,38 @@ export function TableDataView({
     if (hasLoadedOnce) onReadyRef.current?.()
   }, [hasLoadedOnce])
 
-  function handleSort(column: string) {
-    if (orderBy !== column) {
-      setOrderBy(column)
-      setOrderDir('asc')
-    } else if (orderDir === 'asc') {
-      setOrderDir('desc')
-    } else {
-      setOrderBy(null)
-      setOrderDir('asc')
-    }
-    setOffset(0)
+  /**
+   * Writes the view preferences through. Called at each mutation point rather
+   * than from an effect watching the state: on a table change the effect would
+   * still be holding the previous table's sort and would save it under the new
+   * table's key.
+   */
+  function persistPrefs(patch: Partial<TableViewPrefs>) {
+    const next: TableViewPrefs = { ...prefs, orderBy, orderDir, pageSize, ...patch }
+    setPrefs(next)
+    saveViewPrefs(connectionId, details.schema, details.name, next)
   }
+
+  function handleSort(column: string) {
+    let nextOrderBy: string | null = column
+    let nextOrderDir: SortDirection = 'asc'
+    if (orderBy === column) {
+      if (orderDir === 'asc') {
+        nextOrderDir = 'desc'
+      } else {
+        nextOrderBy = null
+      }
+    }
+    setOrderBy(nextOrderBy)
+    setOrderDir(nextOrderDir)
+    setOffset(0)
+    persistPrefs({ orderBy: nextOrderBy, orderDir: nextOrderDir })
+  }
+
+  const visibleColumns = React.useMemo(
+    () => columns.filter((column) => !prefs.hiddenColumns.includes(column.name)),
+    [columns, prefs.hiddenColumns]
+  )
 
   async function handleAiFilter(prompt: string) {
     setIsAiFiltering(true)
@@ -690,6 +750,30 @@ export function TableDataView({
               <Kbd>I</Kbd>
             </span>
           </button>
+          <ColumnVisibilityMenu
+            columns={columns}
+            hiddenColumns={prefs.hiddenColumns}
+            frozenColumns={prefs.frozenColumns}
+            canFreezeMore={prefs.frozenColumns.length < MAX_FROZEN_COLUMNS}
+            onToggle={(column) =>
+              persistPrefs({
+                hiddenColumns: toggleHiddenColumn(
+                  prefs.hiddenColumns,
+                  column,
+                  columns.map((c) => c.name)
+                ),
+                // A hidden column cannot stay pinned to the left of a grid it
+                // is no longer in.
+                frozenColumns: prefs.hiddenColumns.includes(column)
+                  ? prefs.frozenColumns
+                  : prefs.frozenColumns.filter((c) => c !== column)
+              })
+            }
+            onToggleFrozen={(column) =>
+              persistPrefs({ frozenColumns: toggleFrozenColumn(prefs.frozenColumns, column) })
+            }
+            onShowAll={() => persistPrefs({ hiddenColumns: [] })}
+          />
           {details.type === 'table' && (
             <Button
               size="sm"
@@ -726,7 +810,7 @@ export function TableDataView({
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <DataGrid
-          columns={columns}
+          columns={visibleColumns}
           rows={rows}
           orderBy={orderBy}
           orderDir={orderDir}
@@ -734,6 +818,10 @@ export function TableDataView({
           onEditRow={(row) => {
             setEditingRow(row)
             editModal.open()
+          }}
+          onInspectRow={(row) => {
+            setInspectingRow(row)
+            recordView.open()
           }}
           onDeleteRow={(row) => {
             setPendingDelete(row)
@@ -749,6 +837,16 @@ export function TableDataView({
           fkColumns={fkByColumn}
           onOpenForeignKey={openForeignKey}
           pendingUndoRow={pendingUndoRow}
+          insertTarget={{ schema: details.schema, table: details.name, engine }}
+          columnSizing={prefs.columnSizing}
+          frozenColumns={prefs.frozenColumns}
+          onColumnSizingCommit={(columnSizing) => persistPrefs({ columnSizing })}
+          onCopied={(format, cellCount) =>
+            toast.success(
+              `Copied ${cellCount} cell${cellCount === 1 ? '' : 's'} as ${COPY_FORMAT_LABEL[format]}`
+            )
+          }
+          onCopyFailed={(err) => toast.error('Could not copy', { description: errorMessage(err) })}
           hasFilters={filters.length > 0}
           onClearFilters={() => {
             setFilters([])
@@ -819,10 +917,19 @@ export function TableDataView({
               </Button>
               <ExportMenu
                 rows={selectedRows}
-                columns={columns.map((c) => c.name)}
+                columns={visibleColumns.map((c) => c.name)}
                 filenameParts={[details.schema, details.name]}
                 side="top"
                 align="center"
+                insertTarget={{ schema: details.schema, table: details.name, engine }}
+                onCopied={(label) =>
+                  toast.success(
+                    `Copied ${selectedCount} row${selectedCount === 1 ? '' : 's'} as ${label}`
+                  )
+                }
+                onCopyFailed={(err) =>
+                  toast.error('Could not copy', { description: errorMessage(err) })
+                }
               >
                 <Button
                   size="sm"
@@ -861,6 +968,7 @@ export function TableDataView({
         onChangePageSize={(size) => {
           setPageSize(size)
           setOffset(0)
+          persistPrefs({ pageSize: size })
         }}
       />
 
@@ -882,6 +990,32 @@ export function TableDataView({
         onApplied={load}
       />
 
+      <RecordViewSheet
+        isOpen={recordView.isOpen}
+        onClose={recordView.close}
+        connectionId={connectionId}
+        schema={details.schema}
+        table={details.name}
+        columns={columns}
+        row={inspectingRow}
+        foreignKeys={details.foreignKeys}
+        onOpenForeignKey={(column, value) => {
+          recordView.close()
+          openForeignKey(column, value)
+        }}
+        onEdit={
+          canMutate
+            ? (row) => {
+                recordView.close()
+                setEditingRow(row)
+                editModal.open()
+              }
+            : undefined
+        }
+        onCopied={(label) => toast.success(`Copied the record as ${label}`)}
+        onCopyFailed={(err) => toast.error('Could not copy', { description: errorMessage(err) })}
+      />
+
       <RowEditorSheet
         isOpen={insertModal.isOpen}
         onClose={insertModal.close}
@@ -897,6 +1031,9 @@ export function TableDataView({
         columns={columns}
         initialValues={editingRow}
         onSubmit={handleUpdate}
+        connectionId={connectionId}
+        schema={details.schema}
+        table={details.name}
       />
 
       <ConfirmDialog

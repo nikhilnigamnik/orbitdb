@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { IconJson, IconFileTypeCsv, IconFileTypeXls } from '@tabler/icons-react'
+import { IconJson, IconFileTypeCsv, IconFileTypeXls, IconClipboard } from '@tabler/icons-react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -13,6 +13,7 @@ import {
   downloadXlsx,
   type ExportFormat
 } from '@renderer/lib/export'
+import { toInsertSql, toJsonText, toTsv, type InsertTarget } from '../lib/clipboard-format'
 
 interface ExportMenuProps {
   /** Rows to export, already resolved (e.g. current page or current selection). */
@@ -25,6 +26,13 @@ interface ExportMenuProps {
   children: React.ReactNode
   align?: 'start' | 'end' | 'center'
   side?: 'top' | 'bottom' | 'left' | 'right'
+  /**
+   * Enables the clipboard entries. The grid's own Cmd+C covers a cell range;
+   * these act on whole rows, which is where `INSERT` makes sense.
+   */
+  insertTarget?: InsertTarget
+  onCopied?: (label: string) => void
+  onCopyFailed?: (error: unknown) => void
 }
 
 export function ExportMenu({
@@ -33,8 +41,21 @@ export function ExportMenu({
   filenameParts,
   children,
   align = 'end',
-  side = 'bottom'
+  side = 'bottom',
+  insertTarget,
+  onCopied,
+  onCopyFailed
 }: ExportMenuProps) {
+  async function copy(label: string, text: string) {
+    if (rows.length === 0) return
+    try {
+      await navigator.clipboard.writeText(text)
+      onCopied?.(label)
+    } catch (err) {
+      onCopyFailed?.(err)
+    }
+  }
+
   async function run(format: ExportFormat) {
     if (rows.length === 0) return
     const filename = buildExportFilename(filenameParts, format)
@@ -64,6 +85,27 @@ export function ExportMenu({
           <IconFileTypeXls size={13} />
           Excel (.xlsx)
         </DropdownMenuItem>
+        {insertTarget && (
+          <>
+            <DropdownMenuItem
+              className="border-t border-border"
+              onSelect={() => void copy('text', toTsv(rows, columns, { withHeader: true }))}
+            >
+              <IconClipboard size={13} />
+              Copy as text
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void copy('JSON', toJsonText(rows, columns))}>
+              <IconClipboard size={13} />
+              Copy as JSON
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => void copy('SQL', toInsertSql(rows, columns, insertTarget))}
+            >
+              <IconClipboard size={13} />
+              Copy as INSERT
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )

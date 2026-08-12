@@ -16,7 +16,8 @@ import {
   IconPencil,
   IconTrash,
   IconKey,
-  IconArrowUpRight
+  IconArrowUpRight,
+  IconLayoutSidebarRightExpand
 } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
 import { formatColumnType } from '@renderer/lib/column-type'
@@ -25,6 +26,9 @@ import { Button } from '@renderer/components/ui/button'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { CellInlineEditor } from './cell-inline-editor'
+import { useGridCursor, type CopyFormat } from '../hooks/use-grid-cursor'
+import { frozenOffsets, frozenWidth, orderColumns } from '../lib/frozen-columns'
+import type { InsertTarget } from '../lib/clipboard-format'
 import type { ColumnInfo, SortDirection } from '@renderer/types'
 
 type Row = Record<string, unknown>
@@ -43,6 +47,8 @@ interface DataGridProps {
   onSort: (column: string) => void
   onEditRow: (row: Row) => void
   onDeleteRow: (row: Row) => void
+  /** Opens the read-only record view. Also bound to Space on the cursor row. */
+  onInspectRow?: (row: Row) => void
   onEditCell?: (row: Row, column: string, value: unknown) => Promise<void>
   canMutate: boolean
   rowOffset?: number
@@ -57,6 +63,16 @@ interface DataGridProps {
   onClearFilters?: () => void
   /** Primary key of the row a pending undo belongs to, highlighted while it lasts. */
   pendingUndoRow?: Record<string, unknown> | null
+  /** Identifies the table for `copy as INSERT`. Without it that format is unavailable. */
+  insertTarget?: InsertTarget
+  /** Restored widths, keyed by column name. */
+  columnSizing?: Record<string, number>
+  /** Pinned to the left edge, in this order. */
+  frozenColumns?: string[]
+  /** Fires when a resize finishes, not per frame - this is persisted. */
+  onColumnSizingCommit?: (sizing: Record<string, number>) => void
+  onCopied?: (format: CopyFormat, cellCount: number) => void
+  onCopyFailed?: (error: unknown) => void
 }
 
 const SELECT_COLUMN_ID = '__select__'
@@ -64,13 +80,14 @@ const INDEX_COLUMN_ID = '__index__'
 const ACTIONS_COLUMN_ID = '__actions__'
 
 export function DataGrid({
-  columns,
+  columns: unorderedColumns,
   rows,
   orderBy,
   orderDir,
   onSort,
   onEditRow,
   onDeleteRow,
+  onInspectRow,
   onEditCell,
   canMutate,
   rowOffset = 0,
@@ -82,8 +99,21 @@ export function DataGrid({
   onOpenForeignKey,
   hasFilters = false,
   onClearFilters,
-  pendingUndoRow
+  pendingUndoRow,
+  insertTarget,
+  columnSizing: savedColumnSizing,
+  frozenColumns = [],
+  onColumnSizingCommit,
+  onCopied,
+  onCopyFailed
 }: DataGridProps) {
+  // Pinned columns move to the front here rather than at the call site, so the
+  // cursor and the clipboard both see the order actually on screen.
+  const columns = React.useMemo(
+    () => orderColumns(unorderedColumns, frozenColumns),
+    [unorderedColumns, frozenColumns]
+  )
+
   const [internalRowSelection, setInternalRowSelection] = React.useState<RowSelectionState>({})
   const isControlled = controlledRowSelection !== undefined
   const rowSelection = isControlled ? controlledRowSelection : internalRowSelection
@@ -177,6 +207,26 @@ export function DataGrid({
     () => (orderBy ? [{ id: orderBy, desc: orderDir === 'desc' }] : []),
     [orderBy, orderDir]
   )
+
+  const gridRef = React.useRef<HTMLDivElement>(null)
+  const {
+    cursor,
+    selectCell,
+    clear: clearCursor,
+    isCellInRange,
+    handleKeyDown
+  } = useGridCursor({
+    rows,
+    columnIds: dataColumnIds,
+    isEditing: editingCell != null,
+    onStartEditing: canEditCells
+      ? ({ rowIndex, columnIndex }) =>
+          setEditingCell({ rowIndex, columnId: dataColumnIds[columnIndex] })
+      : undefined,
+    insertTarget: insertTarget ?? { schema: '', table: '', engine: 'postgres' },
+    onCopied,
+    onCopyFailed
+  })
 
   const tableColumns = React.useMemo<ColumnDef<Row>[]>(() => {
     const helper = createColumnHelper<Row>()
@@ -319,37 +369,55 @@ export function DataGrid({
     )
 
     const cols: ColumnDef<Row>[] = [selectCol, indexCol, ...dataCols]
-    if (canMutate) {
+    if (canMutate || onInspectRow) {
       cols.push(
         helper.display({
           id: ACTIONS_COLUMN_ID,
           header: () => null,
           cell: ({ row }) => (
             <div className="flex justify-end gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                className="text-text-muted hover:border-transparent hover:bg-text-muted/15 hover:text-text-muted hover:ring-1 hover:ring-inset hover:ring-text-muted/25"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onEditRow(row.original)
-                }}
-                title="Edit row"
-              >
-                <IconPencil stroke={2} />
-              </Button>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                className="text-text-muted hover:border-transparent hover:bg-danger/15 hover:text-danger hover:ring-1 hover:ring-inset hover:ring-danger/25"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDeleteRow(row.original)
-                }}
-                title="Delete row"
-              >
-                <IconTrash stroke={2} />
-              </Button>
+              {onInspectRow && (
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="text-text-muted hover:border-transparent hover:bg-text-muted/15 hover:text-text-muted hover:ring-1 hover:ring-inset hover:ring-text-muted/25"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onInspectRow(row.original)
+                  }}
+                  title="View record"
+                >
+                  <IconLayoutSidebarRightExpand stroke={2} />
+                </Button>
+              )}
+              {canMutate && (
+                <>
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    className="text-text-muted hover:border-transparent hover:bg-text-muted/15 hover:text-text-muted hover:ring-1 hover:ring-inset hover:ring-text-muted/25"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onEditRow(row.original)
+                    }}
+                    title="Edit row"
+                  >
+                    <IconPencil stroke={2} />
+                  </Button>
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    className="text-text-muted hover:border-transparent hover:bg-danger/15 hover:text-danger hover:ring-1 hover:ring-inset hover:ring-danger/25"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDeleteRow(row.original)
+                    }}
+                    title="Delete row"
+                  >
+                    <IconTrash stroke={2} />
+                  </Button>
+                </>
+              )}
             </div>
           )
         })
@@ -364,17 +432,28 @@ export function DataGrid({
     onSort,
     onEditRow,
     onDeleteRow,
+    onInspectRow,
     rowOffset,
     fkColumns,
     onOpenForeignKey
   ])
 
+  // Controlled rather than left to TanStack, because the widths are restored
+  // from the saved view and handed back to it when a drag ends.
+  const [columnSizing, setColumnSizing] = React.useState<Record<string, number>>(
+    savedColumnSizing ?? {}
+  )
+  React.useEffect(() => {
+    setColumnSizing(savedColumnSizing ?? {})
+  }, [savedColumnSizing])
+
   const table = useReactTable<Row>({
     data: rows,
     columns: tableColumns,
-    state: { sorting, rowSelection },
+    state: { sorting, rowSelection, columnSizing },
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
+    onColumnSizingChange: setColumnSizing,
     manualSorting: true,
     getCoreRowModel: getCoreRowModel()
   })
@@ -388,10 +467,25 @@ export function DataGrid({
     [columns]
   )
 
-  const columnSizing = table.getState().columnSizing
   const resizedWidth = React.useCallback(
     (columnId: string): number | undefined => columnSizing[columnId],
     [columnSizing]
+  )
+
+  const stickyOffsets = React.useMemo(
+    () => frozenOffsets(frozenColumns, columnSizing),
+    [frozenColumns, columnSizing]
+  )
+  const isAnyFrozen = frozenColumns.length > 0
+  /** A frozen column is always explicitly sized - the offsets depend on it. */
+  const stickyStyle = React.useCallback(
+    (columnId: string): React.CSSProperties | undefined => {
+      const left = stickyOffsets.get(columnId)
+      if (left === undefined) return undefined
+      const width = frozenWidth(columnId, columnSizing)
+      return { left, width, minWidth: width, maxWidth: width }
+    },
+    [stickyOffsets, columnSizing]
   )
   const [resizingColumn, setResizingColumn] = React.useState<string | null>(null)
   const startResize = React.useCallback(
@@ -402,29 +496,39 @@ export function DataGrid({
       const startWidth = th.getBoundingClientRect().width
       const startX = e.clientX
       setResizingColumn(columnId)
+      // The committed value is read off the table rather than tracked here:
+      // onMove runs on a stale closure over whatever sizing existed at mousedown.
+      let latest: Record<string, number> = table.getState().columnSizing
       const onMove = (ev: MouseEvent): void => {
         const width = Math.min(1200, Math.max(64, startWidth + ev.clientX - startX))
-        table.setColumnSizing((prev) => ({ ...prev, [columnId]: width }))
+        table.setColumnSizing((prev) => {
+          latest = { ...prev, [columnId]: width }
+          return latest
+        })
       }
       const onUp = (): void => {
         window.removeEventListener('mousemove', onMove)
         window.removeEventListener('mouseup', onUp)
         setResizingColumn(null)
+        // Once, at the end. Committing per frame would write to storage on
+        // every mousemove of the drag.
+        onColumnSizingCommit?.(latest)
       }
       window.addEventListener('mousemove', onMove)
       window.addEventListener('mouseup', onUp)
     },
-    [table]
+    [table, onColumnSizingCommit]
   )
   const resetColumnSize = React.useCallback(
     (columnId: string) => {
       table.setColumnSizing((prev) => {
         const next = { ...prev }
         delete next[columnId]
+        onColumnSizingCommit?.(next)
         return next
       })
     },
-    [table]
+    [table, onColumnSizingCommit]
   )
 
   const visibleColCount = tableColumns.length
@@ -435,8 +539,21 @@ export function DataGrid({
 
   return (
     <div
+      ref={gridRef}
+      // Focusable so the grid can own arrow keys and copy. tabIndex 0 rather
+      // than -1: reaching the data by keyboard alone should not need a mouse
+      // click first.
+      tabIndex={0}
+      role="grid"
+      aria-label="Table rows"
+      onKeyDown={handleKeyDown}
+      onBlur={(e) => {
+        // Keep the cursor while focus moves inside (the inline editor, a FK
+        // button); drop it only when the grid as a whole is left.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) clearCursor()
+      }}
       className={cn(
-        'min-h-0 flex-1 overflow-auto transition-opacity duration-150',
+        'min-h-0 flex-1 overflow-auto transition-opacity duration-150 outline-none',
         isLoading && 'pointer-events-none opacity-50',
         resizingColumn && 'cursor-col-resize select-none'
       )}
@@ -451,19 +568,28 @@ export function DataGrid({
                 const isActions = header.column.id === ACTIONS_COLUMN_ID
                 const isDataColumn = !isSelect && !isIndex && !isActions
                 const width = isDataColumn ? resizedWidth(header.column.id) : undefined
+                const sticky = isDataColumn ? stickyStyle(header.column.id) : undefined
                 return (
                   <th
                     key={header.id}
                     style={
-                      width !== undefined ? { width, minWidth: width, maxWidth: width } : undefined
+                      sticky ??
+                      (width !== undefined
+                        ? { width, minWidth: width, maxWidth: width }
+                        : undefined)
                     }
                     className={cn(
                       'border-b border-border bg-surface text-left font-medium',
                       isSelect && 'w-9 px-2 py-2',
                       isIndex &&
                         'w-10 border-r border-r-border/40 px-3 py-2 text-xs text-text-subtle',
+                      // The leading display columns pin too, or a frozen data
+                      // column would slide over them at left: 0.
+                      isAnyFrozen && isSelect && 'sticky left-0 z-20',
+                      isAnyFrozen && isIndex && 'sticky left-9 z-20',
                       isActions && 'sticky right-0 w-20 px-3 py-2',
-                      isDataColumn && 'relative p-0 text-xs text-text-muted'
+                      isDataColumn && 'relative p-0 text-xs text-text-muted',
+                      sticky && 'sticky z-20 border-r border-r-border'
                     )}
                   >
                     {header.isPlaceholder
@@ -555,13 +681,22 @@ export function DataGrid({
                       savedCell?.rowIndex === row.index &&
                       savedCell?.columnId === cell.column.id
                     const width = isData ? resizedWidth(cell.column.id) : undefined
+                    const sticky = isData ? stickyStyle(cell.column.id) : undefined
+                    const dataColumnIndex = isData ? dataColumnIds.indexOf(cell.column.id) : -1
+                    const isCursor =
+                      isData &&
+                      cursor?.rowIndex === row.index &&
+                      cursor?.columnIndex === dataColumnIndex
+                    const isRangeCell = isData && isCellInRange(row.index, dataColumnIndex)
                     return (
                       <td
                         key={cell.id}
+                        aria-selected={isCursor || isRangeCell || undefined}
                         style={
-                          width !== undefined
+                          sticky ??
+                          (width !== undefined
                             ? { width, minWidth: width, maxWidth: width }
-                            : undefined
+                            : undefined)
                         }
                         className={cn(
                           'border-b border-border/60 px-3 py-1.5',
@@ -569,8 +704,17 @@ export function DataGrid({
                           (isIndex || isData) && 'border-r border-r-border/40',
                           isIndex && 'text-xs text-text-subtle',
                           isActions && 'sticky right-0 bg-surface px-2 py-1 group-hover:bg-surface',
+                          // Opaque, or the scrolling columns show through. Same
+                          // trade as the actions column: the row tint stops here.
+                          isAnyFrozen && isSelect && 'sticky left-0 z-10 bg-surface',
+                          isAnyFrozen && isIndex && 'sticky left-9 z-10 bg-surface',
+                          sticky && 'sticky z-10 border-r border-r-border bg-surface',
                           isData && 'max-w-xs truncate font-mono text-xs',
                           isData && canEditCells && 'cursor-text',
+                          // Range fill first, so the cursor's own ring wins on the
+                          // cell that has both.
+                          isRangeCell && !isEditingThis && 'bg-accent/8',
+                          isCursor && !isEditingThis && 'ring-1 ring-inset ring-accent-text/70',
                           isEditingThis && 'bg-accent/10 ring-1 ring-inset',
                           isEditingThis && (isEditorDirty ? 'ring-accent' : 'ring-accent-text/50'),
                           isSavedFlash && 'animate-cell-saved'
@@ -582,11 +726,15 @@ export function DataGrid({
                           // While the editor popover is open its portal events bubble
                           // through this td in the React tree - skip the handler so
                           // double-click text selection inside the editor still works.
-                          isData && canEditCells && !isEditingThis
+                          isData && !isEditingThis
                             ? (e) => {
                                 // Stop the browser's double-click word-selection (the
                                 // highlight) while keeping single-click selection intact.
-                                if (e.detail > 1) e.preventDefault()
+                                if (canEditCells && e.detail > 1) e.preventDefault()
+                                selectCell(row.index, dataColumnIndex, e.shiftKey)
+                                // preventDefault above can cost the container its
+                                // focus, and without focus the arrow keys go nowhere.
+                                if (!editingCell) gridRef.current?.focus()
                               }
                             : undefined
                         }
