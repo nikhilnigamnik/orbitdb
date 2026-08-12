@@ -28,13 +28,16 @@ import {
   type SchemaInfo,
   type TableDetails,
   type TableInfo,
-  type TestConnectionResult
+  type TestConnectionResult,
+  type ValueSearchOptions,
+  type ValueSearchResult
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
 import { toCount } from '../coerce'
 import { buildOrderBySql } from '../order-by'
 import { buildFilterSql, type FilterDialect } from '../filters'
+import { isSearchCancelled, sweepTables, type ValueSearchDialect } from '../value-search'
 import type { ActiveMeta, DatabaseDriver } from './types'
 
 const pools = new Map<string, Pool>()
@@ -500,6 +503,24 @@ const filterDialect: FilterDialect = {
   supportsIlike: true
 }
 
+const searchDialect: ValueSearchDialect = {
+  ...filterDialect,
+  qualifiedTable,
+  castText: (expr) => `${expr}::text`
+}
+
+async function searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult> {
+  const pool = getPool(opts.connectionId)
+  return sweepTables(opts.schema, opts.term, opts.mode, {
+    dialect: searchDialect,
+    listTables: () => listTables(opts.connectionId, opts.schema),
+    columnsFor: async (table) =>
+      (await tableDetails(opts.connectionId, opts.schema, table)).columns,
+    run: async (sql, params) => (await pool.query(sql, params)).rows[0],
+    isCancelled: () => isSearchCancelled(opts.searchId)
+  })
+}
+
 async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   const validColumns = new Set(details.columns.map((c) => c.name))
@@ -944,5 +965,6 @@ export const postgresDriver: DatabaseDriver = {
   runQuery,
   cancelQuery,
   getColumnDistinct,
-  getOverview
+  getOverview,
+  searchValue
 }

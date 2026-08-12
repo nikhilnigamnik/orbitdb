@@ -23,7 +23,9 @@ import {
   type SchemaInfo,
   type TableDetails,
   type TableInfo,
-  type TestConnectionResult
+  type TestConnectionResult,
+  ValueSearchOptions,
+  ValueSearchResult
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl } from '../ddl'
@@ -47,6 +49,7 @@ import {
   type IndexListRow,
   type TableInfoRow
 } from '../sqlite-shared'
+import { isSearchCancelled, sweepTables, type ValueSearchDialect } from '../value-search'
 import { recordQuery } from '../query-log'
 import { detectCommand, isSchemaChanging } from '../sql-command'
 import type { ActiveMeta, DatabaseDriver } from './types'
@@ -573,6 +576,28 @@ async function cancelQuery(connectionId: string, queryId: string): Promise<void>
   entry.controller.abort()
 }
 
+const searchDialect: ValueSearchDialect = {
+  ...sqliteFilterDialect,
+  // SQLite has no schemas, so the qualified name is just the table.
+  qualifiedTable: (_schema, table) => quoteIdent(table),
+  castText: (expr) => `cast(${expr} as text)`
+}
+
+async function searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult> {
+  const saved = loadSaved(opts.connectionId)
+  return sweepTables(SQLITE_SCHEMA, opts.term, opts.mode, {
+    dialect: searchDialect,
+    listTables: () => listTables(opts.connectionId, SQLITE_SCHEMA),
+    columnsFor: async (table) =>
+      (await tableDetails(opts.connectionId, SQLITE_SCHEMA, table)).columns,
+    run: async (sql, params) => {
+      const entry = await callD1<Record<string, unknown>>(saved, sql, params)
+      return entry.results[0]
+    },
+    isCancelled: () => isSearchCancelled(opts.searchId)
+  })
+}
+
 async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]> {
   const saved = loadSaved(opts.connectionId)
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
@@ -762,5 +787,6 @@ export const d1Driver: DatabaseDriver = {
   runQuery,
   cancelQuery,
   getColumnDistinct,
+  searchValue,
   getOverview
 }

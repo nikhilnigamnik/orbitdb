@@ -41,7 +41,9 @@ import type {
   TableInfo,
   UsageSummary,
   TestConnectionResult,
-  UpdateCheckResult
+  UpdateCheckResult,
+  ValueSearchOptions,
+  ValueSearchResult
 } from '../shared/types'
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<OperationResult<T>> {
@@ -82,6 +84,8 @@ const api = {
     cancelQuery: (connectionId: string, queryId: string) =>
       invoke<void>('db:query-cancel', connectionId, queryId),
     columnDistinct: (opts: DistinctValuesOptions) => invoke<unknown[]>('db:column-distinct', opts),
+    searchValue: (opts: ValueSearchOptions) => invoke<ValueSearchResult>('db:search-value', opts),
+    cancelSearch: (searchId: string) => invoke<void>('db:search-cancel', searchId),
     listLogs: () => invoke<QueryLogEntry[]>('db:logs-list'),
     clearLogs: () => invoke<void>('db:logs-clear')
   },
