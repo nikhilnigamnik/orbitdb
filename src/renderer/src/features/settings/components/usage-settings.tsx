@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { IconTrash } from '@tabler/icons-react'
+import { IconChartBar, IconTrash } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
@@ -85,26 +85,30 @@ export function UsageSettings() {
             value={timeframe}
             onChange={setTimeframe}
           />
-          <span className="text-xs text-text-subtle">
-            {formatNumber(window_.calls)} {window_.calls === 1 ? 'call' : 'calls'} ·{' '}
-            <span className="font-mono text-text-muted">
-              {formatNumber(window_.input + window_.output)}
-            </span>{' '}
-            tokens ·{' '}
-            <span className="font-mono text-text" title="Estimated at published list prices">
-              ~{formatCost(window_.cost)}
+          {window_.calls > 0 && (
+            <span className="shrink-0 text-xs text-text-subtle">
+              {formatNumber(window_.calls)} {window_.calls === 1 ? 'call' : 'calls'} ·{' '}
+              <span className="font-mono text-text-muted">
+                {formatNumber(window_.input + window_.output)}
+              </span>{' '}
+              tokens ·{' '}
+              <span className="font-mono text-text" title="Estimated at published list prices">
+                ~{formatCost(window_.cost)}
+              </span>
             </span>
-          </span>
+          )}
         </div>
 
         {!hasAny ? (
-          <p className="px-4 pb-4 text-xs text-text-subtle">
-            Nothing recorded yet - run an AI feature and it will show up here.
-          </p>
+          <UsageEmpty
+            title="No AI usage yet"
+            description="Run an AI feature and the calls will show up here."
+          />
         ) : window_.calls === 0 ? (
-          <p className="px-4 pb-4 text-xs text-text-subtle">
-            Nothing in this period. Try a wider one.
-          </p>
+          <UsageEmpty
+            title="Nothing in this period"
+            description="Pick a wider timeframe to see earlier calls."
+          />
         ) : (
           <>
             <UsageTable
@@ -128,9 +132,9 @@ export function UsageSettings() {
         )}
 
         <SettingFooter>
-          <span className="text-xs text-text-subtle">
-            Counted on this machine, kept for {summary?.retentionDays ?? 90} days. Cost is an
-            estimate at published list prices - your invoice is what counts.
+          <span className="min-w-0 text-xs text-balance text-text-subtle">
+            Counted on this machine, kept for {summary?.retentionDays ?? 90} days. Costs are
+            estimates at list prices.
             {window_.unpricedCalls > 0 && (
               <>
                 {' '}
@@ -145,7 +149,7 @@ export function UsageSettings() {
             variant="ghost"
             onClick={confirmClear.open}
             disabled={!hasAny}
-            className="text-text-muted hover:bg-surface-elevated hover:text-text"
+            className="shrink-0 text-text-muted hover:bg-surface-elevated hover:text-text"
           >
             <IconTrash size={12} />
             Clear
@@ -166,6 +170,17 @@ export function UsageSettings() {
   )
 }
 
+/** Sits inside SettingsCard, whose divide-y already draws the rule above it. */
+function UsageEmpty({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1 px-4 py-10 text-center">
+      <IconChartBar size={18} className="mb-1 text-text-subtle/60" />
+      <p className="text-xs font-medium text-text">{title}</p>
+      <p className="max-w-xs text-xs text-text-subtle">{description}</p>
+    </div>
+  )
+}
+
 function UsageTable({
   heading,
   rows,
@@ -180,7 +195,7 @@ function UsageTable({
   // string cannot be compared by eye, which is the only thing this table is for.
   const columns = 'grid grid-cols-[1fr_4rem_5rem_5rem_5rem] items-center gap-x-3 px-4'
   return (
-    <div className="border-t border-border">
+    <div>
       <div className={cn(columns, 'pt-3 pb-1.5')}>
         <span className="text-xs font-medium text-text">{heading}</span>
         {['Calls', 'Input', 'Output', 'Cost'].map((label) => (
