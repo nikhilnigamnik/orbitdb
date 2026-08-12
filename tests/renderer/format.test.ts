@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatBytes,
   formatCellValue,
   formatNumber,
   isBinaryValue,
@@ -113,5 +114,24 @@ describe('shortServerVersion', () => {
   it('falls back to a clipped string for anything unrecognised', () => {
     expect(shortServerVersion('')).toBe('')
     expect(shortServerVersion('Some Other Engine')).toBe('Some Other Engine')
+  })
+})
+
+describe('byte sizes', () => {
+  it('steps through the units', () => {
+    expect(formatBytes(512)).toBe('512 B')
+    expect(formatBytes(2048)).toBe('2.0 kB')
+    expect(formatBytes(3 * 1024 ** 2)).toBe('3.0 MB')
+  })
+
+  it('goes past a megabyte, which a database does routinely', () => {
+    // "13312.0 MB" is a number nobody reads.
+    expect(formatBytes(13 * 1024 ** 3)).toBe('13.0 GB')
+    expect(formatBytes(2 * 1024 ** 4)).toBe('2.0 TB')
+  })
+
+  it('switches unit exactly at the boundary', () => {
+    expect(formatBytes(1024 ** 3 - 1)).toContain('MB')
+    expect(formatBytes(1024 ** 3)).toBe('1.0 GB')
   })
 })

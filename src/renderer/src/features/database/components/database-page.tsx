@@ -1,7 +1,5 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { IconDatabase } from '@tabler/icons-react'
-import { EmptyState } from '@renderer/components/common/empty-state'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { useAsync } from '@renderer/hooks/use-async'
@@ -18,6 +16,7 @@ import { TableStructure } from './table-structure'
 import { StructureAi } from './structure-ai'
 import { DdlDialog } from './ddl-dialog'
 import { ConnectionPicker } from './connection-picker'
+import { ConnectionOverview } from './connection-overview'
 
 function readLastTable(connectionId: string): string | null {
   try {
@@ -100,11 +99,7 @@ export function DatabasePage() {
             onChangeTab={setActiveTab}
           />
         ) : (
-          <EmptyState
-            icon={<IconDatabase size={20} />}
-            title="Select a table"
-            description="Pick a table from the sidebar to view its data and structure."
-          />
+          <ConnectionOverview connectionId={active.connectionId} />
         )}
       </main>
     </>
@@ -150,6 +145,8 @@ function TableViewContainer({
   onChangeTab
 }: TableViewContainerProps) {
   const navigate = useNavigate()
+  const { current } = useConnection()
+  const engine = current?.engine ?? 'postgres'
   const { data, error, isLoading, refresh } = useAsync<TableDetails>(
     async () => unwrap(window.api.db.tableDetails(connectionId, schema, table)),
     [connectionId, schema, table]
@@ -228,6 +225,7 @@ function TableViewContainer({
         <TableDataView
           connectionId={connectionId}
           details={data}
+          engine={engine}
           onRenameTable={canEdit ? () => openDdl('rename-table') : undefined}
           onReady={() => setHeaderShown(true)}
         />
