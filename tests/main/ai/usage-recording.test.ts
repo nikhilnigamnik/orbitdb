@@ -20,6 +20,13 @@ vi.mock('../../../src/main/store/settings-store', () => ({
   getProviderSettings: (provider: string) => ({
     apiKey: `key-for-${provider}`,
     model: provider === 'openai' ? 'gpt-5.2' : 'claude-sonnet-5'
+  }),
+  getGatewaySettings: () => ({
+    isEnabled: false,
+    accountId: '',
+    gatewayId: '',
+    token: '',
+    keySource: 'app'
   })
 }))
 

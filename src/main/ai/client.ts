@@ -1,7 +1,8 @@
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { APICallError, generateText, Output, type LanguageModel } from 'ai'
+import { APICallError, generateText, Output } from 'ai'
+import type { LanguageModelV3 } from '@ai-sdk/provider'
 import type { z } from 'zod'
 import {
   MISSING_AI_KEY_MESSAGE,
@@ -10,9 +11,15 @@ import {
   type AiModelId,
   type AiProviderId
 } from '../../shared/ai-models'
-import { getAiSettings, getProviderSettings } from '../store/settings-store'
+import {
+  getAiSettings,
+  getGatewaySettings,
+  getProviderSettings,
+  type GatewaySettings
+} from '../store/settings-store'
 import { recordUsage } from '../store/usage-store'
 import { AI_REQUEST_TIMEOUT_MS } from './config'
+import { buildGatewayModel } from './gateway'
 
 export class MissingApiKeyError extends Error {
   constructor() {
@@ -26,20 +33,47 @@ export class MissingApiKeyError extends Error {
  * over the key and returns a model builder - so adding a provider is a row here
  * plus a row in `AI_PROVIDERS`.
  */
-const FACTORY: Record<AiProviderId, (apiKey: string) => (model: string) => LanguageModel> = {
+const FACTORY: Record<AiProviderId, (apiKey: string) => (model: string) => LanguageModelV3> = {
   anthropic: (apiKey) => createAnthropic({ apiKey }),
   openai: (apiKey) => createOpenAI({ apiKey }),
-  google: (apiKey) => createGoogleGenerativeAI({ apiKey })
+  google: (apiKey) => createGoogleGenerativeAI({ apiKey }),
+  // Cloudflare is reached through its own gateway rather than a vendor SDK, and
+  // needs two ids the others do not - hence the special case in `buildModel`
+  // instead of a row that would have to pretend it fits this shape.
+  cloudflare: () => {
+    throw new Error('The Cloudflare provider is built by buildModel, not FACTORY.')
+  }
+}
+
+/**
+ * Every path that needs a model goes through here, so a provider cannot be
+ * honoured in one place and forgotten in another.
+ *
+ * Cloudflare's token is optional - an unauthenticated gateway is a valid setup -
+ * so the missing-key check is per provider rather than up front.
+ */
+function buildModel(
+  provider: AiProviderId,
+  apiKey: string,
+  model: AiModelId,
+  gateway: GatewaySettings
+): LanguageModelV3 {
+  if (provider === 'cloudflare') return buildGatewayModel(gateway, apiKey, model)
+  if (!apiKey) throw new MissingApiKeyError()
+  return FACTORY[provider](apiKey)(model)
 }
 
 // The credential is runtime state now, not build-time state, so the model can no
 // longer be a module constant: it has to be re-read after the user saves a key.
-// Rebuilt only when the provider, key or model actually changes.
+// Rebuilt only when the provider, key, model or gateway actually changes - hence
+// the gateway in the cache key, or turning it on would keep serving the direct
+// model until the next key edit.
 let cached: {
   provider: AiProviderId
   apiKey: string
   model: AiModelId
-  instance: LanguageModel
+  gateway: string
+  instance: LanguageModelV3
 } | null = null
 
 /**
@@ -55,26 +89,33 @@ export function resetModelCache(): void {
  * is the active one; this is for testing a key on a card you are not using yet.
  * Not cached - it is pressed by hand, once.
  */
-export function buildModelFor(provider: string): LanguageModel {
+export function buildModelFor(provider: string): LanguageModelV3 {
   if (!isAiProviderId(provider)) throw new Error(`Unknown provider: ${provider}`)
   const { apiKey, model } = getProviderSettings(provider)
-  if (!apiKey) throw new MissingApiKeyError()
-  return FACTORY[provider](apiKey)(model)
+  return buildModel(provider, apiKey, model, getGatewaySettings())
 }
 
-export function getModel(): LanguageModel {
+/** Identity of the gateway ids, for the model cache: renaming a gateway has to
+ * rebuild the client rather than keep addressing the old one. */
+function gatewayCacheKey(gateway: GatewaySettings): string {
+  return `${gateway.accountId}|${gateway.gatewayId}`
+}
+
+export function getModel(): LanguageModelV3 {
   const { provider, apiKey, model } = getAiSettings()
-  if (!apiKey) throw new MissingApiKeyError()
+  const gateway = getGatewaySettings()
+  const gatewayKey = gatewayCacheKey(gateway)
   if (
     cached &&
     cached.provider === provider &&
     cached.apiKey === apiKey &&
-    cached.model === model
+    cached.model === model &&
+    cached.gateway === gatewayKey
   ) {
     return cached.instance
   }
-  const instance = FACTORY[provider](apiKey)(model)
-  cached = { provider, apiKey, model, instance }
+  const instance = buildModel(provider, apiKey, model, gateway)
+  cached = { provider, apiKey, model, gateway: gatewayKey, instance }
   return instance
 }
 

@@ -127,11 +127,30 @@ Five endpoints under the `ai:` IPC namespace → `window.api.ai.*`:
 
 Renderer surfaces: `features/query/components/ai-prompt.tsx` (NL→SQL on the query page), the 'Ask AI' filter in `table-data-view.tsx`, and `structure-ai.tsx` + `seed-data-dialog.tsx` on the structure tab. Markdown responses render via `components/common/markdown.tsx`.
 
+### Cloudflare AI Gateway
+
+Cloudflare is the **fourth provider**, alongside Anthropic, OpenAI and Google - same card, same Active switch, same model picker. Its "key" is the gateway token, so it reuses every bit of the per-provider key machinery (sealing, hint, the unreadable rule, clear, test).
+
+Two things make it not quite like the others, and both are handled by exception rather than by generalising a shape that has one member:
+
+- **Its model ids are `provider/model`**, where the prefix is Cloudflare's and the model half is **the vendor's own id**: `anthropic/claude-sonnet-5`, `google/gemini-3.6-flash`. Two halves, two traps, both hit in practice. The prefix is `google`, not `google-ai-studio` - that is the separate provider-native route. And the model half must be the vendor id, _not_ the name in Cloudflare's catalog: the catalog lists `anthropic/claude-haiku-4.5`, but under BYOK the gateway forwards everything after the slash straight to Anthropic, which only answers to `claude-haiku-4-5-20251001`. Catalog names apply only when Unified Billing supplies the credential; vendor ids work under both. `tests/shared/ai-cloudflare-models.test.ts` pins all of this, and `tests/shared/ai-pricing.test.ts` fails until a new entry has a price.
+- **It needs two ids beyond its token.** They live in their own `gateway` block rather than in `keys`, because they are not secrets. `needsGatewayIds()` is what the settings card branches on, and `buildModel()` special-cases `cloudflare` rather than `FACTORY` pretending a two-id provider fits a one-key signature. Its token is genuinely optional too - an unauthenticated gateway is a valid setup - so the `MissingApiKeyError` check is per provider, not up front.
+
+Pricing rows mirror the vendors' own, because Unified Billing passes inference through at the vendor rate with no markup; the 5% is charged when credits are bought, so it cannot be priced per token. Gateway usage lands under provider `cloudflare` in the rollup, which separates gateway spend from direct spend rather than muddling them.
+
+Pinning: `ai-gateway-provider@3.2.0`, not `latest` - 4.x peers `ai@^7` and this repo is on 6. Its own peers `@ai-sdk/openai-compatible` and `@ai-sdk/provider` are declared explicitly rather than leaned on transitively (an undeclared `@lezer/highlight` passed locally and broke CI once already).
+
+`createUnified()`'s base URL is a marker, not a destination: it sets `https://gateway.ai.cloudflare.com/v1/compat`, which `createAiGateway` recognises by regex and rewrites to the universal endpoint `…/v1/{accountId}/{gatewayId}`, adding `cf-aig-authorization`. Same destination as pointing an OpenAI client at `…/{accountId}/{gatewayId}/compat` by hand.
+
+**Two caveats worth knowing.** Structured output through the unified endpoint has not been verified against a live gateway - if `Output.object` does not reach it as a native `response_format`, `generateJson()` falls to its plain-text retry and every call silently costs two. And a gateway cache hit costs nothing but may still report tokens, so with caching on the usage figure stops being a strict lower bound.
+
 ### Settings persistence
 
-`src/main/store/settings-store.ts` writes `settings.json` into `userData` (schema v2), holding the selected provider plus a key and model per provider. A v1 file - one `apiKey`/`model`, from when Anthropic was the only provider - migrates on read into the anthropic slot. Same hand-rolled shape and same `safeStorage` encryption as connections, including the rule that a key which fails to decrypt is **kept on disk untouched** rather than blanked - writing the empty read-back would destroy a key the user could still recover by logging into the right OS account.
+`src/main/store/settings-store.ts` writes `settings.json` into `userData` (schema v3), holding the selected provider plus a key and model per provider, and the Cloudflare gateway ids. A v1 file - one `apiKey`/`model`, from when Anthropic was the only provider - migrates on read into the anthropic slot; a v2 file simply has no gateway block, and an absent one reads as a Cloudflare provider nobody has configured yet. Same hand-rolled shape and same `safeStorage` encryption as connections, including the rule that a key which fails to decrypt is **kept on disk untouched** rather than blanked - writing the empty read-back would destroy a key the user could still recover by logging into the right OS account.
 
-Exposed under the `settings:` IPC namespace → `window.api.settings.*`. **No key ever crosses back to the renderer**: `settings:get-ai` returns `{ provider, hasKey, keyHint, isKeyUnreadable, model, configured }`, where `keyHint` is the last four characters and `configured` is just the list of provider ids that have one. `settings:test-ai` makes one tiny real call so a bad key fails on a button the user pressed rather than halfway through generating SQL.
+`accountId` and `gatewayId` are stored **plain** and cross the IPC boundary in full, unlike every other credential here: they identify rather than authorise, and both appear in every dashboard URL. That also means `setGatewaySettings()` treats an empty string as empty rather than as "unchanged" - blanking them is how the provider is un-configured, whereas blanking a key field would be a way to lose one.
+
+Exposed under the `settings:` IPC namespace → `window.api.settings.*`. **No key ever crosses back to the renderer**: `settings:get-ai` returns `{ provider, hasKey, keyHint, isKeyUnreadable, model, configured }`, where `keyHint` is the last four characters and `configured` is just the list of provider ids that have one, plus the gateway ids, which are not secrets. `settings:test-ai` makes one tiny real call so a bad key fails on a button the user pressed rather than halfway through generating SQL - and it goes through `buildModelFor`, so testing Cloudflare exercises the gateway rather than a direct call.
 
 ### AI usage tracking
 

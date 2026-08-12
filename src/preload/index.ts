@@ -4,6 +4,7 @@ import type {
   ActiveConnectionMeta,
   AiModelId,
   AiProviderId,
+  AiGatewayIds,
   AiSettingsView,
   ConnectionInput,
   ConnectionOverview,
@@ -103,7 +104,8 @@ const api = {
     clearAiKey: (provider: AiProviderId) => invoke<void>('settings:clear-ai-key', provider),
     setAiModel: (provider: AiProviderId, model: AiModelId) =>
       invoke<AiModelId>('settings:set-ai-model', provider, model),
-    testAi: (provider: AiProviderId) => invoke<void>('settings:test-ai', provider)
+    testAi: (provider: AiProviderId) => invoke<void>('settings:test-ai', provider),
+    setGateway: (input: AiGatewayIds) => invoke<void>('settings:set-gateway', input)
   },
   queries: {
     list: (connectionId: string) => invoke<SavedQuery[]>('queries:list', connectionId),

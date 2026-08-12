@@ -5,14 +5,39 @@ const settings = vi.hoisted(() => ({
   apiKey: '',
   model: 'claude-sonnet-5'
 }))
+const gateway = vi.hoisted(() => ({
+  accountId: '',
+  gatewayId: ''
+}))
 const created = vi.hoisted(() => ({
   keys: [] as string[],
   models: [] as string[],
   providers: [] as string[]
 }))
+/** What `createAiGateway` was built with, and what it was handed to wrap. */
+const routed = vi.hoisted(() => ({
+  configs: [] as Record<string, unknown>[],
+  wrapped: [] as unknown[]
+}))
 
 vi.mock('../../../src/main/store/settings-store', () => ({
-  getAiSettings: () => ({ ...settings })
+  getAiSettings: () => ({ ...settings }),
+  getProviderSettings: () => ({ apiKey: settings.apiKey, model: settings.model }),
+  getGatewaySettings: () => ({ ...gateway })
+}))
+
+vi.mock('ai-gateway-provider', () => ({
+  createAiGateway: (config: Record<string, unknown>) => {
+    routed.configs.push(config)
+    return (model: unknown) => {
+      routed.wrapped.push(model)
+      return { id: 'gateway', inner: model }
+    }
+  }
+}))
+
+vi.mock('ai-gateway-provider/providers/unified', () => ({
+  createUnified: () => (slug: string) => ({ id: `unified/${slug}` })
 }))
 
 // Stand-ins for each provider SDK: they record what they were built with, so a
@@ -48,6 +73,10 @@ beforeEach(async () => {
   created.keys = []
   created.models = []
   created.providers = []
+  gateway.accountId = ''
+  gateway.gatewayId = ''
+  routed.configs = []
+  routed.wrapped = []
   client = await freshClient()
 })
 
@@ -107,6 +136,78 @@ describe('with a key saved', () => {
 
     settings.apiKey = ''
     expect(() => client.getModel()).toThrow(/Settings/)
+  })
+})
+
+describe('the Cloudflare provider', () => {
+  function configure() {
+    settings.provider = 'cloudflare'
+    settings.model = 'anthropic/claude-sonnet-5'
+    gateway.accountId = 'acct-1'
+    gateway.gatewayId = 'orbitdb'
+  }
+
+  it('goes through the gateway rather than any vendor SDK', () => {
+    configure()
+    settings.apiKey = 'cf-token-1'
+
+    client.getModel()
+
+    expect(routed.configs).toEqual([
+      { accountId: 'acct-1', gateway: 'orbitdb', apiKey: 'cf-token-1' }
+    ])
+    // No vendor SDK is reached for: Cloudflare supplies the upstream credential.
+    expect(created.keys).toEqual([])
+    expect(routed.wrapped).toEqual([{ id: 'unified/anthropic/claude-sonnet-5' }])
+  })
+
+  it('sends the catalog slug verbatim, not a derived one', () => {
+    // Cloudflare's catalog says `google/`, while `google-ai-studio/` is the
+    // separate provider-native route - so the id is the slug, not built from one.
+    configure()
+    settings.model = 'google/gemini-3.6-flash'
+
+    client.getModel()
+
+    expect(routed.wrapped).toEqual([{ id: 'unified/google/gemini-3.6-flash' }])
+  })
+
+  it('works with no token, since an unauthenticated gateway is a real setup', () => {
+    configure()
+
+    client.getModel()
+
+    expect(routed.configs[0].apiKey).toBeUndefined()
+  })
+
+  it('rebuilds when the token is rotated', () => {
+    configure()
+    settings.apiKey = 'cf-token-1'
+    client.getModel()
+
+    settings.apiKey = 'cf-token-2'
+    client.getModel()
+
+    expect(routed.configs.map((c) => c.apiKey)).toEqual(['cf-token-1', 'cf-token-2'])
+  })
+
+  it('rebuilds when the gateway is renamed, not only when the token changes', () => {
+    configure()
+    const first = client.getModel()
+
+    gateway.gatewayId = 'renamed'
+    const second = client.getModel()
+
+    expect(second).not.toBe(first)
+    expect(routed.configs.map((c) => c.gateway)).toEqual(['orbitdb', 'renamed'])
+  })
+
+  it('says what is missing when only one id is filled in', () => {
+    settings.provider = 'cloudflare'
+    settings.model = 'anthropic/claude-sonnet-5'
+    gateway.accountId = 'acct-1'
+
+    expect(() => client.getModel()).toThrow(/gateway id/)
   })
 })
 

@@ -1,5 +1,6 @@
 export type {
   ActiveConnectionMeta,
+  AiGatewayIds,
   AiModelId,
   AiProviderId,
   AiProviderView,

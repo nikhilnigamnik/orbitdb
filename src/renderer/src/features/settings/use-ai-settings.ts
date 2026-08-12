@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { unwrap } from '@renderer/lib/ipc'
 import { errorMessage } from '@renderer/lib/errors'
-import type { AiModelId, AiProviderId, AiSettingsView } from '@renderer/types'
+import type { AiGatewayIds, AiModelId, AiProviderId, AiSettingsView } from '@renderer/types'
 
 function settingsApi() {
   if (typeof window === 'undefined' || !window.api?.settings) {
@@ -20,6 +20,7 @@ interface UseAiSettings {
   clearKey: (provider: AiProviderId) => Promise<void>
   setModel: (provider: AiProviderId, model: AiModelId) => Promise<void>
   testKey: (provider: AiProviderId) => Promise<void>
+  setGateway: (input: AiGatewayIds) => Promise<void>
 }
 
 /**
@@ -71,6 +72,7 @@ export function useAiSettings(): UseAiSettings {
     saveKey: (provider, apiKey) => mutate(() => unwrap(settingsApi().setAiKey(provider, apiKey))),
     clearKey: (provider) => mutate(() => unwrap(settingsApi().clearAiKey(provider))),
     setModel: (provider, model) => mutate(() => unwrap(settingsApi().setAiModel(provider, model))),
+    setGateway: (input) => mutate(() => unwrap(settingsApi().setGateway(input))),
     testKey: async (provider) => {
       setIsTesting(true)
       try {

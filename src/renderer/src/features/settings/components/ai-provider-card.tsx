@@ -11,9 +11,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger
 } from '@renderer/components/ui/collapsible'
-import { aiProvider } from '@renderer/config/site'
+import { aiProvider, needsGatewayIds } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
-import type { AiModelId, AiProviderView } from '@renderer/types'
+import type { AiGatewayIds, AiModelId, AiProviderView } from '@renderer/types'
 import { SettingFooter, SettingRow, SettingsCard } from './settings-card'
 
 interface AiProviderCardProps {
@@ -21,10 +21,13 @@ interface AiProviderCardProps {
   isActive: boolean
   isBusy: boolean
   isTesting: boolean
+  /** Cloudflare's account and gateway ids. Ignored by every other provider. */
+  gateway: AiGatewayIds
   onActivate: () => void
   onSaveKey: (apiKey: string) => Promise<void>
   onRemoveKey: () => void
   onChangeModel: (model: AiModelId) => void
+  onSaveGateway: (ids: AiGatewayIds) => Promise<void>
   onTest: () => void
 }
 
@@ -33,18 +36,34 @@ export function AiProviderCard({
   isActive,
   isBusy,
   isTesting,
+  gateway,
   onActivate,
   onSaveKey,
   onRemoveKey,
   onChangeModel,
+  onSaveGateway,
   onTest
 }: AiProviderCardProps) {
   const spec = aiProvider(view.id)
   const [draftKey, setDraftKey] = React.useState('')
-  // Open where there is something to do: the provider in use, or one whose stored
-  // key needs re-entering. The rest stay folded so three cards read as a list.
-  const [isOpen, setIsOpen] = React.useState(isActive || view.isKeyUnreadable)
+  const [accountId, setAccountId] = React.useState(gateway.accountId)
+  const [gatewayId, setGatewayId] = React.useState(gateway.gatewayId)
+  const hasGatewayIds = needsGatewayIds(view.id)
+  const isMissingIds = hasGatewayIds && !(gateway.accountId && gateway.gatewayId)
+  // Open where there is something to do: the provider in use, one whose stored
+  // key needs re-entering, or Cloudflare before its ids are filled in. The rest
+  // stay folded so the cards read as a list.
+  const [isOpen, setIsOpen] = React.useState(isActive || view.isKeyUnreadable || isMissingIds)
   const activeModel = spec.models.find((model) => model.id === view.model)
+
+  // Whatever main accepted wins: a rejected save must not leave the inputs
+  // showing values the store never took.
+  React.useEffect(() => {
+    setAccountId(gateway.accountId)
+    setGatewayId(gateway.gatewayId)
+  }, [gateway.accountId, gateway.gatewayId])
+
+  const isGatewayDirty = accountId !== gateway.accountId || gatewayId !== gateway.gatewayId
 
   // Keeps the typed key until the save actually lands: clearing it first means a
   // rejected save loses what the user pasted and they have to fetch it again.
@@ -63,7 +82,13 @@ export function AiProviderCard({
   return (
     <section
       aria-label={spec.label}
-      className={cn('transition-opacity', !isActive && 'opacity-75 hover:opacity-100')}
+      // Dimming marks a card as not in use. The Cloudflare one is exempt: it
+      // holds setup you come back to edit while some other provider is active,
+      // so fading it reads as disabled rather than merely unselected.
+      className={cn(
+        'transition-opacity',
+        !isActive && !hasGatewayIds && 'opacity-75 hover:opacity-100'
+      )}
     >
       <SettingsCard>
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -109,10 +134,55 @@ export function AiProviderCard({
                 </div>
               )}
 
+              {hasGatewayIds && (
+                <>
+                  <SettingRow
+                    title="Account ID"
+                    description="From the AI Gateway page, or your dashboard URL. Not a secret, so it is stored in the clear."
+                    isStacked
+                  >
+                    <Input
+                      aria-label="Cloudflare account ID"
+                      value={accountId}
+                      onChange={(e) => setAccountId(e.target.value)}
+                      placeholder="0123456789abcdef0123456789abcdef"
+                      spellCheck={false}
+                      autoComplete="off"
+                      className="font-mono"
+                    />
+                  </SettingRow>
+
+                  <SettingRow
+                    title="Gateway ID"
+                    description="The name you gave the gateway when you created it."
+                    isStacked
+                  >
+                    <div className="flex items-center gap-2">
+                      <Input
+                        aria-label="Cloudflare gateway ID"
+                        value={gatewayId}
+                        onChange={(e) => setGatewayId(e.target.value)}
+                        placeholder="orbitdb"
+                        spellCheck={false}
+                        autoComplete="off"
+                        className="flex-1 font-mono"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => void onSaveGateway({ accountId, gatewayId })}
+                        disabled={!isGatewayDirty || isBusy}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </SettingRow>
+                </>
+              )}
+
               <SettingRow
                 title={
                   <span className="flex items-center gap-2">
-                    API key
+                    {hasGatewayIds ? 'Gateway token' : 'API key'}
                     {view.hasKey ? (
                       <Chip tone="neutral">Saved</Chip>
                     ) : (
@@ -120,7 +190,11 @@ export function AiProviderCard({
                     )}
                   </span>
                 }
-                description="Encrypted on this machine. Never leaves it except to this provider."
+                description={
+                  hasGatewayIds
+                    ? 'A Cloudflare API token with AI Gateway Run. It is what tells Cloudflare whose stored provider keys or credits to spend. Encrypted on this machine.'
+                    : 'Encrypted on this machine. Never leaves it except to this provider.'
+                }
                 isStacked={!view.hasKey}
               >
                 {view.hasKey ? (
@@ -143,7 +217,7 @@ export function AiProviderCard({
                 ) : (
                   <div className="flex items-center gap-2">
                     <Input
-                      aria-label={`${spec.label} API key`}
+                      aria-label={hasGatewayIds ? 'Gateway token' : `${spec.label} API key`}
                       type="password"
                       value={draftKey}
                       onChange={(e) => setDraftKey(e.target.value)}
@@ -192,13 +266,21 @@ export function AiProviderCard({
 
               <SettingFooter>
                 <span className="text-xs text-text-subtle">
-                  {view.hasKey ? 'Check the key still works' : `Add a ${spec.label} key to use it`}
+                  {isMissingIds
+                    ? 'Both ids are needed before the gateway can be reached'
+                    : hasGatewayIds
+                      ? 'Check the gateway answers'
+                      : view.hasKey
+                        ? 'Check the key still works'
+                        : `Add a ${spec.label} key to use it`}
                 </span>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={onTest}
-                  disabled={!view.hasKey || isTesting}
+                  // Cloudflare's token is optional, so what makes it testable is
+                  // the pair of ids rather than a saved credential.
+                  disabled={(hasGatewayIds ? isMissingIds : !view.hasKey) || isTesting}
                   className="text-text-muted hover:bg-surface-elevated hover:text-text"
                 >
                   {isTesting ? (

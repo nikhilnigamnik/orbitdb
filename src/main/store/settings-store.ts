@@ -23,9 +23,20 @@ interface AiSettings {
   models: PerProvider<AiModelId>
 }
 
+/**
+ * The two ids the Cloudflare provider needs on top of its token, which lives in
+ * `keys.cloudflare` like every other provider's. Kept **plain**: they identify
+ * rather than authorise, and both appear in every dashboard URL.
+ */
+export interface GatewaySettings {
+  accountId: string
+  gatewayId: string
+}
+
 interface StoreShape {
-  version: 2
+  version: 3
   ai: AiSettings
+  gateway: GatewaySettings
 }
 
 function emptyKeys(): PerProvider<string> {
@@ -38,10 +49,15 @@ function defaultModels(): PerProvider<AiModelId> {
   ) as PerProvider<AiModelId>
 }
 
+function emptyGateway(): GatewaySettings {
+  return { accountId: '', gatewayId: '' }
+}
+
 function emptyState(): StoreShape {
   return {
-    version: 2,
-    ai: { provider: DEFAULT_AI_PROVIDER, keys: emptyKeys(), models: defaultModels() }
+    version: 3,
+    ai: { provider: DEFAULT_AI_PROVIDER, keys: emptyKeys(), models: defaultModels() },
+    gateway: emptyGateway()
   }
 }
 
@@ -65,11 +81,25 @@ interface LegacyAi {
   model?: unknown
 }
 
+/**
+ * The gateway ids, defaulting anything missing or the wrong type. A v2 file has
+ * no block at all, which is the whole of the v2-to-v3 migration: an absent one
+ * reads as a Cloudflare provider nobody has configured yet.
+ */
+function parseGateway(value: unknown): GatewaySettings {
+  const gateway = emptyGateway()
+  if (!value || typeof value !== 'object') return gateway
+  const raw = value as Record<string, unknown>
+  if (typeof raw.accountId === 'string') gateway.accountId = raw.accountId
+  if (typeof raw.gatewayId === 'string') gateway.gatewayId = raw.gatewayId
+  return gateway
+}
+
 function parseFile(): StoreShape {
   const path = storePath()
   if (!existsSync(path)) return emptyState()
 
-  let parsed: { ai?: Record<string, unknown> }
+  let parsed: { ai?: Record<string, unknown>; gateway?: unknown }
   try {
     parsed = JSON.parse(readFileSync(path, 'utf8'))
   } catch {
@@ -80,6 +110,7 @@ function parseFile(): StoreShape {
   if (!ai || typeof ai !== 'object') return emptyState()
 
   const state = emptyState()
+  state.gateway = parseGateway(parsed.gateway)
   const legacy = ai as LegacyAi
   // A v1 file names anthropic implicitly - it was the only provider.
   if (typeof legacy.apiKey === 'string' && !('keys' in ai)) {
@@ -148,7 +179,7 @@ function read(): StoreShape {
     }
   }
 
-  decryptedCache = { version: 2, ai: { ...raw.ai, keys } }
+  decryptedCache = { version: 3, ai: { ...raw.ai, keys }, gateway: { ...raw.gateway } }
   return decryptedCache
 }
 
@@ -168,7 +199,7 @@ function write(state: StoreShape): void {
         ? stored[provider.id]
         : ''
   }
-  writeRaw({ version: 2, ai: { ...state.ai, keys } })
+  writeRaw({ version: 3, ai: { ...state.ai, keys }, gateway: { ...state.gateway } })
 }
 
 export interface ActiveAiSettings {
@@ -240,6 +271,24 @@ export function setAiModel(provider: string, model: string): AiModelId {
   const state = read()
   write({ ...state, ai: { ...state.ai, models: { ...state.ai.models, [provider]: model } } })
   return model
+}
+
+/** The Cloudflare account and gateway ids. Empty strings when not configured. */
+export function getGatewaySettings(): GatewaySettings {
+  return { ...read().gateway }
+}
+
+/**
+ * Save the two ids. Unlike a key these can legitimately be blanked - clearing
+ * them is how you un-configure the provider - so an empty string means empty,
+ * not "unchanged".
+ */
+export function setGatewaySettings(input: GatewaySettings): void {
+  const state = read()
+  write({
+    ...state,
+    gateway: { accountId: input.accountId.trim(), gatewayId: input.gatewayId.trim() }
+  })
 }
 
 /** Test seam - drops the caches so a fresh file is re-read. */

@@ -42,8 +42,47 @@ export const AI_PROVIDERS = [
       { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Older, widely available' },
       { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite', hint: 'Cheapest offered' }
     ]
+  },
+  {
+    id: 'cloudflare',
+    label: 'Cloudflare AI Gateway',
+    keyPlaceholder: 'Cloudflare API token',
+    /**
+     * `provider/model`, where the prefix is Cloudflare's (`google`, not
+     * `google-ai-studio` - that is the separate provider-native route) and the
+     * model part is **the vendor's own id**.
+     *
+     * That second half is load-bearing and was learned the hard way. Cloudflare's
+     * catalog lists `anthropic/claude-haiku-4.5`, but with BYOK the gateway
+     * forwards everything after the slash straight to the vendor, and Anthropic
+     * has no such model - the real id is `claude-haiku-4-5-20251001`. Catalog
+     * names only apply when Unified Billing is supplying the credential. Vendor
+     * ids work under both, so they are what this list uses.
+     */
+    models: [
+      { id: 'anthropic/claude-sonnet-5', label: 'Sonnet 5', hint: 'Anthropic - the default' },
+      {
+        id: 'anthropic/claude-haiku-4-5-20251001',
+        label: 'Haiku 4.5',
+        hint: 'Anthropic - fast and cheap'
+      },
+      { id: 'anthropic/claude-opus-5', label: 'Opus 5', hint: 'Anthropic - strongest' },
+      { id: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra', hint: 'OpenAI - balanced' },
+      { id: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna', hint: 'OpenAI - fast and cheap' },
+      { id: 'google/gemini-3.6-flash', label: 'Gemini 3.6 Flash', hint: 'Google - balanced' },
+      { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Google - cheap' }
+    ]
   }
 ] as const
+
+/**
+ * Providers needing more than a key. Cloudflare is the only one: its account and
+ * gateway ids go in the URL, and unlike the token they are identifiers rather
+ * than secrets, so they are stored and shown in the clear.
+ */
+export function needsGatewayIds(provider: AiProviderId): boolean {
+  return provider === 'cloudflare'
+}
 
 export type AiProviderId = (typeof AI_PROVIDERS)[number]['id']
 export type AiModelId = (typeof AI_PROVIDERS)[number]['models'][number]['id']
@@ -73,6 +112,10 @@ export function aiFeatureLabel(id: string): string {
  */
 export const MISSING_AI_KEY_MESSAGE =
   'No API key for the selected AI provider. Add one in Settings to use the AI features.'
+
+/** Matched the same way as `MISSING_AI_KEY_MESSAGE`, for a half-filled gateway. */
+export const INCOMPLETE_GATEWAY_MESSAGE =
+  'The Cloudflare AI Gateway needs an account id and a gateway id. Add them in Settings.'
 
 export function aiProvider(id: AiProviderId): (typeof AI_PROVIDERS)[number] {
   const found = AI_PROVIDERS.find((provider) => provider.id === id)

@@ -2,6 +2,7 @@ import { ipcMain, app, shell } from 'electron'
 import { safeExternalUrl } from '../app/open-external'
 import { checkForUpdate } from '../app/update-check'
 import type {
+  AiGatewayIds,
   AiSettingsView,
   UsageSummary,
   ConnectionInput,
@@ -41,11 +42,13 @@ import {
   clearAiApiKey,
   getActiveProvider,
   getAiKeyHint,
+  getGatewaySettings,
   getProviderSettings,
   isAiKeyUnreadable,
   setAiApiKey,
   setAiModel,
-  setAiProvider
+  setAiProvider,
+  setGatewaySettings
 } from '../store/settings-store'
 import {
   createConnection,
@@ -257,9 +260,17 @@ export function registerIpcHandlers(): void {
             isKeyUnreadable: isAiKeyUnreadable(p.id),
             model
           }
-        })
+        }),
+        gateway: getGatewaySettings()
       })
     )
+  )
+  ipcMain.handle(
+    'settings:set-gateway',
+    wrap(async (input: AiGatewayIds) => {
+      setGatewaySettings(input)
+      resetModelCache()
+    })
   )
   ipcMain.handle(
     'settings:set-ai-key',
