@@ -7,6 +7,8 @@ import mysql, {
 import {
   MAX_EXACT_COUNT_ROWS,
   MAX_QUERY_RESULT_ROWS,
+  OVERVIEW_TABLE_LIMIT,
+  type ConnectionOverview,
   type CountRowsOptions,
   type ColumnInfo,
   type ConnectionInput,
@@ -16,6 +18,7 @@ import {
   type GetRowsOptions,
   type IndexInfo,
   type QueryResult,
+  type ReferencingKeyInfo,
   type RowDelete,
   type RowMutation,
   type RowUpdate,
@@ -32,6 +35,7 @@ import {
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl, type DdlDialect } from '../ddl'
+import { toCount } from '../coerce'
 import { buildOrderBySql } from '../order-by'
 import { buildFilterSql, type FilterDialect } from '../filters'
 import { recordQuery } from '../query-log'
@@ -361,6 +365,99 @@ async function tableDetails(
   }
   tableDetailsCache.set(cacheKey, result)
   return result
+}
+
+async function getOverview(connectionId: string): Promise<ConnectionOverview> {
+  const pool = getPool(connectionId)
+  const excluded = [...SYSTEM_SCHEMAS]
+  const placeholders = excluded.map(() => '?').join(', ')
+
+  const [meta, counts, tables] = await Promise.all([
+    pool.query<RowDataPacket[]>('select version() as version, database() as db'),
+    pool.query<RowDataPacket[]>(
+      `select count(distinct table_schema) as schemas,
+              sum(table_type = 'BASE TABLE') as tables,
+              sum(table_type = 'VIEW') as views,
+              sum(coalesce(data_length, 0) + coalesce(index_length, 0)) as bytes
+         from information_schema.tables
+        where table_schema not in (${placeholders})`,
+      excluded
+    ),
+    pool.query<RowDataPacket[]>(
+      // data_length and index_length are the engine's own estimates, refreshed
+      // on ANALYZE rather than continuously. Good enough to rank by.
+      `select table_schema as \`schema\`,
+              table_name as name,
+              coalesce(data_length, 0) + coalesce(index_length, 0) as bytes,
+              table_rows as estimated_rows
+         from information_schema.tables
+        where table_schema not in (${placeholders})
+          and table_type = 'BASE TABLE'
+        order by bytes desc
+        limit ${OVERVIEW_TABLE_LIMIT}`,
+      excluded
+    )
+  ])
+
+  const metaRow = meta[0][0] ?? {}
+  const countRow = counts[0][0] ?? {}
+  return {
+    databaseName: String(metaRow.db ?? ''),
+    serverVersion: String(metaRow.version ?? ''),
+    schemaCount: toCount(countRow.schemas),
+    tableCount: toCount(countRow.tables),
+    viewCount: toCount(countRow.views),
+    totalBytes: countRow.bytes == null ? null : toCount(countRow.bytes),
+    largestTables: tables[0].map((t) => ({
+      schema: String(t.schema),
+      name: String(t.name),
+      bytes: toCount(t.bytes),
+      estimatedRows: t.estimated_rows == null ? null : toCount(t.estimated_rows)
+    }))
+  }
+}
+
+/** The `tableDetails` FK query filtered on the referenced side - see the Postgres note. */
+async function referencingKeys(
+  connectionId: string,
+  schema: string,
+  table: string
+): Promise<ReferencingKeyInfo[]> {
+  const pool = getPool(connectionId)
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `select kcu.constraint_name as name,
+            kcu.table_schema as child_schema,
+            kcu.table_name as child_table,
+            group_concat(kcu.column_name order by kcu.ordinal_position separator ',') as columns,
+            group_concat(kcu.referenced_column_name order by kcu.ordinal_position separator ',') as referenced_columns,
+            rc.delete_rule as on_delete,
+            rc.update_rule as on_update
+       from information_schema.key_column_usage kcu
+       join information_schema.referential_constraints rc
+         on rc.constraint_schema = kcu.constraint_schema
+        and rc.constraint_name = kcu.constraint_name
+      where kcu.referenced_table_schema = ?
+        and kcu.referenced_table_name = ?
+      group by kcu.constraint_name, kcu.table_schema, kcu.table_name,
+               rc.delete_rule, rc.update_rule
+      order by kcu.table_schema, kcu.table_name, kcu.constraint_name`,
+    [schema, table]
+  )
+  return rows.map((r) => ({
+    name: String(r.name),
+    schema: String(r.child_schema),
+    table: String(r.child_table),
+    columns: String(r.columns ?? '')
+      .split(',')
+      .filter(Boolean),
+    referencedSchema: schema,
+    referencedTable: table,
+    referencedColumns: String(r.referenced_columns ?? '')
+      .split(',')
+      .filter(Boolean),
+    onDelete: String(r.on_delete ?? 'NO ACTION'),
+    onUpdate: String(r.on_update ?? 'NO ACTION')
+  }))
 }
 
 function quoteIdent(name: string): string {
@@ -771,6 +868,7 @@ export const mysqlDriver: DatabaseDriver = {
   listSchemas,
   listTables,
   tableDetails,
+  referencingKeys,
   getSchemaGraph,
   getRows,
   countRows,
@@ -781,5 +879,6 @@ export const mysqlDriver: DatabaseDriver = {
   executeDdl,
   runQuery,
   cancelQuery,
-  getColumnDistinct
+  getColumnDistinct,
+  getOverview
 }

@@ -76,6 +76,16 @@ export interface ForeignKeyInfo {
   onUpdate: string
 }
 
+/**
+ * A foreign key seen from the far end: one that *points at* the table being
+ * described. `referencedSchema`/`referencedTable` are therefore that table, and
+ * `schema`/`table` name the child holding the constraint.
+ */
+export interface ReferencingKeyInfo extends ForeignKeyInfo {
+  schema: string
+  table: string
+}
+
 export interface TableDetails {
   schema: string
   name: string
@@ -237,6 +247,35 @@ export interface DistinctValuesOptions {
   search?: string
 }
 
+export interface TableSize {
+  schema: string
+  name: string
+  /** Bytes on disk including indexes, or null where the engine cannot say. */
+  bytes: number | null
+  /** The planner's estimate, not an exact count - this is a listing, not a report. */
+  estimatedRows: number | null
+}
+
+/**
+ * What a connection looks like at a glance. Every size is nullable: D1 exposes
+ * no size at all, and a Postgres user without the right grants gets nulls
+ * rather than an error.
+ */
+export interface ConnectionOverview {
+  databaseName: string
+  serverVersion: string
+  schemaCount: number
+  tableCount: number
+  viewCount: number
+  /** Total bytes across the tables listed, or null when unavailable. */
+  totalBytes: number | null
+  /** Largest first, capped at `OVERVIEW_TABLE_LIMIT`. */
+  largestTables: TableSize[]
+}
+
+/** Enough to see where the weight is without turning the page into a report. */
+export const OVERVIEW_TABLE_LIMIT = 10
+
 export const MAX_QUERY_RESULT_ROWS = 10_000
 
 export interface QueryResult {
@@ -248,6 +287,37 @@ export interface QueryResult {
   command: string | null
   durationMs: number
   truncated: boolean
+}
+
+/**
+ * One entry in the query store: every query that ran, plus the ones the user
+ * kept. Starring is what separates them - a starred entry is never pruned, so
+ * "save this query" and "protect it from the history cap" are one action rather
+ * than two concepts that can disagree.
+ */
+export interface SavedQuery {
+  id: string
+  connectionId: string
+  sql: string
+  /** User-given name. Null until one is typed; only starred entries can have one. */
+  name: string | null
+  isStarred: boolean
+  ranAt: string
+  durationMs: number
+  success: boolean
+}
+
+export interface RecordQueryRun {
+  connectionId: string
+  sql: string
+  durationMs: number
+  success: boolean
+}
+
+export interface SavedQueryPatch {
+  name?: string | null
+  isStarred?: boolean
+  sql?: string
 }
 
 export interface GenerateSqlOptions {

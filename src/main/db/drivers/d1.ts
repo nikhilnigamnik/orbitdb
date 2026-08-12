@@ -1,5 +1,7 @@
 import {
   MAX_QUERY_RESULT_ROWS,
+  OVERVIEW_TABLE_LIMIT,
+  type ConnectionOverview,
   type CountRowsOptions,
   type ConnectionInput,
   type DdlRequest,
@@ -8,6 +10,7 @@ import {
   type IndexInfo,
   type QueryOrigin,
   type QueryResult,
+  type ReferencingKeyInfo,
   type RowDelete,
   type RowMutation,
   type RowUpdate,
@@ -24,6 +27,7 @@ import {
 } from '../../../shared/types'
 import { requireConnection } from '../../store/connections-store'
 import { buildDdl } from '../ddl'
+import { toCount } from '../coerce'
 import { buildOrderBySql } from '../order-by'
 import { buildFilterSql } from '../filters'
 import {
@@ -587,6 +591,84 @@ async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]
   return entry.results.map((r) => r.value)
 }
 
+/**
+ * D1 exposes no size figures at all - `dbstat` is not available over the query
+ * API - so every byte count here is null and the UI says so rather than
+ * inventing one. Row counts come from a real `count(*)` per table, which is
+ * affordable only because the table list is short.
+ */
+async function getOverview(connectionId: string): Promise<ConnectionOverview> {
+  const saved = loadSaved(connectionId)
+  const tableList = await callD1<{ name: string; type: string }>(saved, LIST_TABLES_SQL)
+  const all = tableList.results.map((r) => ({ name: String(r.name), type: String(r.type) }))
+  const tables = all.filter((t) => t.type !== 'view')
+
+  const counted = await mapWithConcurrency(tables.slice(0, OVERVIEW_TABLE_LIMIT), async (table) => {
+    try {
+      const entry = await callD1<{ count: number }>(
+        saved,
+        `select count(*) as count from ${quoteIdent(table.name)}`
+      )
+      return { name: table.name, rows: toCount(entry.results[0]?.count) }
+    } catch {
+      return { name: table.name, rows: null }
+    }
+  })
+
+  return {
+    databaseName: saved.name || (saved.databaseId ?? ''),
+    serverVersion: 'Cloudflare D1',
+    schemaCount: 1,
+    tableCount: tables.length,
+    viewCount: all.length - tables.length,
+    totalBytes: null,
+    largestTables: counted
+      .map((t) => ({ schema: SQLITE_SCHEMA, name: t.name, bytes: null, estimatedRows: t.rows }))
+      .sort((a, b) => (b.estimatedRows ?? -1) - (a.estimatedRows ?? -1))
+  }
+}
+
+/**
+ * SQLite has no reverse foreign-key catalogue - `pragma foreign_key_list` only
+ * answers "what does this table point at". So the whole database is swept and
+ * the answers filtered, which is one request per table. Acceptable because the
+ * row editor asks for it once per row opened, not per keystroke.
+ */
+async function referencingKeys(
+  connectionId: string,
+  schema: string,
+  table: string
+): Promise<ReferencingKeyInfo[]> {
+  const saved = loadSaved(connectionId)
+  const tableList = await callD1<{ name: string }>(saved, LIST_BASE_TABLES_SQL)
+  const others = tableList.results.map((r) => String(r.name)).filter((name) => name !== table)
+
+  const perTable = await mapWithConcurrency(others, async (childTable) => {
+    const entry = await callD1<ForeignKeyRow>(
+      saved,
+      `pragma foreign_key_list(${quoteIdent(childTable)})`
+    )
+    return { childTable, foreignKeys: toForeignKeys(entry.results) }
+  })
+
+  const out: ReferencingKeyInfo[] = []
+  for (const { childTable, foreignKeys } of perTable) {
+    for (const fk of foreignKeys) {
+      // SQLite reports the parent unqualified, and D1 has exactly one schema.
+      if (fk.referencedTable !== table) continue
+      out.push({
+        ...fk,
+        // The pragma id is unique per child table, not per database.
+        name: `${childTable}_${fk.name}`,
+        schema,
+        table: childTable,
+        referencedSchema: schema
+      })
+    }
+  }
+  return out
+}
+
 async function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
   const saved = loadSaved(connectionId)
 
@@ -668,6 +750,7 @@ export const d1Driver: DatabaseDriver = {
   listSchemas,
   listTables,
   tableDetails,
+  referencingKeys,
   getSchemaGraph,
   getRows,
   countRows,
@@ -678,5 +761,6 @@ export const d1Driver: DatabaseDriver = {
   executeDdl,
   runQuery,
   cancelQuery,
-  getColumnDistinct
+  getColumnDistinct,
+  getOverview
 }

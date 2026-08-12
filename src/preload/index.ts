@@ -6,6 +6,7 @@ import type {
   AiProviderId,
   AiSettingsView,
   ConnectionInput,
+  ConnectionOverview,
   DdlRequest,
   DistinctValuesOptions,
   ExplainTableOptions,
@@ -21,12 +22,16 @@ import type {
   OperationResult,
   QueryLogEntry,
   QueryResult,
+  RecordQueryRun,
+  ReferencingKeyInfo,
   RowDelete,
   RowMutation,
   RowUpdate,
   RowsResult,
   RunQueryOptions,
   SavedConnection,
+  SavedQuery,
+  SavedQueryPatch,
   SchemaGraph,
   SchemaInfo,
   SuggestIndexesOptions,
@@ -55,11 +60,14 @@ const api = {
   db: {
     connect: (connectionId: string) => invoke<ActiveConnectionMeta>('db:connect', connectionId),
     disconnect: (connectionId: string) => invoke<void>('db:disconnect', connectionId),
+    overview: (connectionId: string) => invoke<ConnectionOverview>('db:overview', connectionId),
     listSchemas: (connectionId: string) => invoke<SchemaInfo[]>('db:list-schemas', connectionId),
     listTables: (connectionId: string, schema: string) =>
       invoke<TableInfo[]>('db:list-tables', connectionId, schema),
     tableDetails: (connectionId: string, schema: string, table: string) =>
       invoke<TableDetails>('db:table-details', connectionId, schema, table),
+    referencingKeys: (connectionId: string, schema: string, table: string) =>
+      invoke<ReferencingKeyInfo[]>('db:referencing-keys', connectionId, schema, table),
     schemaGraph: (connectionId: string, schema: string) =>
       invoke<SchemaGraph>('db:schema-graph', connectionId, schema),
     getRows: (opts: GetRowsOptions) => invoke<RowsResult>('db:rows-get', opts),
@@ -96,6 +104,13 @@ const api = {
     setAiModel: (provider: AiProviderId, model: AiModelId) =>
       invoke<AiModelId>('settings:set-ai-model', provider, model),
     testAi: (provider: AiProviderId) => invoke<void>('settings:test-ai', provider)
+  },
+  queries: {
+    list: (connectionId: string) => invoke<SavedQuery[]>('queries:list', connectionId),
+    record: (input: RecordQueryRun) => invoke<SavedQuery>('queries:record', input),
+    update: (id: string, patch: SavedQueryPatch) => invoke<SavedQuery>('queries:update', id, patch),
+    delete: (id: string) => invoke<void>('queries:delete', id),
+    clearHistory: (connectionId: string) => invoke<void>('queries:clear-history', connectionId)
   },
   usage: {
     summary: () => invoke<UsageSummary>('usage:summary'),
