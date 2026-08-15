@@ -152,6 +152,11 @@ describe('the tunnel end to end', () => {
   function startEchoServer(): Promise<{ port: number; server: NetServer }> {
     return new Promise((resolve) => {
       const server = createServer((socket) => {
+        // closeTunnel destroys the far end mid-flight, so this side sees
+        // ECONNRESET. Unhandled, a socket 'error' takes the whole run down -
+        // and only under load, which makes it a flaky failure rather than a
+        // reproducible one.
+        socket.on('error', () => undefined)
         socket.on('data', (chunk) => socket.write(chunk.toString('utf8').toUpperCase()))
       })
       server.listen(0, '127.0.0.1', () => {
@@ -183,6 +188,7 @@ describe('the tunnel end to end', () => {
           client.on('tcpip', (accept, reject, info) => {
             const target = connect(info.destPort, info.destIP, () => {
               const channel = accept()
+              channel.on('error', () => undefined)
               channel.pipe(target).pipe(channel)
             })
             target.on('error', () => reject())

@@ -98,6 +98,11 @@
     "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },
+  "pnpm": {
+    "overrides": {
+      "cpu-features": "-"
+    }
+  },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
     "@electron-toolkit/eslint-config-ts": "^3.1.0",

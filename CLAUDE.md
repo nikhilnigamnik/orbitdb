@@ -121,7 +121,9 @@ Tunnel and pool have the same lifetime, so `disconnectPool` closes both - includ
 
 Agent auth reads `SSH_AUTH_SOCK` **first on every platform**, falling back to the literal `'pageant'` only on Windows when nothing set it. Windows' built-in OpenSSH agent exports a named pipe through that variable and ssh2 takes it directly, so answering `'pageant'` unconditionally strands those users.
 
-`ssh2` is pinned at `1.17.0`. Its native deps (`cpu-features`, `nan`) are **optional** and it falls back to pure JS, which is why `npmRebuild: false` in `electron-builder.yml` stays correct - do not add anything here that needs a native rebuild.
+`ssh2` is pinned at `1.17.0` and runs on its pure-JS fallback.
+
+**`cpu-features` is removed via a `pnpm.overrides` entry set to `"-"`,** and that is not cosmetic. It is an optional native dep of ssh2 whose published tarball omits the vendored `deps/cpu_features` submodule, so node-gyp fails on it with `buildcheck.gypi not found`. `npmRebuild: false` does **not** save you: it governs the `build` command, while the `postinstall` hook calls `electron-builder install-app-deps` directly, which rebuilds every native module it finds regardless. pnpm's ignored-build-scripts warning hides this locally - the failure only appears on a clean CI install. If you ever add a dependency with optional native deps, check `pnpm install --frozen-lockfile` on a clean `node_modules`, not just a warm one.
 
 The renderer side is `ssh-tunnel-fields.tsx` (a `SettingsCard`-shaped card whose rows appear under an `AnimatedSize`) plus `ssh-tunnel-route.tsx`, which draws the hops - this machine → bastion → database - because "which host is reached from where" is the only genuinely confusing thing about a tunnel, and the database host field meaning "resolved on the far side" is not obvious from a label. **`shrink-0` on the card root is load-bearing:** it is a flex child of the sheet's scrolling column, so a default flex-shrink compresses it, and its own `overflow-hidden` turns that into silently clipped fields rather than a visible overflow. jsdom has no layout, so no unit test catches that class of bug - it was found by driving the built app.
 
