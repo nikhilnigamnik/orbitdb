@@ -58,6 +58,19 @@ const D1: ConnectionInput = {
   apiToken: 'tok3n'
 }
 
+const TUNNELLED: ConnectionInput = {
+  ...PG,
+  name: 'tunnelled',
+  sshEnabled: true,
+  sshHost: 'bastion',
+  sshPort: 22,
+  sshUser: 'ubuntu',
+  sshAuthMethod: 'key',
+  sshPassword: 'ssh-pw',
+  sshPrivateKey: '-----BEGIN OPENSSH PRIVATE KEY-----',
+  sshPassphrase: 'unlock'
+}
+
 function sealed(plain: string): string {
   return `enc:v1:${Buffer.from(`sealed:${plain}`, 'utf8').toString('base64')}`
 }
@@ -95,6 +108,34 @@ describe('encryption at rest', () => {
     expect(onDisk()[1].apiToken).toBe(sealed('tok3n'))
     expect(store.getConnection(pg.id)?.password).toBe('s3cret')
     expect(store.requireConnection(pg.id).password).toBe('s3cret')
+  })
+
+  it('seals the SSH credentials too, and leaves the rest of the tunnel plain', () => {
+    const conn = store.createConnection(TUNNELLED)
+    const row = onDisk()[0]
+
+    expect(row.sshPassword).toBe(sealed('ssh-pw'))
+    expect(row.sshPrivateKey).toBe(sealed('-----BEGIN OPENSSH PRIVATE KEY-----'))
+    expect(row.sshPassphrase).toBe(sealed('unlock'))
+    // These identify the bastion rather than authorising anything.
+    expect(row.sshHost).toBe('bastion')
+    expect(row.sshUser).toBe('ubuntu')
+
+    const read = store.requireConnection(conn.id)
+    expect(read.sshPrivateKey).toBe('-----BEGIN OPENSSH PRIVATE KEY-----')
+    expect(read.sshPassphrase).toBe('unlock')
+  })
+
+  it('keeps an unreadable SSH key on disk rather than blanking it', async () => {
+    const conn = store.createConnection(TUNNELLED)
+    stub.failDecrypt = true
+    store = await freshStore()
+
+    expect(() => store.requireConnection(conn.id)).toThrow(/could not be decrypted/)
+    // Saving an unrelated edit must not write the empty read-back over the key.
+    store.updateConnection(conn.id, { ...TUNNELLED, name: 'renamed', sshPrivateKey: '' })
+    expect(onDisk()[0].sshPrivateKey).toBe(sealed('-----BEGIN OPENSSH PRIVATE KEY-----'))
+    expect(onDisk()[0].name).toBe('renamed')
   })
 
   it('falls back to plaintext when the OS has no keychain', async () => {
@@ -194,6 +235,24 @@ describe('crud', () => {
     store.deleteConnection(pg.id)
     expect(store.listConnections().map((c) => c.name)).toEqual(['d1'])
     expect(store.getConnection(pg.id)).toBeUndefined()
+  })
+
+  it('pins an SSH host key without touching anything else', () => {
+    const conn = store.createConnection(TUNNELLED)
+    store.setSshHostKeyFingerprint(conn.id, 'SHA256:abc')
+
+    expect(store.getConnection(conn.id)?.sshHostKeyFingerprint).toBe('SHA256:abc')
+    expect(onDisk()[0].sshHostKeyFingerprint).toBe('SHA256:abc')
+    expect(store.requireConnection(conn.id).sshPrivateKey).toBe(
+      '-----BEGIN OPENSSH PRIVATE KEY-----'
+    )
+  })
+
+  it('ignores an empty fingerprint or an unknown connection', () => {
+    const conn = store.createConnection(TUNNELLED)
+    store.setSshHostKeyFingerprint(conn.id, '')
+    store.setSshHostKeyFingerprint('nope', 'SHA256:abc')
+    expect(store.getConnection(conn.id)?.sshHostKeyFingerprint).toBeUndefined()
   })
 
   it('throws on an unknown connection', () => {

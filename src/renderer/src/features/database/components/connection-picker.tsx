@@ -1,6 +1,12 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconArrowRight, IconDatabase, IconPlug, IconSettings } from '@tabler/icons-react'
+import {
+  IconArrowRight,
+  IconDatabase,
+  IconPlug,
+  IconSettings,
+  IconShieldLock
+} from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Chip } from '@renderer/components/ui/chip'
 import { Spinner } from '@renderer/components/ui/spinner'
@@ -10,7 +16,7 @@ import { LoadingState } from '@renderer/components/common/loading-state'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { ENGINE_ICON } from '@renderer/features/connections/components/engine-icons'
 import { ROUTES } from '@renderer/config/routes'
-import { DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL } from '@renderer/config/site'
+import { DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL, usesSshTunnel } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 
@@ -153,6 +159,14 @@ export function ConnectionPicker() {
                       <Chip tone={ENVIRONMENT_TONE[environment]}>
                         {ENVIRONMENT_LABEL[environment]}
                       </Chip>
+                      {usesSshTunnel(connection) && (
+                        <span
+                          className="flex shrink-0 items-center text-text-subtle/70"
+                          title={`Tunnelled through ${connection.sshHost || 'SSH'}`}
+                        >
+                          <IconShieldLock size={11} />
+                        </span>
+                      )}
                     </div>
                     <div className="mt-1 truncate font-mono text-xs leading-tight text-text-subtle">
                       {subtitle(connection)}

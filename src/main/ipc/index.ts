@@ -1,4 +1,7 @@
-import { ipcMain, app, shell } from 'electron'
+import { ipcMain, app, dialog, shell } from 'electron'
+import { readFile } from 'fs/promises'
+import { homedir } from 'os'
+import { basename, join } from 'path'
 import { safeExternalUrl } from '../app/open-external'
 import { checkForUpdate } from '../app/update-check'
 import type {
@@ -22,7 +25,8 @@ import type {
   SavedQueryPatch,
   SuggestIndexesOptions,
   ValueSearchOptions,
-  CheckReferencesOptions
+  CheckReferencesOptions,
+  SshKeyPick
 } from '../../shared/types'
 import { generateSql } from '../ai/generate-sql'
 import { explainTable } from '../ai/explain-table'
@@ -126,6 +130,29 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'connections:test',
     wrap(async (input: ConnectionInput) => testConnection(input))
+  )
+  ipcMain.handle(
+    'connections:pick-ssh-key',
+    wrap(async (): Promise<SshKeyPick | null> => {
+      const result = await dialog.showOpenDialog({
+        title: 'Select an SSH private key',
+        properties: ['openFile', 'showHiddenFiles'],
+        // ~/.ssh is hidden on every platform, so it is not reachable without it.
+        defaultPath: join(homedir(), '.ssh')
+      })
+      const path = result.filePaths[0]
+      if (result.canceled || !path) return null
+      const contents = await readFile(path, 'utf8')
+      if (!contents.includes('PRIVATE KEY')) {
+        throw new Error(
+          `${basename(path)} does not look like a private key. Pick the key itself, not the ` +
+            `matching .pub file.`
+        )
+      }
+      // The contents travel to the renderer so the form can hand them back to be
+      // sealed; the path comes along only as a label of what was picked.
+      return { path, contents }
+    })
   )
 
   ipcMain.handle(

@@ -34,7 +34,16 @@ import {
   type CheckReferencesOptions,
   type CheckReferencesResult
 } from '../../../shared/types'
-import { requireConnection } from '../../store/connections-store'
+import { requireConnection, setSshHostKeyFingerprint } from '../../store/connections-store'
+import {
+  addTunnelPoolEvictor,
+  closeTunnel,
+  isSshEnabled,
+  openEphemeralTunnel,
+  openTunnel,
+  type EphemeralTunnel,
+  type TunnelEndpoint
+} from '../ssh-tunnel'
 import { buildDdl, type DdlDialect } from '../ddl'
 import { toCount } from '../coerce'
 import { buildOrderBySql } from '../order-by'
@@ -58,10 +67,12 @@ function invalidateTableDetailsForConnection(connectionId: string): void {
   }
 }
 
-function toPoolConfig(input: ConnectionInput): PoolConfig {
+function toPoolConfig(input: ConnectionInput, tunnel?: TunnelEndpoint): PoolConfig {
   return {
-    host: input.host,
-    port: input.port,
+    // Over a tunnel the driver dials the local forward; the real host is only
+    // resolved on the far side of the bastion.
+    host: tunnel?.host ?? input.host,
+    port: tunnel?.port ?? input.port,
     database: input.database,
     user: input.user,
     password: input.password,
@@ -72,12 +83,30 @@ function toPoolConfig(input: ConnectionInput): PoolConfig {
   }
 }
 
-function getPool(connectionId: string): Pool {
+/** Two queries on a cold connection would otherwise each build a pool. */
+const pendingPools = new Map<string, Promise<Pool>>()
+
+function getPool(connectionId: string): Promise<Pool> {
   const existing = pools.get(connectionId)
-  if (existing) return existing
+  if (existing) return Promise.resolve(existing)
+  const inFlight = pendingPools.get(connectionId)
+  if (inFlight) return inFlight
+  const promise = createPool(connectionId).finally(() => pendingPools.delete(connectionId))
+  pendingPools.set(connectionId, promise)
+  return promise
+}
+
+async function createPool(connectionId: string): Promise<Pool> {
   const saved = requireConnection(connectionId)
   if (saved.engine !== 'postgres') throw new Error(`Wrong driver for connection ${connectionId}`)
-  const pool = new Pool(toPoolConfig(saved))
+  let tunnel: TunnelEndpoint | undefined
+  if (isSshEnabled(saved)) {
+    tunnel = await openTunnel(saved)
+    if (tunnel.learnedFingerprint) {
+      setSshHostKeyFingerprint(saved.id, tunnel.learnedFingerprint)
+    }
+  }
+  const pool = new Pool(toPoolConfig(saved, tunnel))
   pool.on('error', (err) => {
     console.error(`[pg pool ${connectionId}] error`, err)
   })
@@ -85,6 +114,17 @@ function getPool(connectionId: string): Pool {
   pools.set(connectionId, pool)
   return pool
 }
+
+// When the bastion drops, the forwarded port stops working but the pool would
+// happily keep handing out sockets to it. Dropping it here means the next call
+// rebuilds both.
+addTunnelPoolEvictor((connectionId) => {
+  const pool = pools.get(connectionId)
+  if (!pool) return
+  pools.delete(connectionId)
+  invalidateTableDetailsForConnection(connectionId)
+  pool.end().catch(() => undefined)
+})
 
 function instrumentPgPool(pool: Pool, connectionId: string): void {
   const original = pool.query.bind(pool) as (...args: unknown[]) => Promise<unknown>
@@ -126,8 +166,18 @@ function instrumentPgPool(pool: Pool, connectionId: string): void {
 }
 
 async function disconnectPool(connectionId: string): Promise<void> {
+  // An SSH handshake takes seconds, so disconnecting mid-connect is realistic.
+  // Let the in-flight one land first: neither the pool nor the tunnel is
+  // registered yet, so closing now would close nothing and leave both standing
+  // once it resolved.
+  const inFlight = pendingPools.get(connectionId)
+  if (inFlight) await inFlight.catch(() => undefined)
+
   const pool = pools.get(connectionId)
   invalidateTableDetailsForConnection(connectionId)
+  // The tunnel and the pool have the same lifetime, so it goes even when there
+  // was no pool - a failed first connect can leave one standing.
+  closeTunnel(connectionId)
   if (!pool) return
   pools.delete(connectionId)
   try {
@@ -143,20 +193,30 @@ async function disconnectAll(): Promise<void> {
 }
 
 async function test(input: ConnectionInput): Promise<TestConnectionResult> {
-  const pool = new Pool({ ...toPoolConfig(input), max: 1 })
-  instrumentPgPool(pool, '<test>')
+  let tunnel: EphemeralTunnel | undefined
+  let pool: Pool | null = null
   try {
+    if (isSshEnabled(input)) {
+      tunnel = await openEphemeralTunnel(input)
+    }
+    pool = new Pool({ ...toPoolConfig(input, tunnel), max: 1 })
+    instrumentPgPool(pool, '<test>')
     const res = await pool.query<{ version: string }>('select version() as version')
-    return { success: true, serverVersion: res.rows[0]?.version }
+    return {
+      success: true,
+      serverVersion: res.rows[0]?.version,
+      sshHostKeyFingerprint: tunnel?.learnedFingerprint
+    }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) }
   } finally {
-    await pool.end().catch(() => undefined)
+    if (pool) await pool.end().catch(() => undefined)
+    if (tunnel) closeTunnel(tunnel.key)
   }
 }
 
 async function describeActive(saved: SavedConnection): Promise<ActiveMeta> {
-  const pool = getPool(saved.id)
+  const pool = await getPool(saved.id)
   const res = await pool.query<{ version: string; database: string; user: string }>(
     'select version() as version, current_database() as database, current_user as user'
   )
@@ -171,7 +231,7 @@ async function describeActive(saved: SavedConnection): Promise<ActiveMeta> {
 const SYSTEM_SCHEMAS = ['pg_catalog', 'information_schema', 'pg_toast']
 
 async function listSchemas(connectionId: string): Promise<SchemaInfo[]> {
-  const pool = getPool(connectionId)
+  const pool = await getPool(connectionId)
   const res = await pool.query<{ name: string }>(
     `select nspname as name
        from pg_namespace
@@ -185,7 +245,7 @@ async function listSchemas(connectionId: string): Promise<SchemaInfo[]> {
 }
 
 async function listTables(connectionId: string, schema: string): Promise<TableInfo[]> {
-  const pool = getPool(connectionId)
+  const pool = await getPool(connectionId)
   const res = await pool.query<{
     schema: string
     name: string
@@ -255,7 +315,7 @@ async function tableDetails(
   const cached = tableDetailsCache.get(cacheKey)
   if (cached) return cached
 
-  const pool = getPool(connectionId)
+  const pool = await getPool(connectionId)
 
   const kindRes = await pool.query<{ kind: string; estimated_rows: string | null }>(
     `select c.relkind::text as kind,
@@ -435,7 +495,7 @@ async function referencingKeys(
   schema: string,
   table: string
 ): Promise<ReferencingKeyInfo[]> {
-  const pool = getPool(connectionId)
+  const pool = await getPool(connectionId)
   const res = await pool.query<{
     name: string
     child_schema: string
@@ -514,7 +574,7 @@ const searchDialect: ValueSearchDialect = {
 }
 
 async function searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult> {
-  const pool = getPool(opts.connectionId)
+  const pool = await getPool(opts.connectionId)
   return sweepTables(opts.schema, opts.term, opts.mode, {
     dialect: searchDialect,
     listTables: () => listTables(opts.connectionId, opts.schema),
@@ -543,7 +603,7 @@ async function getRows(opts: GetRowsOptions): Promise<RowsResult> {
   const limit = Math.max(1, Math.min(opts.limit ?? 100, 1000))
   const offset = Math.max(0, opts.offset ?? 0)
 
-  const pool = getPool(opts.connectionId)
+  const pool = await getPool(opts.connectionId)
   const sql = `select * from ${qualifiedTable(opts.schema, opts.table)} ${whereSql} ${orderSql} limit ${limit} offset ${offset}`
   const rowsRes = await pool.query<Record<string, unknown>>(sql, params)
 
@@ -568,7 +628,7 @@ async function countRows(opts: CountRowsOptions): Promise<number | null> {
   // the UI would feel; the estimate already covers that case.
   if (!whereSql && (details.estimatedRows ?? 0) > MAX_EXACT_COUNT_ROWS) return null
 
-  const pool = getPool(opts.connectionId)
+  const pool = await getPool(opts.connectionId)
   const res = await pool.query<{ total: string }>(
     `select count(*)::text as total from ${qualifiedTable(opts.schema, opts.table)} ${whereSql}`,
     params
@@ -596,7 +656,7 @@ async function insertRow(opts: RowMutation): Promise<Record<string, unknown>> {
   }
   if (cols.length === 0) throw new Error('No valid columns to insert')
 
-  const pool = getPool(opts.connectionId)
+  const pool = await getPool(opts.connectionId)
   const sql = `insert into ${qualifiedTable(opts.schema, opts.table)} (${cols.join(', ')}) values (${placeholders.join(', ')}) ${returningClause(details)}`
   const res = await pool.query<Record<string, unknown>>(sql, values)
   return res.rows[0]
@@ -625,7 +685,7 @@ async function updateRow(opts: RowUpdate): Promise<Record<string, unknown>> {
     whereClauses.push(`${quoteIdent(pkCol)} = $${params.length}`)
   }
 
-  const pool = getPool(opts.connectionId)
+  const pool = await getPool(opts.connectionId)
   const sql = `update ${qualifiedTable(opts.schema, opts.table)} set ${setClauses.join(', ')} where ${whereClauses.join(' and ')} ${returningClause(details)}`
   const res = await pool.query<Record<string, unknown>>(sql, params)
   if (res.rowCount === 0) throw new Error('No row matched the primary key')
@@ -644,7 +704,7 @@ async function deleteRow(opts: RowDelete): Promise<{ deleted: number }> {
     params.push(opts.pk[pkCol])
     whereClauses.push(`${quoteIdent(pkCol)} = $${params.length}`)
   }
-  const pool = getPool(opts.connectionId)
+  const pool = await getPool(opts.connectionId)
   const sql = `delete from ${qualifiedTable(opts.schema, opts.table)} where ${whereClauses.join(' and ')}`
   const res = await pool.query(sql, params)
   return { deleted: res.rowCount ?? 0 }
@@ -663,7 +723,7 @@ async function generateDdl(opts: DdlRequest): Promise<string> {
 
 async function executeDdl(opts: DdlRequest): Promise<void> {
   const sql = buildDdl(opts.operation, opts.schema, opts.table, ddlDialect)
-  const pool = getPool(opts.connectionId)
+  const pool = await getPool(opts.connectionId)
   await pool.query(sql)
   invalidateTableDetailsForConnection(opts.connectionId)
 }
@@ -675,7 +735,7 @@ interface PgInflightQuery {
 const pgInflight = new Map<string, PgInflightQuery>()
 
 async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
-  const pool = getPool(opts.connectionId)
+  const pool = await getPool(opts.connectionId)
   const started = Date.now()
   // Runs on a dedicated client (so the backend PID is stable for cancellation),
   // which bypasses the instrumented pool.query - log it explicitly.
@@ -753,7 +813,7 @@ async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
 async function cancelQuery(connectionId: string, queryId: string): Promise<void> {
   const entry = pgInflight.get(queryId)
   if (!entry || entry.connectionId !== connectionId) return
-  const pool = getPool(connectionId)
+  const pool = await getPool(connectionId)
   try {
     await pool.query('select pg_cancel_backend($1)', [entry.pid])
   } catch (err) {
@@ -762,7 +822,7 @@ async function cancelQuery(connectionId: string, queryId: string): Promise<void>
 }
 
 async function checkReferences(opts: CheckReferencesOptions): Promise<CheckReferencesResult> {
-  const pool = getPool(opts.connectionId)
+  const pool = await getPool(opts.connectionId)
   return sweepReferences(opts.schema, {
     dialect: searchDialect,
     loadTables: async () => {
@@ -784,7 +844,7 @@ async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]
   if (!details.columns.some((c) => c.name === opts.column)) {
     throw new Error(`Column ${opts.column} does not exist on ${opts.schema}.${opts.table}`)
   }
-  const pool = getPool(opts.connectionId)
+  const pool = await getPool(opts.connectionId)
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500)
   const params: unknown[] = []
   let where = ''
@@ -799,7 +859,7 @@ async function getColumnDistinct(opts: DistinctValuesOptions): Promise<unknown[]
 }
 
 async function getOverview(connectionId: string): Promise<ConnectionOverview> {
-  const pool = getPool(connectionId)
+  const pool = await getPool(connectionId)
   const systemFilter = SYSTEM_SCHEMAS.map((_, i) => `$${i + 1}`).join(', ')
 
   const [meta, counts, tables] = await Promise.all([
@@ -858,7 +918,7 @@ async function getOverview(connectionId: string): Promise<ConnectionOverview> {
 }
 
 async function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
-  const pool = getPool(connectionId)
+  const pool = await getPool(connectionId)
 
   const tablesPromise = pool.query<{ name: string }>(
     `select c.relname as name

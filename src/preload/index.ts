@@ -41,6 +41,7 @@ import type {
   TableInfo,
   UsageSummary,
   TestConnectionResult,
+  SshKeyPick,
   UpdateCheckResult,
   ValueSearchOptions,
   ValueSearchResult,
@@ -60,7 +61,8 @@ const api = {
     update: (id: string, input: ConnectionInput) =>
       invoke<SavedConnection>('connections:update', id, input),
     delete: (id: string) => invoke<void>('connections:delete', id),
-    test: (input: ConnectionInput) => invoke<TestConnectionResult>('connections:test', input)
+    test: (input: ConnectionInput) => invoke<TestConnectionResult>('connections:test', input),
+    pickSshKey: () => invoke<SshKeyPick | null>('connections:pick-ssh-key')
   },
   db: {
     connect: (connectionId: string) => invoke<ActiveConnectionMeta>('db:connect', connectionId),

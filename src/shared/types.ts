@@ -6,6 +6,20 @@ export type DatabaseEngine = 'postgres' | 'mysql' | 'd1'
 
 export type ConnectionEnvironment = 'dev' | 'stage' | 'prod'
 
+export type SshAuthMethod = 'password' | 'key' | 'agent'
+
+export const SSH_DEFAULT_PORT = 22
+
+/**
+ * Whether a connection actually rides a tunnel. Shared rather than duplicated
+ * because the renderer badges it and the main process acts on it: D1 speaks
+ * over the REST API, so a `sshEnabled` left set by switching engine must not
+ * read as "tunnelled" on one side and be ignored on the other.
+ */
+export function usesSshTunnel(input: Pick<ConnectionInput, 'engine' | 'sshEnabled'>): boolean {
+  return input.engine !== 'd1' && input.sshEnabled === true
+}
+
 export interface ConnectionInput {
   name: string
   engine: DatabaseEngine
@@ -20,6 +34,24 @@ export interface ConnectionInput {
   accountId?: string
   databaseId?: string
   apiToken?: string
+  // SSH tunnel - flat like the D1 fields above, because connections-store seals
+  // secrets by top-level key name and a nested block would not reach that list.
+  sshEnabled?: boolean
+  sshHost?: string
+  sshPort?: number
+  sshUser?: string
+  sshAuthMethod?: SshAuthMethod
+  sshPassword?: string
+  sshPrivateKey?: string
+  sshPassphrase?: string
+  /** SHA-256 host key fingerprint pinned on first connect. Empty means trust-on-first-use. */
+  sshHostKeyFingerprint?: string
+}
+
+/** What the SSH key file picker hands back: contents to seal, path to display. */
+export interface SshKeyPick {
+  path: string
+  contents: string
 }
 
 export interface SavedConnection extends ConnectionInput {
@@ -32,6 +64,8 @@ export interface TestConnectionResult {
   success: boolean
   error?: string
   serverVersion?: string
+  /** Fingerprint the tunnel saw, so the form can pin it on save. */
+  sshHostKeyFingerprint?: string
 }
 
 export interface SchemaInfo {

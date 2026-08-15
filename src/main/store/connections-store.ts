@@ -6,7 +6,13 @@ import type { ConnectionInput, SavedConnection } from '../../shared/types'
 import { decryptString, encryptString, isEncrypted, isEncryptionAvailable } from './crypto'
 
 const FILE_NAME = 'connections.json'
-const SENSITIVE_FIELDS = ['password', 'apiToken'] as const
+const SENSITIVE_FIELDS = [
+  'password',
+  'apiToken',
+  'sshPassword',
+  'sshPrivateKey',
+  'sshPassphrase'
+] as const
 type SensitiveField = (typeof SENSITIVE_FIELDS)[number]
 
 interface StoreShape {
@@ -201,6 +207,22 @@ export function updateConnection(id: string, input: ConnectionInput): SavedConne
   // are still unreadable, so a re-entered one clears itself.
   write({ ...state, connections })
   return updated
+}
+
+/**
+ * Pin the bastion's host key on first successful connect. Kept separate from
+ * updateConnection because it is written by the tunnel rather than by the user,
+ * and must never look like an edit that could clear a secret.
+ */
+export function setSshHostKeyFingerprint(id: string, fingerprint: string): void {
+  if (!fingerprint) return
+  const state = read()
+  const idx = state.connections.findIndex((c) => c.id === id)
+  if (idx === -1) return
+  if (state.connections[idx].sshHostKeyFingerprint === fingerprint) return
+  const connections = [...state.connections]
+  connections[idx] = { ...connections[idx], sshHostKeyFingerprint: fingerprint }
+  write({ ...state, connections })
 }
 
 export function deleteConnection(id: string): void {

@@ -3,6 +3,7 @@ import {
   IconDatabase,
   IconDotsVertical,
   IconLock,
+  IconShieldLock,
   IconPencil,
   IconPlugOff,
   IconTrash
@@ -12,7 +13,7 @@ import { Chip } from '@renderer/components/ui/chip'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { Popover } from '@renderer/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
-import { DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL } from '@renderer/config/site'
+import { DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL, usesSshTunnel } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 import type { ConnectionHealth } from '../lib/use-connection-health'
@@ -152,6 +153,18 @@ export function ConnectionCard({
                 </span>
               </TooltipTrigger>
               <TooltipContent side="bottom">SSL enabled</TooltipContent>
+            </Tooltip>
+          )}
+          {usesSshTunnel(connection) && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex shrink-0 items-center text-text-subtle/70">
+                  <IconShieldLock size={11} />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                Tunnelled through {connection.sshHost || 'SSH'}
+              </TooltipContent>
             </Tooltip>
           )}
         </div>
