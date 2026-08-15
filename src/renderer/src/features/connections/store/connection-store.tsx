@@ -39,24 +39,46 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
     }
   }, [])
 
+  /**
+   * Re-read the list without touching loading or error state - for refreshes
+   * the user did not ask for, where a spinner or a cleared error would be
+   * noise. `refresh` is still the one bound to the Refresh button.
+   */
+  const reloadQuietly = React.useCallback(async () => {
+    try {
+      setConnections(await unwrap(window.api.connections.list()))
+    } catch {
+      // The visible list is still the last good one; a background re-read that
+      // fails is not worth an error state over.
+    }
+  }, [])
+
   React.useEffect(() => {
     void refresh()
   }, [refresh])
 
-  const connect = React.useCallback(async (id: string) => {
-    setIsConnecting(true)
-    setConnectError(null)
-    try {
-      const meta = await unwrap(window.api.db.connect(id))
-      setActive(meta)
-    } catch (err) {
-      setActive(null)
-      setConnectError(err instanceof Error ? err.message : String(err))
-      throw err
-    } finally {
-      setIsConnecting(false)
-    }
-  }, [])
+  const connect = React.useCallback(
+    async (id: string) => {
+      setIsConnecting(true)
+      setConnectError(null)
+      try {
+        const meta = await unwrap(window.api.db.connect(id))
+        setActive(meta)
+        // Connecting can write back to the saved connection - an SSH tunnel
+        // pins the bastion's host key on its first success. Without this the
+        // list stays as it loaded at mount, and editing any field later would
+        // save that stale copy over the pin and silently unpin it.
+        void reloadQuietly()
+      } catch (err) {
+        setActive(null)
+        setConnectError(err instanceof Error ? err.message : String(err))
+        throw err
+      } finally {
+        setIsConnecting(false)
+      }
+    },
+    [reloadQuietly]
+  )
 
   const disconnect = React.useCallback(async () => {
     if (!active) return

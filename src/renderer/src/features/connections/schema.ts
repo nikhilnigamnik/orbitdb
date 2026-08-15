@@ -17,9 +17,57 @@ export const connectionSchema = z
     ssl: z.boolean(),
     accountId: z.string().optional().default(''),
     databaseId: z.string().optional().default(''),
-    apiToken: z.string().optional().default('')
+    apiToken: z.string().optional().default(''),
+    sshEnabled: z.boolean().optional().default(false),
+    sshHost: z.string().optional().default(''),
+    sshPort: z
+      .number({ invalid_type_error: 'SSH port must be a number' })
+      .int('SSH port must be an integer')
+      .min(0, 'SSH port must be at least 0')
+      .max(65535, 'SSH port must be at most 65535')
+      .optional()
+      .default(22),
+    sshUser: z.string().optional().default(''),
+    sshAuthMethod: z.enum(['password', 'key', 'agent']).optional().default('agent'),
+    sshPassword: z.string().optional().default(''),
+    sshPrivateKey: z.string().optional().default(''),
+    sshPassphrase: z.string().optional().default(''),
+    sshHostKeyFingerprint: z.string().optional().default('')
   })
   .superRefine((val, ctx) => {
+    if (val.sshEnabled && val.engine !== 'd1') {
+      if (!val.sshHost.trim())
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['sshHost'],
+          message: 'SSH host is required'
+        })
+      if (val.sshPort < 1)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['sshPort'],
+          message: 'SSH port must be at least 1'
+        })
+      if (!val.sshUser.trim())
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['sshUser'],
+          message: 'SSH user is required'
+        })
+      // The agent supplies its own credential, so only these two need one here.
+      if (val.sshAuthMethod === 'password' && !val.sshPassword)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['sshPassword'],
+          message: 'SSH password is required'
+        })
+      if (val.sshAuthMethod === 'key' && !val.sshPrivateKey.trim())
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['sshPrivateKey'],
+          message: 'Choose a private key file'
+        })
+    }
     if (val.engine === 'd1') {
       if (!val.accountId.trim())
         ctx.addIssue({

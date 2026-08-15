@@ -30,6 +30,7 @@ import { postgresDriver } from './drivers/postgres'
 import { mysqlDriver } from './drivers/mysql'
 import { d1Driver } from './drivers/d1'
 import { clearSweepCancel, requestSweepCancel } from './sweep-cancel'
+import { closeAllTunnels } from './ssh-tunnel'
 
 function driverFor(engine: DatabaseEngine): DatabaseDriver {
   if (engine === 'mysql') return mysqlDriver
@@ -63,6 +64,9 @@ export async function disconnectAll(): Promise<void> {
     mysqlDriver.disconnectAll(),
     d1Driver.disconnectAll()
   ])
+  // Each disconnectPool closes its own tunnel; this also catches the ephemeral
+  // ones a connection test can leave behind.
+  closeAllTunnels()
 }
 
 export function listSchemas(connectionId: string): Promise<SchemaInfo[]> {

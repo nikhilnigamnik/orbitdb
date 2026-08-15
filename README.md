@@ -9,6 +9,7 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 **Browsing and editing**
 
 - **Multi-engine connections** - saved profiles per engine, credentials encrypted at rest via the OS keychain, testable before you connect.
+- **SSH tunnels** - reach a database that only its bastion can see. Authenticate with your running SSH agent, a key file, or a password, and the bastion's host key is pinned on first connect so a changed key stops the connection rather than going unnoticed.
 - **Schema browser** - schemas, tables, views, columns, indexes and foreign keys in a sidebar tree, with pinned tables and per-table actions.
 - **Data grid** - paginated rows with sorting, resizable columns, multi-row selection and foreign-key jumps. Row counts are exact rather than estimated wherever counting is affordable.
 - **Relationships both ways** - follow a foreign key out to its parent from any cell, and see from the row editor which rows in other tables reference the one you are editing, counted, with cascading deletes flagged.
@@ -55,13 +56,13 @@ Each provider keeps its own key and model, so switching between them costs nothi
 
 ## Supported engines
 
-| Engine        | Driver   | Connection                           |
-| ------------- | -------- | ------------------------------------ |
-| PostgreSQL    | `pg`     | host / port / user / password / SSL  |
-| MySQL/MariaDB | `mysql2` | host / port / user / password / SSL  |
-| Cloudflare D1 | REST API | account ID + database ID + API token |
+| Engine        | Driver   | Connection                           | SSH tunnel |
+| ------------- | -------- | ------------------------------------ | ---------- |
+| PostgreSQL    | `pg`     | host / port / user / password / SSL  | yes        |
+| MySQL/MariaDB | `mysql2` | host / port / user / password / SSL  | yes        |
+| Cloudflare D1 | REST API | account ID + database ID + API token | n/a        |
 
-Postgres-compatible hosts - Neon, Supabase, Timescale - connect through the Postgres option.
+Postgres-compatible hosts - Neon, Supabase, Timescale - connect through the Postgres option. D1 speaks over the Cloudflare REST API rather than a socket, so there is nothing for a tunnel to forward.
 
 ## Install
 
@@ -89,7 +90,9 @@ Connection details live in `connections.json`, and your AI provider keys in `set
 | Windows  | `%APPDATA%\OrbitDB\`                     |
 | Linux    | `~/.config/OrbitDB/`                     |
 
-Passwords, database API tokens and AI provider keys are encrypted at rest with Electron `safeStorage`, backed by the OS keychain (Keychain on macOS, DPAPI on Windows, libsecret on Linux). If no keychain is available the app says so and falls back to plaintext.
+Passwords, database API tokens, SSH credentials and AI provider keys are encrypted at rest with Electron `safeStorage`, backed by the OS keychain (Keychain on macOS, DPAPI on Windows, libsecret on Linux). If no keychain is available the app says so and falls back to plaintext.
+
+An SSH private key is read once when you pick it and stored encrypted alongside the rest, rather than referenced by path - so moving or renaming the file does not silently break the connection. Choosing SSH agent authentication instead stores no credential at all.
 
 Nothing is sent anywhere except to the databases you connect to - and, if you add an AI key, your schema (table and column names, not row data) to the provider you selected, or to Cloudflare first if you turn the gateway on.
 
