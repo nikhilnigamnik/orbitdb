@@ -41,7 +41,7 @@
       #splash .logo {
         width: 64px;
         height: 64px;
-        animation: splash-pulse 1.6s ease-in-out infinite;
+        animation: splash-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
       }
       @keyframes splash-pulse {
         0%,
@@ -66,26 +66,10 @@
       <div id="splash">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="200"
-          height="200"
           viewBox="0 0 100 100"
-          class="animate-pulse [animation-duration:1.6s]"
+          class="logo"
           aria-label="OrbitDB"
         >
-          <style>
-            @keyframes orbit-pulse {
-              0%,
-              100% {
-                opacity: 1;
-              }
-              50% {
-                opacity: 0.5;
-              }
-            }
-            svg {
-              animation: orbit-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-            }
-          </style>
           <defs>
             <linearGradient
               id="_R_955esnealb_"
