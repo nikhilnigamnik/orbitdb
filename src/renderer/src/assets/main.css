@@ -38,6 +38,18 @@
   --color-danger-shade: #8f2b27; /* bevel under destructive fills */
   --color-info: #5c8af5;
   --color-orange: #db6d28;
+
+  /* Connection accents. Their own tokens rather than the status colours: these
+     have to stay apart from *each other*, and a green connection tagged with
+     --color-success would read as "healthy" next to the health dot. */
+  --color-tag-slate: #8b949e;
+  --color-tag-blue: #4c8dff;
+  --color-tag-violet: #a371f7;
+  --color-tag-cyan: #39c5cf;
+  --color-tag-green: #3fb950;
+  --color-tag-amber: #d29922;
+  --color-tag-orange: #db6d28;
+  --color-tag-rose: #f778ba;
 }
 
 .orbit-flow {

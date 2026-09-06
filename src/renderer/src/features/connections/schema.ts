@@ -1,10 +1,24 @@
 import { z } from 'zod'
 
+import { CONNECTION_COLORS, MAX_FOLDER_NAME_LENGTH } from '@renderer/config/site'
+
 export const connectionSchema = z
   .object({
     name: z.string().min(1, 'Name is required').max(80, 'Name is too long'),
     engine: z.enum(['postgres', 'mysql', 'd1']),
     environment: z.enum(['dev', 'stage', 'prod']),
+    // Trimmed here rather than at the store: '  ' and '' are the same folder,
+    // and a header rendered from an untrimmed name would sort away from its twin.
+    folder: z
+      .string()
+      .trim()
+      .max(MAX_FOLDER_NAME_LENGTH, 'Folder name is too long')
+      .optional()
+      .default(''),
+    // Derived rather than re-listed: the class and label maps are keyed on
+    // ConnectionColor so tsc catches a colour missing from them, but a hand-kept
+    // copy here would only fail at save time, on a field with no form control.
+    color: z.enum(CONNECTION_COLORS).optional(),
     host: z.string(),
     port: z
       .number({ invalid_type_error: 'Port must be a number' })

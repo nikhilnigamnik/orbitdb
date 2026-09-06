@@ -1,9 +1,14 @@
-import type { ConnectionEnvironment, DatabaseEngine, SshAuthMethod } from '@renderer/types'
+import type {
+  ConnectionColor,
+  ConnectionEnvironment,
+  DatabaseEngine,
+  SshAuthMethod
+} from '@renderer/types'
 import { SSH_DEFAULT_PORT } from '../../../shared/types'
 
 // Same rule as the AI re-exports above: a value crossing the shared boundary
 // comes through config/ rather than a relative path from a component.
-export { usesSshTunnel } from '../../../shared/types'
+export { usesSshTunnel, normalizeFolder, CONNECTION_COLORS } from '../../../shared/types'
 
 // Re-exported so components follow the usual "constants come from config/" rule
 // rather than reaching across the shared boundary by relative path.
@@ -94,6 +99,38 @@ export const ENVIRONMENT_LABEL: Record<ConnectionEnvironment, string> = {
 
 export const DEFAULT_ENVIRONMENT: ConnectionEnvironment = 'dev'
 
+/**
+ * Tailwind resolves class names statically, so every accent has to be written
+ * out here as a literal - `bg-tag-${color}` compiles to nothing.
+ */
+export const CONNECTION_COLOR_CLASS: Record<ConnectionColor, string> = {
+  slate: 'bg-tag-slate',
+  blue: 'bg-tag-blue',
+  violet: 'bg-tag-violet',
+  cyan: 'bg-tag-cyan',
+  green: 'bg-tag-green',
+  amber: 'bg-tag-amber',
+  orange: 'bg-tag-orange',
+  rose: 'bg-tag-rose'
+}
+
+export const CONNECTION_COLOR_LABEL: Record<ConnectionColor, string> = {
+  slate: 'Slate',
+  blue: 'Blue',
+  violet: 'Violet',
+  cyan: 'Cyan',
+  green: 'Green',
+  amber: 'Amber',
+  orange: 'Orange',
+  rose: 'Rose'
+}
+
+/** Long enough for "Client work / staging", short enough to fit a group header. */
+export const MAX_FOLDER_NAME_LENGTH = 40
+
+/** Heading for the connections that were never filed anywhere. */
+export const UNGROUPED_FOLDER_LABEL = 'Ungrouped'
+
 export const SSH_AUTH_METHODS: SshAuthMethod[] = ['agent', 'key', 'password']
 
 export const SSH_AUTH_LABEL: Record<SshAuthMethod, string> = {
@@ -114,6 +151,8 @@ export const DEFAULT_CONNECTION_VALUES = {
   name: '',
   engine: 'postgres' as DatabaseEngine,
   environment: DEFAULT_ENVIRONMENT,
+  folder: '',
+  color: undefined as ConnectionColor | undefined,
   host: 'localhost',
   port: DEFAULT_PORTS.postgres,
   database: DEFAULT_DATABASES.postgres,

@@ -1,6 +1,12 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconPlug, IconRefresh, IconArrowsSort, IconSettings } from '@tabler/icons-react'
+import {
+  IconChevronRight,
+  IconPlug,
+  IconRefresh,
+  IconArrowsSort,
+  IconSettings
+} from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Popover } from '@renderer/components/ui/popover'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
@@ -13,10 +19,21 @@ import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '../store/connection-store'
 import { useConnectionHealth } from '../lib/use-connection-health'
+import {
+  folderNames,
+  groupByFolder,
+  loadCollapsedFolders,
+  saveCollapsedFolders
+} from '../lib/folders'
 import { ConnectionCard } from './connection-card'
 import { ConnectionFormSheet } from './connection-form-sheet'
 import { ROUTES } from '@renderer/config/routes'
-import { APP_NAME, DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL } from '@renderer/config/site'
+import {
+  APP_NAME,
+  DEFAULT_ENVIRONMENT,
+  ENVIRONMENT_LABEL,
+  UNGROUPED_FOLDER_LABEL
+} from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import orbitdbLogo from '@renderer/assets/orbitdb-icon-transparent.png'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
@@ -24,10 +41,13 @@ import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 type SortMode = 'name-asc' | 'name-desc' | 'recent'
 
 const SORT_LABEL: Record<SortMode, string> = {
-  'name-asc': 'Name (A–Z)',
-  'name-desc': 'Name (Z–A)',
+  'name-asc': 'Name (A-Z)',
+  'name-desc': 'Name (Z-A)',
   recent: 'Recently added'
 }
+
+/** React key for the ungrouped bucket. A NUL cannot collide with a real folder name. */
+const UNGROUPED_KEY = '\u0000ungrouped'
 
 type TabKey = 'all' | ConnectionEnvironment
 
@@ -64,6 +84,7 @@ export function ConnectionsPage() {
   const [activeTab, setActiveTab] = React.useState<TabKey>('all')
   const [sort, setSort] = React.useState<SortMode>('name-asc')
   const [sortOpen, setSortOpen] = React.useState(false)
+  const [collapsedFolders, setCollapsedFolders] = React.useState<string[]>(loadCollapsedFolders)
 
   const counts = React.useMemo(() => {
     const acc: Record<TabKey, number> = { all: connections.length, dev: 0, stage: 0, prod: 0 }
@@ -82,6 +103,22 @@ export function ConnectionsPage() {
     else list.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     return list
   }, [connections, sort, activeTab])
+
+  // Grouping happens after the sort, so the cards inside a folder stay in the
+  // order the user asked for; the folders themselves are always name-ordered.
+  const groups = React.useMemo(() => groupByFolder(sorted), [sorted])
+  const hasFolders = groups.some((group) => group.folder)
+  // Every folder in use, not just the ones on this tab - the form is filing a
+  // connection anywhere, and a tab is a filter over the list rather than a scope.
+  const folders = React.useMemo(() => folderNames(connections), [connections])
+
+  function toggleFolder(folder: string) {
+    const next = collapsedFolders.includes(folder)
+      ? collapsedFolders.filter((f) => f !== folder)
+      : [...collapsedFolders, folder]
+    setCollapsedFolders(next)
+    saveCollapsedFolders(next)
+  }
 
   function openCreate() {
     setEditing(null)
@@ -129,6 +166,24 @@ export function ConnectionsPage() {
     } finally {
       setIsDeleting(false)
     }
+  }
+
+  function renderCard(connection: SavedConnection) {
+    return (
+      <ConnectionCard
+        key={connection.id}
+        connection={connection}
+        isActive={active?.connectionId === connection.id}
+        isConnecting={isConnecting && pendingConnectId === connection.id}
+        health={health[connection.id] ?? 'unknown'}
+        healthError={healthErrors[connection.id]}
+        onConnect={() => handleConnect(connection)}
+        onDisconnect={() => void disconnect()}
+        onEdit={() => openEdit(connection)}
+        onDelete={() => confirmDelete(connection)}
+        onRefreshHealth={() => void refreshHealth(connection)}
+      />
+    )
   }
 
   return (
@@ -245,22 +300,39 @@ export function ConnectionsPage() {
                   </Button>
                 }
               />
+            ) : hasFolders ? (
+              // Headings only once something has actually been filed. A lone
+              // "Ungrouped" header over every card names a distinction the user
+              // has not made yet.
+              groups.map((group) => {
+                const isCollapsed = collapsedFolders.includes(group.folder)
+                return (
+                  <div key={group.folder || UNGROUPED_KEY} className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleFolder(group.folder)}
+                      aria-expanded={!isCollapsed}
+                      className="group/folder flex w-full cursor-pointer items-center gap-1.5 pt-1 text-left"
+                    >
+                      <IconChevronRight
+                        size={12}
+                        className={cn(
+                          'shrink-0 text-text-subtle transition-transform',
+                          !isCollapsed && 'rotate-90'
+                        )}
+                      />
+                      <span className="truncate text-xs font-semibold text-text-muted transition-colors group-hover/folder:text-text">
+                        {group.folder || UNGROUPED_FOLDER_LABEL}
+                      </span>
+                      <span className="text-xs text-text-subtle">{group.connections.length}</span>
+                      <span className="ml-1 h-px flex-1 bg-border" aria-hidden />
+                    </button>
+                    {!isCollapsed && group.connections.map(renderCard)}
+                  </div>
+                )
+              })
             ) : (
-              sorted.map((connection) => (
-                <ConnectionCard
-                  key={connection.id}
-                  connection={connection}
-                  isActive={active?.connectionId === connection.id}
-                  isConnecting={isConnecting && pendingConnectId === connection.id}
-                  health={health[connection.id] ?? 'unknown'}
-                  healthError={healthErrors[connection.id]}
-                  onConnect={() => handleConnect(connection)}
-                  onDisconnect={() => void disconnect()}
-                  onEdit={() => openEdit(connection)}
-                  onDelete={() => confirmDelete(connection)}
-                  onRefreshHealth={() => void refreshHealth(connection)}
-                />
-              ))
+              sorted.map(renderCard)
             )}
           </div>
         </div>
@@ -269,6 +341,7 @@ export function ConnectionsPage() {
       <ConnectionFormSheet
         isOpen={formModal.isOpen}
         onClose={formModal.close}
+        folders={folders}
         onSaved={() => {
           void refresh()
         }}

@@ -54,7 +54,7 @@ export function PaginationBar({
       <div className="flex items-center gap-1.5 text-xs">
         <span className="inline-flex items-center gap-1 rounded-md bg-surface-elevated/40 px-1.5 py-0.5 font-mono text-text ring-1 ring-white/5">
           {formatNumber(start)}
-          <span className="text-text-subtle">–</span>
+          <span className="text-text-subtle">-</span>
           {formatNumber(end)}
         </span>
         {shownTotal != null && (

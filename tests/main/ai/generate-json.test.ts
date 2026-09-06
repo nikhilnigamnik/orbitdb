@@ -25,6 +25,16 @@ vi.mock('../../../src/main/store/settings-store', () => ({
   })
 }))
 
+vi.mock('../../../src/main/ai/gateway', async (importOriginal) => {
+  // The real prefix rule is what these tests are about; only the model
+  // construction - which would reach the gateway SDK - is stubbed.
+  const actual = await importOriginal<typeof import('../../../src/main/ai/gateway')>()
+  return {
+    ...actual,
+    buildGatewayModel: (_g: unknown, _t: unknown, model: string) => ({ id: model })
+  }
+})
+
 const stubSdk = () => () => (model: string) => ({ id: model })
 vi.mock('@ai-sdk/anthropic', () => ({ createAnthropic: stubSdk() }))
 vi.mock('@ai-sdk/openai', () => ({ createOpenAI: stubSdk() }))
@@ -55,6 +65,7 @@ beforeEach(async () => {
   calls.lastArgs = null
   settings.provider = 'anthropic'
   settings.apiKey = 'sk-ant-1'
+  settings.model = 'claude-sonnet-5'
   vi.resetModules()
   client = await import('../../../src/main/ai/client')
 })
@@ -140,5 +151,42 @@ describe('when the request never landed', () => {
 
     await expect(run()).rejects.toThrow(/Settings/)
     expect(calls.count).toBe(0)
+  })
+})
+
+describe('on a Cloudflare gateway model', () => {
+  beforeEach(() => {
+    settings.provider = 'cloudflare'
+    settings.apiKey = 'cf-token'
+  })
+
+  it('asks OpenAI upstreams for a native schema', async () => {
+    settings.model = 'openai/gpt-5.6-luna'
+    calls.queue = [{ output: { ok: true } }]
+
+    await expect(run()).resolves.toEqual({ ok: true })
+    expect(calls.lastArgs?.output, 'openai/* answers a json_schema natively').toBeTruthy()
+    expect(calls.count).toBe(1)
+  })
+
+  it('does not ask an Anthropic upstream for one, and so takes a single call', async () => {
+    // The gateway turns a schema request into an Anthropic tool call, which comes
+    // back with `content: null` - no text for Output.object to read. That first
+    // call was always going to be thrown away, so it is never made.
+    settings.model = 'anthropic/claude-sonnet-5'
+    calls.queue = [{ text: '```json\n{"ok":true}\n```' }]
+
+    await expect(run()).resolves.toEqual({ ok: true })
+    expect(calls.lastArgs?.output, 'no schema is sent on this path').toBeUndefined()
+    expect(calls.count, 'one call, not the two this used to cost').toBe(1)
+  })
+
+  it('does not ask a Google upstream for one either', async () => {
+    settings.model = 'google-ai-studio/gemini-3.6-flash'
+    calls.queue = [{ text: '{"ok":true}' }]
+
+    await expect(run()).resolves.toEqual({ ok: true })
+    expect(calls.lastArgs?.output).toBeUndefined()
+    expect(calls.count).toBe(1)
   })
 })

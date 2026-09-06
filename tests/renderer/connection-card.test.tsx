@@ -21,12 +21,14 @@ const connection: SavedConnection = {
   updatedAt: '2026-01-01T00:00:00.000Z'
 }
 
-function setup(state: { isActive?: boolean; isConnecting?: boolean } = {}) {
+function setup(
+  state: { isActive?: boolean; isConnecting?: boolean; overrides?: Partial<SavedConnection> } = {}
+) {
   const onConnect = vi.fn()
   const onDisconnect = vi.fn()
   render(
     <ConnectionCard
-      connection={connection}
+      connection={{ ...connection, ...state.overrides }}
       isActive={state.isActive ?? false}
       isConnecting={state.isConnecting ?? false}
       onConnect={onConnect}
@@ -35,7 +37,7 @@ function setup(state: { isActive?: boolean; isConnecting?: boolean } = {}) {
       onDelete={vi.fn()}
     />
   )
-  return { onConnect, onDisconnect }
+  return { onConnect, onDisconnect, container: document.body }
 }
 
 describe('the connect control', () => {
@@ -95,5 +97,17 @@ describe('once connected', () => {
     const button = container.querySelector('[data-slot="button"]')!
     expect(button.getAttribute('data-tone')).toBe('default')
     expect(button.className).not.toMatch(/bg-success\//)
+  })
+})
+
+describe('the colour tag', () => {
+  it('draws a rail in the chosen accent', () => {
+    const { container } = setup({ overrides: { color: 'violet' } })
+    expect(container.querySelector('.bg-tag-violet')).toBeTruthy()
+  })
+
+  it('draws nothing when the connection was never tagged', () => {
+    const { container } = setup()
+    expect(container.querySelector('[class*="bg-tag-"]')).toBeNull()
   })
 })

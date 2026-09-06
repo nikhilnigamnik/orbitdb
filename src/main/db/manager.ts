@@ -1,4 +1,7 @@
 import type {
+  CascadeDeleteOptions,
+  CascadeDeletePlan,
+  CascadeDeleteResult,
   ConnectionInput,
   ConnectionOverview,
   CountRowsOptions,
@@ -119,6 +122,14 @@ export function updateRow(opts: RowUpdate): Promise<Record<string, unknown>> {
 
 export function deleteRow(opts: RowDelete): Promise<{ deleted: number }> {
   return driverForConnection(opts.connectionId).deleteRow(opts)
+}
+
+export function cascadeDeletePlan(opts: CascadeDeleteOptions): Promise<CascadeDeletePlan> {
+  return driverForConnection(opts.connectionId).cascadeDeletePlan(opts)
+}
+
+export function cascadeDelete(opts: CascadeDeleteOptions): Promise<CascadeDeleteResult> {
+  return driverForConnection(opts.connectionId).cascadeDelete(opts)
 }
 
 export function generateDdl(opts: DdlRequest): Promise<string> {

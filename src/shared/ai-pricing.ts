@@ -1,3 +1,5 @@
+import { currentAiModelId } from './ai-models'
+
 /**
  * Published list prices for the models offered in Settings, in USD per million
  * tokens. Lives in `shared/` because main prices the usage rollup and the
@@ -74,8 +76,8 @@ const PRICING: Record<string, ModelPricing> = {
   'anthropic/claude-haiku-4-5-20251001': { input: 1, output: 5 },
   'openai/gpt-5.6-terra': { input: 2, output: 12 },
   'openai/gpt-5.6-luna': { input: 0.2, output: 1.2 },
-  'google/gemini-3.6-flash': { input: 1.5, output: 7.5 },
-  'google/gemini-2.5-flash': { input: 0.3, output: 2.5 }
+  'google-ai-studio/gemini-3.6-flash': { input: 1.5, output: 7.5 },
+  'google-ai-studio/gemini-2.5-flash': { input: 0.3, output: 2.5 }
 }
 
 /**
@@ -86,7 +88,9 @@ const PRICING: Record<string, ModelPricing> = {
  * Day keys sort lexicographically, which is the whole comparison a promo needs.
  */
 export function rateFor(model: string, day?: string): TokenRate | null {
-  const pricing = PRICING[model]
+  // Through the rename map, so spend recorded under a model's old id keeps its
+  // rate instead of dropping into `unpricedCalls` the day it is renamed.
+  const pricing = PRICING[currentAiModelId(model)]
   if (!pricing) return null
   const { promo } = pricing
   if (promo && day && day <= promo.through) return { input: promo.input, output: promo.output }
@@ -106,7 +110,7 @@ export function costOf(
 }
 
 export function isPricedModel(model: string): boolean {
-  return model in PRICING
+  return currentAiModelId(model) in PRICING
 }
 
 /**
