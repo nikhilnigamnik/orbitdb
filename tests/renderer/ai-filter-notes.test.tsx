@@ -42,8 +42,7 @@ function mount(filterTable: () => Promise<unknown>) {
   Object.assign(window, {
     api: {
       db: { getRows, countRows: () => ok(1) },
-      ai: { filterTable },
-      views: { list: () => ok([]) }
+      ai: { filterTable }
     }
   })
   render(

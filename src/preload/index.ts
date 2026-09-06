@@ -36,10 +36,6 @@ import type {
   SavedConnection,
   SavedQuery,
   SavedQueryPatch,
-  SavedTableView,
-  SavedTableViewPatch,
-  SaveTableViewInput,
-  TableViewScope,
   SchemaGraph,
   SchemaInfo,
   SuggestIndexesOptions,
@@ -133,13 +129,6 @@ const api = {
     update: (id: string, patch: SavedQueryPatch) => invoke<SavedQuery>('queries:update', id, patch),
     delete: (id: string) => invoke<void>('queries:delete', id),
     clearHistory: (connectionId: string) => invoke<void>('queries:clear-history', connectionId)
-  },
-  views: {
-    list: (scope: TableViewScope) => invoke<SavedTableView[]>('views:list', scope),
-    save: (input: SaveTableViewInput) => invoke<SavedTableView>('views:save', input),
-    update: (id: string, patch: SavedTableViewPatch) =>
-      invoke<SavedTableView>('views:update', id, patch),
-    delete: (id: string) => invoke<void>('views:delete', id)
   },
   usage: {
     summary: () => invoke<UsageSummary>('usage:summary'),

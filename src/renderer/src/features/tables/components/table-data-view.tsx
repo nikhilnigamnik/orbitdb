@@ -19,12 +19,10 @@ import {
   toggleHiddenColumn,
   type TableViewPrefs
 } from '@renderer/features/tables/lib/view-prefs'
-import { applyViewToPrefs, captureView } from '@renderer/features/tables/lib/saved-views'
 import { useAiFilter } from '../hooks/use-ai-filter'
-import { useSavedViews } from '@renderer/features/tables/hooks/use-saved-views'
 import { tableRouteWithFk } from '@renderer/config/routes'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
-import type { DatabaseEngine, SavedTableView, SortDirection, TableDetails } from '@renderer/types'
+import type { DatabaseEngine, SortDirection, TableDetails } from '@renderer/types'
 import { DataGrid } from './data-grid'
 import { TableOverflowMenu } from './table-overflow-menu'
 import { FiltersBar } from './filters-bar'
@@ -32,7 +30,6 @@ import { PaginationBar } from './pagination-bar'
 import { RowEditorSheet } from './row-editor-sheet'
 import { RecordViewSheet } from './record-view-sheet'
 import { ColumnVisibilityMenu } from './column-visibility-menu'
-import { SavedViewsMenu } from './saved-views-menu'
 import { CascadeDeleteDialog } from './cascade-delete-dialog'
 import type { CopyFormat } from '../hooks/use-grid-cursor'
 
@@ -189,33 +186,6 @@ export function TableDataView({
     saveViewPrefs(connectionId, details.schema, details.name, next)
   }
 
-  // Named ways of looking at this table, kept in userData rather than beside the
-  // widths in localStorage: a view the user named is theirs, not view state.
-  const currentView = React.useMemo(
-    () => captureView({ filters, filterJoin, orderBy, orderDir, prefs }),
-    [filters, filterJoin, orderBy, orderDir, prefs]
-  )
-  const savedViews = useSavedViews(
-    { connectionId, schema: details.schema, table: details.name },
-    currentView
-  )
-
-  function applySavedView(view: SavedTableView) {
-    const nextPrefs = applyViewToPrefs(view.view, prefs)
-    setPrefs(nextPrefs)
-    saveViewPrefs(connectionId, details.schema, details.name, nextPrefs)
-    setOrderBy(view.view.orderBy)
-    setOrderDir(view.view.orderDir)
-    setPageSize(view.view.pageSize)
-    // Both filter pieces at once, so the URL is written from the pair rather
-    // than from one of them and whatever the other still held this render.
-    setFiltersState(view.view.filters)
-    setFilterJoinState(view.view.filterJoin)
-    writeFilterParams(view.view.filters, view.view.filterJoin)
-    setOffset(0)
-    savedViews.markApplied(view.id)
-  }
-
   function handleSort(column: string) {
     let nextOrderBy: string | null = column
     let nextOrderDir: SortDirection = 'asc'
@@ -283,17 +253,6 @@ export function TableDataView({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <SavedViewsMenu
-            views={savedViews.views}
-            activeView={savedViews.activeView}
-            isDirty={savedViews.isDirty}
-            isBusy={savedViews.isSaving}
-            onApply={applySavedView}
-            onSave={(name) => void savedViews.save(name)}
-            onOverwrite={(view) => void savedViews.patch(view, { useCurrent: true })}
-            onRename={(view, name) => void savedViews.patch(view, { name })}
-            onDelete={(view) => void savedViews.remove(view)}
-          />
           <FiltersBar
             connectionId={connectionId}
             schema={details.schema}
