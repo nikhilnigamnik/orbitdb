@@ -244,7 +244,7 @@ describe('the floating selection toolbar', () => {
    */
   function deleteButtonClasses(): string[] {
     const source = readFileSync(
-      resolve('src/renderer/src/features/tables/components/table-data-view.tsx'),
+      resolve('src/renderer/src/features/tables/components/selection-bar.tsx'),
       'utf8'
     )
     const button = /className="([^"]*bg-danger-fill[^"]*)"/.exec(source)
@@ -256,7 +256,7 @@ describe('the floating selection toolbar', () => {
     // Rendering it needs a loaded table, so it is checked at the source, keyed
     // on the entrance animation the bar is the only user of.
     const source = readFileSync(
-      resolve('src/renderer/src/features/tables/components/table-data-view.tsx'),
+      resolve('src/renderer/src/features/tables/components/selection-bar.tsx'),
       'utf8'
     )
     const bar = /className="(animate-slide-up-fade pointer-events-auto[^"]*)"/.exec(source)
@@ -268,7 +268,7 @@ describe('the floating selection toolbar', () => {
   it('does not make the delete button glow', () => {
     // A coloured drop shadow under a red fill reads as a halo, not depth.
     const source = readFileSync(
-      resolve('src/renderer/src/features/tables/components/table-data-view.tsx'),
+      resolve('src/renderer/src/features/tables/components/selection-bar.tsx'),
       'utf8'
     )
     expect(source).not.toMatch(/shadow-danger/)

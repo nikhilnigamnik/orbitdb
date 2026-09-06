@@ -62,7 +62,7 @@ CI (`.github/workflows/ci.yml`) runs lint → typecheck → test → build on ev
 
 ## Architecture
 
-Three processes, three TS contexts. The shared boundary lives in `src/shared/types.ts` - both sides import from it.
+Three processes, three TS contexts. The shared boundary lives in `src/shared/types/` - eleven files by domain behind an `index.ts` barrel, so every import still says `shared/types` and no caller has to know which one a shape sits in.
 
 ```
 renderer (Chromium, no Node access)
@@ -70,7 +70,7 @@ renderer (Chromium, no Node access)
 preload (Node + browser bridge)
    ↕  ipcRenderer.invoke
 main (full Node)
-   └─ db/drivers/{postgres,mysql,d1}.ts  via  db/manager.ts
+   └─ db/drivers/{postgres,mysql,d1}/    via  db/manager.ts
 ```
 
 ### The IPC envelope pattern (important - don't break it)
@@ -87,11 +87,11 @@ To add a new IPC endpoint, you touch **three** files:
 
 1. `src/main/ipc/index.ts` - `ipcMain.handle('namespace:action', wrap(async (...args) => ...))`
 2. `src/preload/index.ts` - add to the `api.db` (or new namespace) object with `invoke<T>(...)`
-3. `src/shared/types.ts` - if new request/response shapes are needed
+3. `src/shared/types/` - if new request/response shapes are needed (add to the domain file, the barrel re-exports it)
 
 ### Database driver abstraction
 
-`DatabaseDriver` (`src/main/db/drivers/types.ts`) is implemented three times: `postgres.ts`, `mysql.ts`, `d1.ts`. `src/main/db/manager.ts` looks up the saved connection's `engine` field and dispatches to the right driver. To add a new engine: implement the interface, register it in `manager.ts:driverFor()`. The renderer is engine-agnostic - it just passes `connectionId` around.
+`DatabaseDriver` (`src/main/db/drivers/types.ts`) is implemented three times, each a directory whose `index.ts` holds the driver object and whose siblings hold the work: `pool` (or `client` for D1, which has no socket to pool), `dialect`, `introspect`, `rows`, `cascade`, `query`. Import them as `./drivers/postgres` and so on - the directory index is the entry point. `src/main/db/manager.ts` looks up the saved connection's `engine` field and dispatches to the right driver. To add a new engine: implement the interface, register it in `manager.ts:driverFor()`. The renderer is engine-agnostic - it just passes `connectionId` around.
 
 D1 is special: it has no schemas (returns `[]`), uses the Cloudflare REST API instead of a socket connection, and has no concept of enums or PK introspection beyond what `pragma table_info` exposes.
 
@@ -105,7 +105,7 @@ D1's SQLite-dialect pieces - pragma row mapping, identifier quoting, type normal
 
 One consequence: with `ssl: true` the driver now handshakes against `127.0.0.1`, so the certificate hostname cannot match. Both drivers already pass `rejectUnauthorized: false`, so nothing breaks - but that flag cannot simply be tightened later without also passing the real hostname as `servername`.
 
-**`getPool()` is async in both drivers because of this**, and that is the change that touched the most lines (19 sites in `postgres.ts`, 20 in `mysql.ts`). Opening a pool that rides a tunnel genuinely is asynchronous; the alternative - a separate "connect" IPC that pre-opens tunnels - breaks the moment any handler is the first to touch a connection. Both `getPool` and `openTunnel` keep a **pending-promise map**, because two queries arriving on a cold connection would otherwise each build a pool and a bastion connection, and the loser would leak.
+**`getPool()` is async in both drivers because of this**, and that is the change that touched the most lines (19 sites in postgres, 20 in mysql). Opening a pool that rides a tunnel genuinely is asynchronous; the alternative - a separate "connect" IPC that pre-opens tunnels - breaks the moment any handler is the first to touch a connection. Both `getPool` and `openTunnel` keep a **pending-promise map**, because two queries arriving on a cold connection would otherwise each build a pool and a bastion connection, and the loser would leak.
 
 **Host keys are pinned, not merely accepted.** `ssh2` accepts any host key unless you supply `hostVerifier`, which would leave the tunnel encrypted but unauthenticated - the exact thing a bastion exists to prevent. First successful connect records the SHA-256 fingerprint through `setSshHostKeyFingerprint()`; later connects compare and refuse on mismatch. Empty means trust-on-first-use. The connection test opens its own tunnel, so it is usually what learns the fingerprint first - `TestConnectionResult.sshHostKeyFingerprint` carries it back so the form pins it on save rather than letting the next connect trust whatever answers then.
 
@@ -117,7 +117,7 @@ Tunnel and pool have the same lifetime, so `disconnectPool` closes both - includ
 
 **`openEphemeralTunnel` mints a unique key per call** and hands it back for the caller to close. It is tempting to give each engine one constant test key, but `useConnectionHealth` pings every saved connection at once from the connections page: a shared key lets the second test overwrite the first (orphaning a client and listener past the reach of `closeTunnel`), and lets whichever finishes first tear down the other's live tunnel mid-query.
 
-`isSshEnabled` is a re-export of `usesSshTunnel` from `src/shared/types.ts` rather than its own copy, because the renderer badges connections with the same rule. `sshEnabled: true` on a D1 row is reachable - switching engine hides the section without clearing the flag - so a second implementation would have the card claiming a tunnel the driver ignores.
+`isSshEnabled` is a re-export of `usesSshTunnel` from `src/shared/types/` rather than its own copy, because the renderer badges connections with the same rule. `sshEnabled: true` on a D1 row is reachable - switching engine hides the section without clearing the flag - so a second implementation would have the card claiming a tunnel the driver ignores.
 
 Agent auth reads `SSH_AUTH_SOCK` **first on every platform**, falling back to the literal `'pageant'` only on Windows when nothing set it. Windows' built-in OpenSSH agent exports a named pipe through that variable and ssh2 takes it directly, so answering `'pageant'` unconditionally strands those users.
 
@@ -131,7 +131,7 @@ The renderer side is `ssh-tunnel-fields.tsx` (a `SettingsCard`-shaped card whose
 
 ### DDL / structure editing
 
-Structure edits (add/drop/rename column, rename table, create/drop index) go through `generateDdl`/`executeDdl` on the driver. Both build SQL from a `DdlOperation` discriminated union (`src/shared/types.ts`) via the shared `buildDdl()` in `src/main/db/ddl.ts` - each driver supplies a `DdlDialect` (identifier quoting + the engine-specific `DROP INDEX` grammar). `generateDdl` is preview-only (returns the SQL string, no DB call); `executeDdl` runs it and invalidates that connection's `tableDetailsCache`. Exposed as `db:ddl-preview` / `db:ddl-execute` → `window.api.db.ddlPreview` / `ddlExecute`. The renderer dialog (`features/database/components/ddl-dialog.tsx`) live-previews the generated SQL before the user confirms; `dataType` and `defaultValue` are passed through as raw SQL expressions (the preview shows exactly what runs). The dialog is hosted once in `database-page.tsx`'s `TableViewContainer` and shared by two triggers: the rename action surfaced by `table-data-view.tsx` and the per-section/row actions in the presentational `table-structure.tsx` (which just calls `onEdit(kind, target?)`). DDL controls only render for `type === 'table'` (not views); on `rename-table` success the container navigates to the new table route.
+Structure edits (add/drop/rename column, rename table, create/drop index) go through `generateDdl`/`executeDdl` on the driver. Both build SQL from a `DdlOperation` discriminated union (`src/shared/types/`) via the shared `buildDdl()` in `src/main/db/ddl.ts` - each driver supplies a `DdlDialect` (identifier quoting + the engine-specific `DROP INDEX` grammar). `generateDdl` is preview-only (returns the SQL string, no DB call); `executeDdl` runs it and invalidates that connection's `tableDetailsCache`. Exposed as `db:ddl-preview` / `db:ddl-execute` → `window.api.db.ddlPreview` / `ddlExecute`. The renderer dialog (`features/database/components/ddl-dialog.tsx`) live-previews the generated SQL before the user confirms; `dataType` and `defaultValue` are passed through as raw SQL expressions (the preview shows exactly what runs). The dialog is hosted once in `database-page.tsx`'s `TableViewContainer` and shared by two triggers: the rename action surfaced by `table-data-view.tsx` and the per-section/row actions in the presentational `table-structure.tsx` (which just calls `onEdit(kind, target?)`). DDL controls only render for `type === 'table'` (not views); on `rename-table` success the container navigates to the new table route.
 
 ### AI layer (Anthropic / OpenAI / Google via Vercel AI SDK)
 
@@ -265,20 +265,6 @@ Arrow keys clamp at the edges rather than wrapping - `CellInlineEditor`'s Tab wr
 `toggleHiddenColumn` refuses to hide the last visible column, because an empty grid has no control left to bring anything back. Hidden columns are still selected and fetched; hiding is a view concern.
 
 **A trap this uncovered:** `TableDataView`'s "reset on table change" effect only ever ran on mount, since `database-page.tsx` keys the container by `${schema}.${table}` and a switch remounts. On mount it called `setFilters([])`, throwing away the filters a deep link arrived with - which is exactly what an FK jump is. It is now guarded by a ref so the first run is skipped; `tests/renderer/table-view-prefs.test.tsx` pins it.
-
-### Saved table views
-
-`views:list` / `views:save` / `views:update` / `views:delete` → `window.api.views.*`, backed by `src/main/store/views-store.ts` (`views.json` in `userData`, plain JSON for the same reason as `queries.json`).
-
-A saved view is a **named** set of filters, join, sort, hidden columns, frozen columns and page size for one connection+schema+table. That is why it lives in `userData` and not beside `view-prefs` in `localStorage`: view-prefs is state you would shrug at losing, and a view the user named and typed five filters into is theirs.
-
-**Column widths are excluded on purpose.** A width is physical drag state that belongs to the table however you are looking at it, so restoring one on every view switch would undo the last drag rather than restore a view. `applyViewToPrefs` merges a view into the stored prefs and leaves `columnSizing` alone.
-
-**Saving is an upsert on the name**, matched case-insensitively, because re-saving is how a view is updated and two rows both reading "Active users" leave no way to tell which one a click applies. _Renaming_ onto an existing name is refused instead - folding there would silently destroy the view that held the name. The store keeps no cap and no pruning: every entry was named by hand, which is the same rule that exempts starred queries from the history cap.
-
-The "modified" hint compares a canonical form (`isSameView` in `lib/saved-views.ts`), and two fields are deliberately normalised out of it. The join is inert below two filters and the sort direction is inert with no sort column, so comparing them raw reports a change against a control that is not even on screen. Hidden columns compare as a **set** (tick order is not part of a view); frozen columns compare as a **sequence**, since that order is the pin order.
-
-`useSavedViews` (`features/tables/hooks/`) owns the list, which view is applied, and the four IPC calls. _Applying_ one is deliberately left in `table-data-view.tsx`: it writes filters, join, sort, page size and prefs at once, and the filter pair has to go through `writeFilterParams` together - passing half a dozen setters into a hook would move the code without moving the coupling. Deleting a connection cascades into `deleteViewsForConnection`, since the views name tables nothing can reach any more.
 
 ### The SQL editor
 

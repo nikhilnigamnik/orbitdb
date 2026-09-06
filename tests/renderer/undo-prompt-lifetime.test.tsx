@@ -51,8 +51,7 @@ beforeEach(() => {
         getRows: () => ok({ rows, columns, totalEstimate: 1 }),
         countRows: () => ok(1),
         updateRow: () => ok({ id: 'a1', related_type: 'Customer' })
-      },
-      views: { list: () => ok([]) }
+      }
     }
   })
 })

@@ -1,44 +1,32 @@
 import * as React from 'react'
 import {
-  createColumnHelper,
   flexRender,
   getCoreRowModel,
   useReactTable,
-  type ColumnDef,
   type RowData,
   type RowSelectionState,
   type SortingState
 } from '@tanstack/react-table'
-import {
-  IconArrowDown,
-  IconArrowUp,
-  IconArrowsSort,
-  IconPencil,
-  IconTrash,
-  IconKey,
-  IconArrowUpRight,
-  IconLayoutSidebarRightExpand
-} from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
-import { formatColumnType } from '@renderer/lib/column-type'
-import { formatCellValue, isBlankString } from '@renderer/lib/format'
-import { Button } from '@renderer/components/ui/button'
-import { Checkbox } from '@renderer/components/ui/checkbox'
+import { formatCellValue } from '@renderer/lib/format'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { CellInlineEditor } from './cell-inline-editor'
 import { useGridCursor, type CopyFormat } from '../hooks/use-grid-cursor'
 import { revealDelta, stickyWidth } from '../lib/reveal-cell'
-import { frozenOffsets, frozenWidth, orderColumns } from '../lib/frozen-columns'
+import { orderColumns } from '../lib/frozen-columns'
 import type { InsertTarget } from '../lib/clipboard-format'
+import {
+  ACTIONS_COLUMN_ID,
+  INDEX_COLUMN_ID,
+  SELECT_COLUMN_ID,
+  type ForeignKeyTarget,
+  type Row
+} from '../lib/grid-types'
+import { useGridColumns } from '../hooks/use-grid-columns'
+import { useCellEditing } from '../hooks/use-cell-editing'
+import { useColumnSizing } from '../hooks/use-column-sizing'
+import { useRowSelection } from '../hooks/use-row-selection'
 import type { ColumnInfo, SortDirection } from '@renderer/types'
-
-type Row = Record<string, unknown>
-
-interface ForeignKeyTarget {
-  schema: string
-  table: string
-  column: string
-}
 
 interface DataGridProps {
   columns: ColumnInfo[]
@@ -76,10 +64,6 @@ interface DataGridProps {
   onCopyFailed?: (error: unknown) => void
 }
 
-const SELECT_COLUMN_ID = '__select__'
-const INDEX_COLUMN_ID = '__index__'
-const ACTIONS_COLUMN_ID = '__actions__'
-
 export function DataGrid({
   columns: unorderedColumns,
   rows,
@@ -115,94 +99,25 @@ export function DataGrid({
     [unorderedColumns, frozenColumns]
   )
 
-  const [internalRowSelection, setInternalRowSelection] = React.useState<RowSelectionState>({})
-  const isControlled = controlledRowSelection !== undefined
-  const rowSelection = isControlled ? controlledRowSelection : internalRowSelection
-  const setRowSelection = React.useCallback(
-    (updater: RowSelectionState | ((prev: RowSelectionState) => RowSelectionState)) => {
-      const next =
-        typeof updater === 'function'
-          ? (updater as (prev: RowSelectionState) => RowSelectionState)(rowSelection)
-          : updater
-      if (isControlled) {
-        onRowSelectionChange?.(next)
-      } else {
-        setInternalRowSelection(next)
-      }
-    },
-    [isControlled, onRowSelectionChange, rowSelection]
-  )
-
-  React.useEffect(() => {
-    if (isControlled) return
-    setInternalRowSelection({})
-  }, [rows, isControlled])
-
-  const [isEditorDirty, setIsEditorDirty] = React.useState(false)
-  const [editingCell, setEditingCell] = React.useState<{
-    rowIndex: number
-    columnId: string
-  } | null>(null)
-  const canEditCells = canMutate && !!onEditCell
-  // Cell saves patch `rows` in place; this flag keeps the editing session
-  // alive across that change so Tab-to-next-cell works.
-  const keepEditingOnRowsChange = React.useRef(false)
-  React.useEffect(() => {
-    if (keepEditingOnRowsChange.current) {
-      keepEditingOnRowsChange.current = false
-      return
-    }
-    setEditingCell(null)
-    // The flash is keyed by row index; a new row set (sort/page/reload) would
-    // make it light up an unrelated cell.
-    setSavedCell(null)
-  }, [rows])
-
-  const [savedCell, setSavedCell] = React.useState<{ rowIndex: number; columnId: string } | null>(
-    null
-  )
-  const savedFlashTimer = React.useRef<number | null>(null)
-  const markSaved = React.useCallback((rowIndex: number, columnId: string) => {
-    if (savedFlashTimer.current) window.clearTimeout(savedFlashTimer.current)
-    // Drop the class for a frame so re-saving the same cell within the flash
-    // window restarts the CSS animation instead of silently continuing it.
-    setSavedCell(null)
-    requestAnimationFrame(() => {
-      setSavedCell({ rowIndex, columnId })
-      savedFlashTimer.current = window.setTimeout(() => setSavedCell(null), 900)
-    })
-  }, [])
-  React.useEffect(
-    () => () => {
-      if (savedFlashTimer.current) window.clearTimeout(savedFlashTimer.current)
-    },
-    []
-  )
+  const { rowSelection, setRowSelection } = useRowSelection({
+    rows,
+    controlled: controlledRowSelection,
+    onChange: onRowSelectionChange
+  })
 
   const dataColumnIds = React.useMemo(() => columns.map((c) => c.name), [columns])
-  const moveEditing = React.useCallback(
-    (rowIndex: number, columnId: string, direction: 'next' | 'prev') => {
-      const colIndex = dataColumnIds.indexOf(columnId)
-      if (colIndex === -1) {
-        setEditingCell(null)
-        return
-      }
-      let nextCol = colIndex + (direction === 'next' ? 1 : -1)
-      let nextRow = rowIndex
-      if (nextCol >= dataColumnIds.length) {
-        nextCol = 0
-        nextRow += 1
-      } else if (nextCol < 0) {
-        nextCol = dataColumnIds.length - 1
-        nextRow -= 1
-      }
-      // At the edge of the loaded rows, stay put rather than ending the session
-      // without a signal - the commit already happened either way.
-      if (nextRow < 0 || nextRow >= rows.length) return
-      setEditingCell({ rowIndex: nextRow, columnId: dataColumnIds[nextCol] })
-    },
-    [dataColumnIds, rows.length]
-  )
+  const canEditCells = canMutate && !!onEditCell
+
+  const {
+    isEditorDirty,
+    setIsEditorDirty,
+    editingCell,
+    setEditingCell,
+    savedCell,
+    markSaved,
+    moveEditing,
+    keepEditingOnRowsChange
+  } = useCellEditing({ rows, dataColumnIds })
 
   const sorting: SortingState = React.useMemo(
     () => (orderBy ? [{ id: orderBy, desc: orderDir === 'desc' }] : []),
@@ -256,203 +171,7 @@ export function DataGrid({
     if (left !== 0 || top !== 0) container.scrollBy({ left, top })
   }, [cursor?.rowIndex, cursor?.columnIndex])
 
-  const tableColumns = React.useMemo<ColumnDef<Row>[]>(() => {
-    const helper = createColumnHelper<Row>()
-
-    const selectCol = helper.display({
-      id: SELECT_COLUMN_ID,
-      header: ({ table }) => {
-        const allSelected = table.getIsAllRowsSelected()
-        const someSelected = table.getIsSomeRowsSelected()
-        return (
-          <Checkbox
-            checked={allSelected ? true : someSelected ? 'indeterminate' : false}
-            onCheckedChange={(value) => table.toggleAllRowsSelected(!!value)}
-            aria-label="Select all rows"
-          />
-        )
-      },
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          onClick={(e) => e.stopPropagation()}
-          aria-label="Select row"
-        />
-      )
-    })
-
-    const indexCol = helper.display({
-      id: INDEX_COLUMN_ID,
-      header: () => '#',
-      cell: ({ row }) => row.index + 1 + rowOffset
-    })
-
-    const dataCols = columns.map((col) =>
-      helper.accessor((row) => row[col.name], {
-        id: col.name,
-        enableSorting: true,
-        header: () => {
-          const isActive = orderBy === col.name
-          const sortLabel = isActive
-            ? orderDir === 'asc'
-              ? `Sort ${col.name} descending`
-              : `Clear sort on ${col.name}`
-            : `Sort by ${col.name}`
-          return (
-            <div
-              aria-sort={isActive ? (orderDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-              className={cn(
-                'group/header flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors',
-                isActive && 'bg-surface-elevated/60'
-              )}
-            >
-              {/* Name left, type right against the sort control: the types line
-                  up down the grid instead of sitting at a ragged offset that
-                  moves with each name, and the name gets the room left over. */}
-              <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                {col.isPrimaryKey && <IconKey size={10} className="shrink-0 text-text-subtle" />}
-                <span
-                  className={cn(
-                    'min-w-0 flex-1 truncate text-xs',
-                    isActive ? 'font-semibold text-text' : 'font-medium text-text-muted'
-                  )}
-                >
-                  {col.name}
-                </span>
-                {col.dataType && (
-                  // max-w so a long type can never crush the name, which is what
-                  // identifies the column.
-                  <span
-                    className="max-w-[55%] shrink-0 truncate pl-2 font-mono text-[10px] font-normal text-text-subtle"
-                    title={col.dataType}
-                  >
-                    {formatColumnType(col.dataType, col.udtName)}
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => onSort(col.name)}
-                aria-label={sortLabel}
-                className={cn(
-                  'flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors',
-                  'hover:bg-surface-elevated',
-                  isActive ? 'text-text' : 'text-text-subtle'
-                )}
-              >
-                {isActive ? (
-                  orderDir === 'asc' ? (
-                    <IconArrowUp size={12} />
-                  ) : (
-                    <IconArrowDown size={12} />
-                  )
-                ) : (
-                  <IconArrowsSort
-                    size={12}
-                    className="opacity-40 transition-opacity group-hover/header:opacity-100"
-                  />
-                )}
-              </button>
-            </div>
-          )
-        },
-        cell: (info) => {
-          const value = info.getValue()
-          const display = formatCellValue(value, col.udtName)
-          if (value === null) {
-            return <span className="italic text-text-subtle">NULL</span>
-          }
-          // '' and '   ' both render as an empty cell otherwise, with no way to
-          // tell which one is failing to match a comparison.
-          if (isBlankString(value)) {
-            return <span className="italic text-text-subtle">{`'${value}'`}</span>
-          }
-          const fkTarget = fkColumns?.get(col.name)
-          if (fkTarget && onOpenForeignKey) {
-            return (
-              <span className="flex max-w-full items-center gap-1">
-                <span className="truncate text-accent-text">{display}</span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenForeignKey(col.name, value)
-                  }}
-                  onDoubleClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  className="shrink-0 cursor-pointer rounded p-0.5 text-accent-text opacity-0 transition-opacity hover:bg-accent/15 focus-visible:opacity-100 group-hover:opacity-100"
-                  title={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
-                  aria-label={`Go to ${fkTarget.schema}.${fkTarget.table}.${fkTarget.column}`}
-                >
-                  <IconArrowUpRight size={11} />
-                </button>
-              </span>
-            )
-          }
-          return <span className="text-text">{display}</span>
-        },
-        meta: { dataType: col.dataType }
-      })
-    )
-
-    const cols: ColumnDef<Row>[] = [selectCol, indexCol, ...dataCols]
-    if (canMutate || onInspectRow) {
-      cols.push(
-        helper.display({
-          id: ACTIONS_COLUMN_ID,
-          header: () => null,
-          cell: ({ row }) => (
-            <div className="flex justify-end gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-              {onInspectRow && (
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  className="text-text-muted hover:border-transparent hover:bg-text-muted/15 hover:text-text-muted hover:ring-1 hover:ring-inset hover:ring-text-muted/25"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onInspectRow(row.original)
-                  }}
-                  title="View record"
-                >
-                  <IconLayoutSidebarRightExpand stroke={2} />
-                </Button>
-              )}
-              {canMutate && (
-                <>
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    className="text-text-muted hover:border-transparent hover:bg-text-muted/15 hover:text-text-muted hover:ring-1 hover:ring-inset hover:ring-text-muted/25"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onEditRow(row.original)
-                    }}
-                    title="Edit row"
-                  >
-                    <IconPencil stroke={2} />
-                  </Button>
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    className="text-text-muted hover:border-transparent hover:bg-danger/15 hover:text-danger hover:ring-1 hover:ring-inset hover:ring-danger/25"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onDeleteRow(row.original)
-                    }}
-                    title="Delete row"
-                  >
-                    <IconTrash stroke={2} />
-                  </Button>
-                </>
-              )}
-            </div>
-          )
-        })
-      )
-    }
-    return cols
-  }, [
+  const tableColumns = useGridColumns({
     columns,
     canMutate,
     orderBy,
@@ -464,16 +183,18 @@ export function DataGrid({
     rowOffset,
     fkColumns,
     onOpenForeignKey
-  ])
+  })
 
-  // Controlled rather than left to TanStack, because the widths are restored
-  // from the saved view and handed back to it when a drag ends.
-  const [columnSizing, setColumnSizing] = React.useState<Record<string, number>>(
-    savedColumnSizing ?? {}
-  )
-  React.useEffect(() => {
-    setColumnSizing(savedColumnSizing ?? {})
-  }, [savedColumnSizing])
+  const {
+    columnSizing,
+    setColumnSizing,
+    resizedWidth,
+    isAnyFrozen,
+    stickyStyle,
+    resizingColumn,
+    startResize,
+    resetColumnSize
+  } = useColumnSizing({ savedColumnSizing, frozenColumns, onColumnSizingCommit })
 
   const table = useReactTable<Row>({
     data: rows,
@@ -486,77 +207,9 @@ export function DataGrid({
     getCoreRowModel: getCoreRowModel()
   })
 
-  // Columns stay auto-sized until the user drags a header edge; only then is
-  // an explicit width pinned. Double-clicking the handle clears it back to auto.
-  // The drag is driven manually (not header.getResizeHandler()) because TanStack
-  // starts from its 150px default size, which makes auto-sized columns jump.
   const udtByColumn = React.useMemo(
     () => new Map(columns.map((c) => [c.name, c.udtName])),
     [columns]
-  )
-
-  const resizedWidth = React.useCallback(
-    (columnId: string): number | undefined => columnSizing[columnId],
-    [columnSizing]
-  )
-
-  const stickyOffsets = React.useMemo(
-    () => frozenOffsets(frozenColumns, columnSizing),
-    [frozenColumns, columnSizing]
-  )
-  const isAnyFrozen = frozenColumns.length > 0
-  /** A frozen column is always explicitly sized - the offsets depend on it. */
-  const stickyStyle = React.useCallback(
-    (columnId: string): React.CSSProperties | undefined => {
-      const left = stickyOffsets.get(columnId)
-      if (left === undefined) return undefined
-      const width = frozenWidth(columnId, columnSizing)
-      return { left, width, minWidth: width, maxWidth: width }
-    },
-    [stickyOffsets, columnSizing]
-  )
-  const [resizingColumn, setResizingColumn] = React.useState<string | null>(null)
-  const startResize = React.useCallback(
-    (e: React.MouseEvent<HTMLDivElement>, columnId: string) => {
-      e.preventDefault()
-      const th = e.currentTarget.closest('th')
-      if (!th) return
-      const startWidth = th.getBoundingClientRect().width
-      const startX = e.clientX
-      setResizingColumn(columnId)
-      // The committed value is read off the table rather than tracked here:
-      // onMove runs on a stale closure over whatever sizing existed at mousedown.
-      let latest: Record<string, number> = table.getState().columnSizing
-      const onMove = (ev: MouseEvent): void => {
-        const width = Math.min(1200, Math.max(64, startWidth + ev.clientX - startX))
-        table.setColumnSizing((prev) => {
-          latest = { ...prev, [columnId]: width }
-          return latest
-        })
-      }
-      const onUp = (): void => {
-        window.removeEventListener('mousemove', onMove)
-        window.removeEventListener('mouseup', onUp)
-        setResizingColumn(null)
-        // Once, at the end. Committing per frame would write to storage on
-        // every mousemove of the drag.
-        onColumnSizingCommit?.(latest)
-      }
-      window.addEventListener('mousemove', onMove)
-      window.addEventListener('mouseup', onUp)
-    },
-    [table, onColumnSizingCommit]
-  )
-  const resetColumnSize = React.useCallback(
-    (columnId: string) => {
-      table.setColumnSizing((prev) => {
-        const next = { ...prev }
-        delete next[columnId]
-        onColumnSizingCommit?.(next)
-        return next
-      })
-    },
-    [table, onColumnSizingCommit]
   )
 
   const visibleColCount = tableColumns.length
