@@ -6,6 +6,9 @@ import type {
   AiProviderId,
   AiGatewayIds,
   AiSettingsView,
+  CascadeDeleteOptions,
+  CascadeDeletePlan,
+  CascadeDeleteResult,
   ConnectionInput,
   ConnectionOverview,
   DdlRequest,
@@ -33,6 +36,10 @@ import type {
   SavedConnection,
   SavedQuery,
   SavedQueryPatch,
+  SavedTableView,
+  SavedTableViewPatch,
+  SaveTableViewInput,
+  TableViewScope,
   SchemaGraph,
   SchemaInfo,
   SuggestIndexesOptions,
@@ -82,6 +89,9 @@ const api = {
     insertRow: (opts: RowMutation) => invoke<Record<string, unknown>>('db:row-insert', opts),
     updateRow: (opts: RowUpdate) => invoke<Record<string, unknown>>('db:row-update', opts),
     deleteRow: (opts: RowDelete) => invoke<{ deleted: number }>('db:row-delete', opts),
+    cascadePlan: (opts: CascadeDeleteOptions) => invoke<CascadeDeletePlan>('db:cascade-plan', opts),
+    cascadeDelete: (opts: CascadeDeleteOptions) =>
+      invoke<CascadeDeleteResult>('db:cascade-delete', opts),
     ddlPreview: (opts: DdlRequest) => invoke<string>('db:ddl-preview', opts),
     ddlExecute: (opts: DdlRequest) => invoke<void>('db:ddl-execute', opts),
     runQuery: (opts: RunQueryOptions) => invoke<QueryResult>('db:query-run', opts),
@@ -123,6 +133,13 @@ const api = {
     update: (id: string, patch: SavedQueryPatch) => invoke<SavedQuery>('queries:update', id, patch),
     delete: (id: string) => invoke<void>('queries:delete', id),
     clearHistory: (connectionId: string) => invoke<void>('queries:clear-history', connectionId)
+  },
+  views: {
+    list: (scope: TableViewScope) => invoke<SavedTableView[]>('views:list', scope),
+    save: (input: SaveTableViewInput) => invoke<SavedTableView>('views:save', input),
+    update: (id: string, patch: SavedTableViewPatch) =>
+      invoke<SavedTableView>('views:update', id, patch),
+    delete: (id: string) => invoke<void>('views:delete', id)
   },
   usage: {
     summary: () => invoke<UsageSummary>('usage:summary'),

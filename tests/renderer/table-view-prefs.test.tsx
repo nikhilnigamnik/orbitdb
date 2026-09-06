@@ -46,7 +46,9 @@ beforeEach(() => {
   getRows
     .mockReset()
     .mockImplementation(() => ok({ rows: [{ id: '1', name: 'Ada', secret: 'x' }], columns }))
-  Object.assign(window, { api: { db: { getRows, countRows: () => ok(1) } } })
+  Object.assign(window, {
+    api: { db: { getRows, countRows: () => ok(1) }, views: { list: () => ok([]) } }
+  })
 })
 
 afterEach(cleanup)

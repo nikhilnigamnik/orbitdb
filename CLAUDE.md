@@ -165,7 +165,7 @@ Cloudflare is the **fourth provider**, alongside Anthropic, OpenAI and Google - 
 
 Two things make it not quite like the others, and both are handled by exception rather than by generalising a shape that has one member:
 
-- **Its model ids are `provider/model`**, where the prefix is Cloudflare's and the model half is **the vendor's own id**: `anthropic/claude-sonnet-5`, `google/gemini-3.6-flash`. Two halves, two traps, both hit in practice. The prefix is `google`, not `google-ai-studio` - that is the separate provider-native route. And the model half must be the vendor id, _not_ the name in Cloudflare's catalog: the catalog lists `anthropic/claude-haiku-4.5`, but under BYOK the gateway forwards everything after the slash straight to Anthropic, which only answers to `claude-haiku-4-5-20251001`. Catalog names apply only when Unified Billing supplies the credential; vendor ids work under both. `tests/shared/ai-cloudflare-models.test.ts` pins all of this, and `tests/shared/ai-pricing.test.ts` fails until a new entry has a price.
+- **Its model ids are `provider/model`**, where the prefix is Cloudflare's and the model half is **the vendor's own id**: `anthropic/claude-sonnet-5`, `google-ai-studio/gemini-3.6-flash`. Two halves, two traps, both hit in practice. The prefix for Gemini is `google-ai-studio`; a plain `google` is refused by the endpoint with `AiGatewayError 2008 Invalid provider`, which left both Gemini rows here dead for a release. And the model half must be the vendor id, _not_ the name in Cloudflare's catalog: the catalog lists `anthropic/claude-haiku-4.5`, but under BYOK the gateway forwards everything after the slash straight to Anthropic, which only answers to `claude-haiku-4-5-20251001`. Catalog names apply only when Unified Billing supplies the credential; vendor ids work under both. `tests/shared/ai-cloudflare-models.test.ts` pins all of this, and `tests/shared/ai-pricing.test.ts` fails until a new entry has a price.
 - **It needs two ids beyond its token.** They live in their own `gateway` block rather than in `keys`, because they are not secrets. `needsGatewayIds()` is what the settings card branches on, and `buildModel()` special-cases `cloudflare` rather than `FACTORY` pretending a two-id provider fits a one-key signature. Its token is genuinely optional too - an unauthenticated gateway is a valid setup - so the `MissingApiKeyError` check is per provider, not up front.
 
 Pricing rows mirror the vendors' own, because Unified Billing passes inference through at the vendor rate with no markup; the 5% is charged when credits are bought, so it cannot be priced per token. Gateway usage lands under provider `cloudflare` in the rollup, which separates gateway spend from direct spend rather than muddling them.
@@ -174,7 +174,17 @@ Pinning: `ai-gateway-provider@3.2.0`, not `latest` - 4.x peers `ai@^7` and this 
 
 `createUnified()`'s base URL is a marker, not a destination: it sets `https://gateway.ai.cloudflare.com/v1/compat`, which `createAiGateway` recognises by regex and rewrites to the universal endpoint `…/v1/{accountId}/{gatewayId}`, adding `cf-aig-authorization`. Same destination as pointing an OpenAI client at `…/{accountId}/{gatewayId}/compat` by hand.
 
-**Two caveats worth knowing.** Structured output through the unified endpoint has not been verified against a live gateway - if `Output.object` does not reach it as a native `response_format`, `generateJson()` falls to its plain-text retry and every call silently costs two. And a gateway cache hit costs nothing but may still report tokens, so with caching on the usage figure stops being a strict lower bound.
+**Structured output is decided per upstream, and that is not a preference.** `createUnified()` defaults `supportsStructuredOutputs` to `false`, which makes `@ai-sdk/openai-compatible` drop the schema and downgrade the request to `{type: 'json_object'}` - the `responseFormat is not supported` warning in the console is that happening. Driving a live gateway showed the three upstreams answer three different ways:
+
+- **OpenAI** rejects the downgraded form outright: `'messages' must contain the word 'json'…`, a 400. That is an `APICallError`, which `isWorthRetrying()` deliberately never retries, so **every AI feature on an `openai/*` gateway model failed** until this was fixed. It does honour a real `json_schema` - so `gateway.ts` builds those models from a second `createUnified` that declares support.
+- **Anthropic** answers a `json_schema` request as a _tool call_: `content: null`, payload in `tool_calls`. `Output.object` reads text, so it sees nothing at all. Declaring support there is strictly worse than not, and `gatewaySupportsStructuredOutput()` therefore returns false for it - `generateJson()` then skips the structured attempt entirely rather than spending a call to rediscover the fenced reply it cannot repair. That is where the old "every call silently costs two" came from.
+- **Google** never got far enough to matter (see the prefix trap above).
+
+`strict` is forced off in `transformRequestBody` rather than through `providerOptions`, so the quirk stays inside `gateway.ts` and `generateJson()` need not know it is talking to a gateway. It has to be off: OpenAI's strict mode requires every property to appear in `required`, and `filter-table`'s `value` is optional by design (it is omitted for `is null`), which strict answers with a 400.
+
+One latent trap sits next to this: GPT-5.x refuses `max_tokens` through the compat endpoint (`Use 'max_completion_tokens' instead`), a 400 like the one above. Nothing here sets `maxOutputTokens`, so it does not bite today - but the first call that does will fail on `openai/*` gateway models only.
+
+**One caveat still standing.** A gateway cache hit costs nothing but may still report tokens, so with caching on the usage figure stops being a strict lower bound.
 
 ### Settings persistence
 
@@ -218,6 +228,30 @@ Inwards needs `db:referencing-keys` → `driver.referencingKeys()`, because `Tab
 
 `ReferencedBy` (`features/tables/components/referenced-by.tsx`) renders it inside the row editor, counting each child with `db:rows-count`. Two rules live in `lib/referencing.ts` and are the reason it is a separate testable module: a NULL on the parent side yields **no** link rather than a count (`col = NULL` is never true, so zero would read as a real answer), and links go through `tableRouteWithFilters` - the `filters` URL param, not the single-column `fkColumn`/`fkValue` pair - so a composite key links as precisely as a simple one.
 
+### Cascade delete
+
+`db:cascade-plan` / `db:cascade-delete` (`src/main/db/cascade-delete.ts`) delete a row together with everything pointing at it. Same shape as the two sweeps - pure decisions in the shared module, a `ValueSearchDialect` and a `select` from each driver - because the walk is identical on all three engines.
+
+**Nothing is deleted before the plan has been shown.** A cascade removes rows the user never selected, so `cascadeDeletePlan` is a read-only walk that returns an exact `count(*)` per table, and `cascadeDelete` is a separate call. The plan is **replanned** on execute rather than carrying the preview's statements across IPC: the bound values can be thousands, and a row inserted between preview and confirm has to be caught by the walk rather than left behind to fail the delete.
+
+**`SET NULL`/`SET DEFAULT` children are never followed.** Those rows are meant to survive with the reference rewritten, so cascading into them would be the app overruling the schema. They are counted into `plan.detached` and reported as "Kept, reference cleared". `CASCADE` children _are_ included, even though the database would take them anyway - the point of the dialog is the count, and deleting them explicitly first is equivalent.
+
+**Rows are matched by a bound IN list, not a correlated subquery.** The subquery reads better but MySQL rejects `delete from t where … (select … from t)` outright (error 1093), which is exactly the self-referencing tree case. It is also what lets the preview report a real count rather than an estimate.
+
+The walk is breadth-first and the deletes run in **reverse** - deepest first, target last. That order is what makes it legal: a row's dependents are always at a strictly greater depth than the row itself, so every constraint is satisfied by the time its parent goes. Two tables referencing each other would revisit the same row set forever, hence the `seen` fingerprint; a self-referencing tree walks real levels and is bounded by `CASCADE_DELETE_MAX_DEPTH`, which sets `isTruncated` so the UI can admit the counts are a lower bound. `isTruncated` is set **after** the count, not on the way into a node: a table at the limit whose declared child matches no row has not truncated anything, and flagging it there reported exact plans as partial. `referencingKeys` is memoised per walk - the answer cannot change inside one, and on D1 each call sweeps `pragma foreign_key_list` over every table.
+
+**`plan.totalRows` is a count of rows, not a sum of steps.** `notifications.recipient_id` and `notifications.actor_id` can both point at `users.id`, which is two steps over one overlapping row set - and summing them promises more than the delete removes, because the second statement finds the first one's rows already gone. Any table more than one step reached is counted once more with the conditions OR'd together. That number is what the confirm button says, so it has to be the real one; `planTableCount` in `delete-error.ts` had always deduplicated _tables_ for the same reason.
+
+Key values are bound in batches of `CASCADE_DELETE_BIND_CHUNK`, so the size of an `IN` list is never what decides whether a cascade is possible. `CASCADE_DELETE_KEY_LIMIT` then caps the **parent key values carried into a level** - not the rows deleted, since a leaf is deleted by its parent's values, so one user with 50k log rows cascades fine. Past that cap the whole plan is refused (`CascadeLimitError`, rethrown past the per-key catch) rather than half-built. The limit sits far above the chunk size deliberately: it used to be the chunk size, which meant an ordinary customer → orders → order-items shape with a thousand orders was refused outright, leaving the user nowhere to go once the plain delete had already been turned down by the foreign key.
+
+Postgres and MySQL run the statements in a transaction on a dedicated client, and the **replan runs inside that transaction, behind a `select … for update` on the target rows**. Planning on a pooled connection first put every count outside the transaction, so a child inserted after the last one was in no bound list and failed the parent delete - rolling back every dependent delete issued alongside it. Both engines take a shared lock on a parent row when a child referencing it is inserted, so `for update` is what actually closes that window; the replan alone only narrows it. `planCascade` takes an optional `select` for this, which is how the walk runs on the connection holding the transaction.
+
+D1 cannot do any of that - the REST endpoint is one statement per request - so `CascadeDeleteResult.wasAtomic` is `false` there. It is read rather than merely carried: a statement that fails mid-sequence throws an error naming how many rows are already committed, and the success toast says the deletes were applied one at a time.
+
+The renderer never offers this up front. A plain delete runs first, and only when it comes back a foreign key violation does `isForeignKeyError` (`features/tables/lib/delete-error.ts`) turn the toast into an offer that opens `cascade-delete-dialog.tsx`. Matching on the _message_ is forced: the IPC envelope carries `err.message` and nothing else, so the driver's `code`/`errno` is long gone - all three engines' wordings are pinned in `tests/renderer/delete-error.test.ts`. Bulk delete uses `Promise.allSettled`, since the first rejection would otherwise leave the rest in flight and the reported count would be whatever had landed.
+
+One fix came with it: D1's `referencingKeys` excluded the table itself, so a self-referencing `parent_id` was invisible - `ReferencedBy` showed no dependents and a cascade would have missed the whole branch below.
+
 ### The grid's keyboard, and remembered views
 
 `useGridCursor` (`features/tables/hooks/`) owns a cell cursor, a rectangular selection extended with shift, and copy. It is deliberately separate from the row checkboxes: those select whole rows to _act_ on (delete, export), this selects a region to _read out_. `Cmd+C` gives TSV (with a header only when more than one cell is selected, since Excel's quoting rules are what make a multi-line JSON column paste as one field), `Cmd+Shift+C` gives JSON with the values still typed. The maths lives in `lib/grid-cursor.ts` and the formatting in `lib/clipboard-format.ts`, both pure.
@@ -231,6 +265,20 @@ Arrow keys clamp at the edges rather than wrapping - `CellInlineEditor`'s Tab wr
 `toggleHiddenColumn` refuses to hide the last visible column, because an empty grid has no control left to bring anything back. Hidden columns are still selected and fetched; hiding is a view concern.
 
 **A trap this uncovered:** `TableDataView`'s "reset on table change" effect only ever ran on mount, since `database-page.tsx` keys the container by `${schema}.${table}` and a switch remounts. On mount it called `setFilters([])`, throwing away the filters a deep link arrived with - which is exactly what an FK jump is. It is now guarded by a ref so the first run is skipped; `tests/renderer/table-view-prefs.test.tsx` pins it.
+
+### Saved table views
+
+`views:list` / `views:save` / `views:update` / `views:delete` → `window.api.views.*`, backed by `src/main/store/views-store.ts` (`views.json` in `userData`, plain JSON for the same reason as `queries.json`).
+
+A saved view is a **named** set of filters, join, sort, hidden columns, frozen columns and page size for one connection+schema+table. That is why it lives in `userData` and not beside `view-prefs` in `localStorage`: view-prefs is state you would shrug at losing, and a view the user named and typed five filters into is theirs.
+
+**Column widths are excluded on purpose.** A width is physical drag state that belongs to the table however you are looking at it, so restoring one on every view switch would undo the last drag rather than restore a view. `applyViewToPrefs` merges a view into the stored prefs and leaves `columnSizing` alone.
+
+**Saving is an upsert on the name**, matched case-insensitively, because re-saving is how a view is updated and two rows both reading "Active users" leave no way to tell which one a click applies. _Renaming_ onto an existing name is refused instead - folding there would silently destroy the view that held the name. The store keeps no cap and no pruning: every entry was named by hand, which is the same rule that exempts starred queries from the history cap.
+
+The "modified" hint compares a canonical form (`isSameView` in `lib/saved-views.ts`), and two fields are deliberately normalised out of it. The join is inert below two filters and the sort direction is inert with no sort column, so comparing them raw reports a change against a control that is not even on screen. Hidden columns compare as a **set** (tick order is not part of a view); frozen columns compare as a **sequence**, since that order is the pin order.
+
+`useSavedViews` (`features/tables/hooks/`) owns the list, which view is applied, and the four IPC calls. _Applying_ one is deliberately left in `table-data-view.tsx`: it writes filters, join, sort, page size and prefs at once, and the filter pair has to go through `writeFilterParams` together - passing half a dozen setters into a hook would move the code without moving the coupling. Deleting a connection cascades into `deleteViewsForConnection`, since the views name tables nothing can reach any more.
 
 ### The SQL editor
 
@@ -297,6 +345,16 @@ Node positions are saved per connection+schema in `localStorage` and applied ove
 
 `src/main/store/connections-store.ts` writes a plain JSON file (`connections.json`) into Electron's `userData` directory. There is no `electron-store` dependency - it's hand-rolled. Sensitive fields (`password`, `apiToken`, and the three SSH secrets - see _SSH tunnels_) are encrypted at rest via Electron `safeStorage` (`src/main/store/crypto.ts`) with an `enc:v1:` prefix; plaintext values are migrated to encrypted on read. If `safeStorage` is unavailable on the host (no OS keychain/DPAPI), it logs a warning and falls back to plaintext.
 
+### Connection folders and colours
+
+Two optional fields on `ConnectionInput`: `folder` (free text) and `color` (a fixed eight-value union). They sit alongside `environment`, which is a separate axis - dev/stage/prod is what a connection _is_, a folder is where you filed it.
+
+**A folder is a name, not an entity.** There is no folder list to keep in sync, so renaming one is an ordinary connection edit and emptying one leaves nothing behind. The cost is that "Work" and "work" would be two groups, which `lib/folders.ts` handles by keying case-insensitively and heading the group with the spelling **most** of its members use (locale order breaks a tie, so the heading never depends on the page's sort). `groupByFolder` preserves the order it is handed inside each group - the page has already applied the user's sort - and always orders the groups by name with ungrouped last, because a folder list is a directory rather than a result set. Headings only render once something has actually been filed; a lone "Ungrouped" header over every card names a distinction the user has not made.
+
+**Colours are a union, not hex**, because Tailwind resolves class names statically - `bg-tag-${color}` compiles to nothing. `CONNECTION_COLORS` is the single list and `ConnectionColor` is `(typeof CONNECTION_COLORS)[number]`; the zod enum in `connections/schema.ts` takes the same array. A hand-kept copy in any of the three fails at save time on a field with no form control, rather than at compile time. `CONNECTION_COLOR_CLASS` in `config/site.ts` writes every class out as a literal, against `--color-tag-*` tokens that are deliberately their own rather than the status colours: a green connection tagged `--color-success` would read as "healthy" beside the health dot.
+
+The accent draws as a rail on the card and picker row (not a tint on the engine tile, which already carries the engine's own colour) and as a bar under the sidebar logo while that connection is active - the one place that is on screen whatever page you are on, and the answer to "which database am I typing into". Collapsed folders live in `localStorage`; that one _is_ view state.
+
 ### Renderer structure
 
 Feature folders under `src/renderer/src/features/{connections, database, tables, query, logs, diagram, command-palette, settings}`. Shared design-system primitives live in `src/renderer/src/components/ui/` (Radix-based: button, input, select, sheet, popover, etc.). Use `@renderer/*` for absolute imports (alias defined in `electron.vite.config.ts`).
@@ -307,6 +365,8 @@ Routing is React Router v7 (`src/renderer/src/app.tsx` + `config/routes.ts`). Ac
 
 - `pnpm` only - postinstall hook runs `electron-builder install-app-deps` (rebuilds native modules).
 - `pg` and `mysql2` are real native modules and are externalized; do not try to bundle them into the renderer.
+- **Pools and tunnels are closed on `before-quit`, not `window-all-closed`.** Electron does not emit `window-all-closed` when the app is quit by `app.quit()` or Cmd+Q, which is the ordinary way to leave on macOS - so cleanup hung off it never ran on the path that needed it most. `before-quit` takes one `preventDefault`, awaits `disconnectAll()`, then quits for real behind a flag so it cannot recurse.
+- **Window shortcuts use `before-input-event`, never `globalShortcut`.** A global registration captures the combination system-wide, so the browser the user alt-tabs to stops opening its own devtools while OrbitDB merely runs.
 - Selected/hover row colors in `data-grid.tsx` use neutral `surface-elevated` tones, not `accent` - see git history if you're tempted to use blue.
 - macOS code signing is **intentionally disabled** in `electron-builder.yml` (`identity: null`). Don't change this without a Developer ID Application cert in the keychain - builds will fail loudly otherwise.
 - App icons live in `build/icon.{png,icns}` (electron-builder source) and `resources/icon.png` (runtime BrowserWindow icon). Both must have ~12% transparent padding around the artwork or macOS will render them oversized.

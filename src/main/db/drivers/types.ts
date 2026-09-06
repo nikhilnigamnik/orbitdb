@@ -1,4 +1,7 @@
 import type {
+  CascadeDeleteOptions,
+  CascadeDeletePlan,
+  CascadeDeleteResult,
   ConnectionInput,
   ConnectionOverview,
   DdlRequest,
@@ -55,6 +58,10 @@ export interface DatabaseDriver {
   insertRow(opts: RowMutation): Promise<Record<string, unknown>>
   updateRow(opts: RowUpdate): Promise<Record<string, unknown>>
   deleteRow(opts: RowDelete): Promise<{ deleted: number }>
+  /** What would go with these rows, counted per table. Reads only. */
+  cascadeDeletePlan(opts: CascadeDeleteOptions): Promise<CascadeDeletePlan>
+  /** The rows and everything that depends on them, deepest first. */
+  cascadeDelete(opts: CascadeDeleteOptions): Promise<CascadeDeleteResult>
 
   generateDdl(opts: DdlRequest): Promise<string>
   executeDdl(opts: DdlRequest): Promise<void>

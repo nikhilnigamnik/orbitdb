@@ -112,7 +112,10 @@ export function DatabasePage() {
       <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-surface shadow-lg shadow-black/20">
         {schema && table ? (
           <TableViewContainer
-            key={`${schema}.${table}`}
+            // The connection belongs in the key: two connections can both
+            // have public.users, and without it switching between them keeps the
+            // same mounted view - saved views, filters and prefs included.
+            key={`${active.connectionId}:${schema}.${table}`}
             connectionId={active.connectionId}
             schema={schema}
             table={table}

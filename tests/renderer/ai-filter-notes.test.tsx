@@ -40,7 +40,11 @@ function ok<T>(data: T) {
 function mount(filterTable: () => Promise<unknown>) {
   const getRows = vi.fn(() => ok({ rows: [{ id: 'a1' }], columns, totalEstimate: 1 }))
   Object.assign(window, {
-    api: { db: { getRows, countRows: () => ok(1) }, ai: { filterTable } }
+    api: {
+      db: { getRows, countRows: () => ok(1) },
+      ai: { filterTable },
+      views: { list: () => ok([]) }
+    }
   })
   render(
     <MemoryRouter>

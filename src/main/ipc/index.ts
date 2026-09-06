@@ -8,6 +8,7 @@ import type {
   AiGatewayIds,
   AiSettingsView,
   UsageSummary,
+  CascadeDeleteOptions,
   ConnectionInput,
   CountRowsOptions,
   DdlRequest,
@@ -22,7 +23,10 @@ import type {
   RowMutation,
   RowUpdate,
   RunQueryOptions,
+  SaveTableViewInput,
   SavedQueryPatch,
+  SavedTableViewPatch,
+  TableViewScope,
   SuggestIndexesOptions,
   ValueSearchOptions,
   CheckReferencesOptions,
@@ -45,6 +49,13 @@ import {
   updateQuery
 } from '../store/queries-store'
 import {
+  deleteTableView,
+  deleteViewsForConnection,
+  listTableViews,
+  saveTableView,
+  updateTableView
+} from '../store/views-store'
+import {
   clearAiApiKey,
   getActiveProvider,
   getAiKeyHint,
@@ -65,6 +76,8 @@ import {
 } from '../store/connections-store'
 import {
   cancelQuery,
+  cascadeDelete,
+  cascadeDeletePlan,
   countRows,
   describeActive,
   deleteRow,
@@ -125,6 +138,9 @@ export function registerIpcHandlers(): void {
     wrap(async (id: string) => {
       await disconnectPool(id)
       deleteConnection(id)
+      // The views name tables on a connection that is gone, so nothing would
+      // ever list them again - they would only sit in views.json forever.
+      deleteViewsForConnection(id)
     })
   )
   ipcMain.handle(
@@ -219,6 +235,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'db:row-delete',
     wrap(async (opts: RowDelete) => deleteRow(opts))
+  )
+  ipcMain.handle(
+    'db:cascade-plan',
+    wrap(async (opts: CascadeDeleteOptions) => cascadeDeletePlan(opts))
+  )
+  ipcMain.handle(
+    'db:cascade-delete',
+    wrap(async (opts: CascadeDeleteOptions) => cascadeDelete(opts))
   )
 
   ipcMain.handle(
@@ -372,6 +396,25 @@ export function registerIpcHandlers(): void {
     'queries:clear-history',
     wrap(async (connectionId: string) => {
       clearQueryHistory(connectionId)
+    })
+  )
+
+  ipcMain.handle(
+    'views:list',
+    wrap(async (scope: TableViewScope) => listTableViews(scope))
+  )
+  ipcMain.handle(
+    'views:save',
+    wrap(async (input: SaveTableViewInput) => saveTableView(input))
+  )
+  ipcMain.handle(
+    'views:update',
+    wrap(async (id: string, patch: SavedTableViewPatch) => updateTableView(id, patch))
+  )
+  ipcMain.handle(
+    'views:delete',
+    wrap(async (id: string) => {
+      deleteTableView(id)
     })
   )
 

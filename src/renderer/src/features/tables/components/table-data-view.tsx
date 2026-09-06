@@ -18,8 +18,9 @@ import { SeedDataDialog } from '@renderer/features/database/components/seed-data
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { LoadingState } from '@renderer/components/common/loading-state'
-import { formatCellValue } from '@renderer/lib/format'
+import { formatCellValue, formatNumber } from '@renderer/lib/format'
 import { errorMessage } from '@renderer/lib/errors'
+import { isForeignKeyError } from '@renderer/features/tables/lib/delete-error'
 import { isMissingAiKeyError } from '@renderer/components/common/ai-key-required'
 import { cn } from '@renderer/lib/utils'
 import { unwrap } from '@renderer/lib/ipc'
@@ -45,6 +46,8 @@ import {
   toggleHiddenColumn,
   type TableViewPrefs
 } from '@renderer/features/tables/lib/view-prefs'
+import { applyViewToPrefs, captureView } from '@renderer/features/tables/lib/saved-views'
+import { useSavedViews } from '@renderer/features/tables/hooks/use-saved-views'
 import { UNDO_PROMPT_MS } from '@renderer/config/site'
 import { ROUTES, tableRouteWithFk } from '@renderer/config/routes'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
@@ -54,6 +57,7 @@ import type {
   FilterJoin,
   RowFilter,
   RowsResult,
+  SavedTableView,
   SortDirection,
   TableDetails
 } from '@renderer/types'
@@ -65,6 +69,8 @@ import { PaginationBar } from './pagination-bar'
 import { RowEditorSheet } from './row-editor-sheet'
 import { RecordViewSheet } from './record-view-sheet'
 import { ColumnVisibilityMenu } from './column-visibility-menu'
+import { SavedViewsMenu } from './saved-views-menu'
+import { CascadeDeleteDialog } from './cascade-delete-dialog'
 import type { CopyFormat } from '../hooks/use-grid-cursor'
 
 interface TableDataViewProps {
@@ -241,8 +247,13 @@ export function TableDataView({
   const [inspectingRow, setInspectingRow] = React.useState<Record<string, unknown> | null>(null)
   const deleteConfirm = useDisclosure(false)
   const bulkDeleteConfirm = useDisclosure(false)
+  const cascadeDialog = useDisclosure(false)
   const [editingRow, setEditingRow] = React.useState<Record<string, unknown> | null>(null)
   const [pendingDelete, setPendingDelete] = React.useState<Record<string, unknown> | null>(null)
+  // Held separately from the selection: the rows a cascade was offered for are
+  // the ones the failed delete was aiming at, and clearing the grid selection
+  // afterwards must not change what the dialog is about.
+  const [cascadeTargets, setCascadeTargets] = React.useState<Record<string, unknown>[]>([])
   const [isMutating, setIsMutating] = React.useState(false)
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
 
@@ -483,6 +494,33 @@ export function TableDataView({
     saveViewPrefs(connectionId, details.schema, details.name, next)
   }
 
+  // Named ways of looking at this table, kept in userData rather than beside the
+  // widths in localStorage: a view the user named is theirs, not view state.
+  const currentView = React.useMemo(
+    () => captureView({ filters, filterJoin, orderBy, orderDir, prefs }),
+    [filters, filterJoin, orderBy, orderDir, prefs]
+  )
+  const savedViews = useSavedViews(
+    { connectionId, schema: details.schema, table: details.name },
+    currentView
+  )
+
+  function applySavedView(view: SavedTableView) {
+    const nextPrefs = applyViewToPrefs(view.view, prefs)
+    setPrefs(nextPrefs)
+    saveViewPrefs(connectionId, details.schema, details.name, nextPrefs)
+    setOrderBy(view.view.orderBy)
+    setOrderDir(view.view.orderDir)
+    setPageSize(view.view.pageSize)
+    // Both filter pieces at once, so the URL is written from the pair rather
+    // than from one of them and whatever the other still held this render.
+    setFiltersState(view.view.filters)
+    setFilterJoinState(view.view.filterJoin)
+    writeFilterParams(view.view.filters, view.view.filterJoin)
+    setOffset(0)
+    savedViews.markApplied(view.id)
+  }
+
   function handleSort(column: string) {
     let nextOrderBy: string | null = column
     let nextOrderDir: SortDirection = 'asc'
@@ -669,18 +707,67 @@ export function TableDataView({
     setIsUndoPromptVisible(true)
   }
 
+  function pkOf(row: Record<string, unknown>): Record<string, unknown> {
+    const pk: Record<string, unknown> = {}
+    for (const key of details.primaryKey) pk[key] = row[key]
+    return pk
+  }
+
+  /**
+   * A refused delete, reported as the thing it is.
+   *
+   * The raw constraint error is accurate but names nothing the user can act on -
+   * SQLite does not even say which table is holding the row - so it becomes an
+   * offer to look, and the plan behind that offer does the naming. Cascading
+   * needs a primary key to walk from, so without one the error stands as it is.
+   */
+  function reportDeleteFailure(
+    err: unknown,
+    targets: Record<string, unknown>[],
+    deletedCount = 0
+  ): void {
+    const message = errorMessage(err)
+    // A bulk delete can land some rows and be refused on others. Reporting only
+    // the refusal left the grid quietly shorter than the user was told.
+    const partial =
+      deletedCount > 0
+        ? `${formatNumber(deletedCount)} row${deletedCount === 1 ? '' : 's'} deleted first. `
+        : ''
+
+    if (!isForeignKeyError(message) || details.primaryKey.length === 0) {
+      toast.error('Delete failed', { description: `${partial}${message}` })
+      return
+    }
+
+    const pks = targets.map(pkOf)
+    toast.error('Other rows still point at this', {
+      description: `${partial}The database refused the delete while something still references it.`,
+      // The rows are pinned on the action rather than read back from state, so a
+      // toast still on screen after a successful cascade reopens on the rows it
+      // was raised for - planning those finds nothing left, which is an honest
+      // empty plan rather than the "no primary key values" internal error an
+      // already-cleared list produced.
+      action: {
+        label: 'Show what depends on it',
+        onClick: () => {
+          setCascadeTargets(pks)
+          cascadeDialog.open()
+        }
+      }
+    })
+  }
+
   async function handleDelete() {
     if (!pendingDelete) return
     setIsMutating(true)
+    const target = pendingDelete
     try {
-      const pk: Record<string, unknown> = {}
-      for (const key of details.primaryKey) pk[key] = pendingDelete[key]
       await unwrap(
         window.api.db.deleteRow({
           connectionId,
           schema: details.schema,
           table: details.name,
-          pk
+          pk: pkOf(target)
         })
       )
       await load()
@@ -688,7 +775,8 @@ export function TableDataView({
       setPendingDelete(null)
       toast.success('Row deleted')
     } catch (err) {
-      toast.error('Delete failed', { description: errorMessage(err) })
+      deleteConfirm.close()
+      reportDeleteFailure(err, [target])
     } finally {
       setIsMutating(false)
     }
@@ -697,31 +785,37 @@ export function TableDataView({
   async function handleBulkDelete() {
     if (selectedRows.length === 0) return
     setIsMutating(true)
-    try {
-      await Promise.all(
-        selectedRows.map((row) => {
-          const pk: Record<string, unknown> = {}
-          for (const key of details.primaryKey) pk[key] = row[key]
-          return unwrap(
-            window.api.db.deleteRow({
-              connectionId,
-              schema: details.schema,
-              table: details.name,
-              pk
-            })
-          )
-        })
+    const targets = selectedRows
+    // allSettled rather than all: the first rejection would otherwise leave the
+    // rest in flight, and the count reported would be whatever had landed by
+    // then rather than what actually went.
+    const outcomes = await Promise.allSettled(
+      targets.map((row) =>
+        unwrap(
+          window.api.db.deleteRow({
+            connectionId,
+            schema: details.schema,
+            table: details.name,
+            pk: pkOf(row)
+          })
+        )
       )
-      const deleted = selectedRows.length
-      setRowSelection({})
-      await load()
-      bulkDeleteConfirm.close()
+    )
+    const failure = outcomes.find((outcome) => outcome.status === 'rejected')
+    const deleted = outcomes.filter((outcome) => outcome.status === 'fulfilled').length
+    setIsMutating(false)
+    setRowSelection({})
+    await load()
+    bulkDeleteConfirm.close()
+
+    if (!failure) {
       toast.success(`${deleted} row${deleted === 1 ? '' : 's'} deleted`)
-    } catch (err) {
-      toast.error('Delete failed', { description: errorMessage(err) })
-    } finally {
-      setIsMutating(false)
+      return
     }
+    // Cascading is offered for the whole selection, not just the rows that
+    // failed: the ones already gone plan to nothing and delete nothing, so
+    // narrowing it would only risk dropping a row from the retry.
+    reportDeleteFailure(failure.reason, targets, deleted)
   }
 
   // Hold the whole view behind one full-area loader until the first page is in,
@@ -750,19 +844,32 @@ export function TableDataView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-2">
-        <FiltersBar
-          connectionId={connectionId}
-          schema={details.schema}
-          table={details.name}
-          columns={columns}
-          filters={filters}
-          onChange={setFilters}
-          join={filterJoin}
-          onChangeJoin={setFilterJoin}
-          onApply={() => {
-            setOffset(0)
-          }}
-        />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <SavedViewsMenu
+            views={savedViews.views}
+            activeView={savedViews.activeView}
+            isDirty={savedViews.isDirty}
+            isBusy={savedViews.isSaving}
+            onApply={applySavedView}
+            onSave={(name) => void savedViews.save(name)}
+            onOverwrite={(view) => void savedViews.patch(view, { useCurrent: true })}
+            onRename={(view, name) => void savedViews.patch(view, { name })}
+            onDelete={(view) => void savedViews.remove(view)}
+          />
+          <FiltersBar
+            connectionId={connectionId}
+            schema={details.schema}
+            table={details.name}
+            columns={columns}
+            filters={filters}
+            onChange={setFilters}
+            join={filterJoin}
+            onChangeJoin={setFilterJoin}
+            onApply={() => {
+              setOffset(0)
+            }}
+          />
+        </div>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -1087,6 +1194,31 @@ export function TableDataView({
         confirmLabel={isMutating ? 'Deleting…' : `Delete ${selectedCount}`}
         variant="danger"
         isLoading={isMutating}
+      />
+
+      <CascadeDeleteDialog
+        isOpen={cascadeDialog.isOpen}
+        onClose={cascadeDialog.close}
+        connectionId={connectionId}
+        schema={details.schema}
+        table={details.name}
+        pks={cascadeTargets}
+        onDeleted={(result) => {
+          cascadeDialog.close()
+          setCascadeTargets([])
+          setPendingDelete(null)
+          setRowSelection({})
+          void load()
+          const summary = result.deleted
+            .map((entry) => `${entry.table} ${formatNumber(entry.rows)}`)
+            .join(' · ')
+          toast.success(`${formatNumber(result.totalRows)} rows deleted`, {
+            // D1 has no transaction to hold the sequence together, so what the
+            // result names is what landed rather than a set that either all
+            // went or none did.
+            description: result.wasAtomic ? summary : `${summary} · applied one statement at a time`
+          })
+        }}
       />
     </div>
   )

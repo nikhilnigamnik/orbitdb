@@ -57,7 +57,9 @@ describe('a reload that fails', () => {
         ? Promise.resolve({ success: false, error: 'connection terminated' })
         : ok({ rows: [{ id: 'a1' }], columns, totalEstimate: 1 })
     )
-    Object.assign(window, { api: { db: { getRows, countRows: () => ok(1) } } })
+    Object.assign(window, {
+      api: { db: { getRows, countRows: () => ok(1) }, views: { list: () => ok([]) } }
+    })
     mount()
     await screen.findByText('a1')
 
@@ -91,7 +93,11 @@ describe('a reload that fails', () => {
       ok({ filters: [{ column: 'id', operator: '=', value: 'update' }] })
     )
     Object.assign(window, {
-      api: { db: { getRows, countRows: () => ok(1) }, ai: { filterTable } }
+      api: {
+        db: { getRows, countRows: () => ok(1) },
+        ai: { filterTable },
+        views: { list: () => ok([]) }
+      }
     })
     mount()
     await screen.findByText('a1')
@@ -121,7 +127,8 @@ describe('a reload that fails', () => {
           getRows: () =>
             Promise.resolve({ success: false, error: 'password authentication failed' }),
           countRows: () => ok(0)
-        }
+        },
+        views: { list: () => ok([]) }
       }
     })
     mount()
