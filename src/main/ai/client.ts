@@ -19,7 +19,7 @@ import {
 } from '../store/settings-store'
 import { recordUsage } from '../store/usage-store'
 import { AI_REQUEST_TIMEOUT_MS } from './config'
-import { buildGatewayModel } from './gateway'
+import { buildGatewayModel, gatewaySupportsStructuredOutput } from './gateway'
 
 export class MissingApiKeyError extends Error {
   constructor() {
@@ -183,12 +183,30 @@ function isWorthRetrying(err: unknown): boolean {
 }
 
 /**
+ * Whether the active model can be asked for structured output natively. A vendor
+ * SDK always can - every model offered in Settings reports it. The gateway is
+ * the exception, and only for some upstreams, so asking `gateway.ts` beats
+ * assuming.
+ *
+ * When it cannot, `generateJson` skips the structured attempt entirely rather
+ * than spending a call to discover it: the reply comes back as fenced text that
+ * `Output.object` has no repair hook for, so that first call was always going to
+ * be thrown away.
+ */
+function supportsStructuredOutput(): boolean {
+  const { provider, model } = getAiSettings()
+  if (provider !== 'cloudflare') return true
+  return gatewaySupportsStructuredOutput(model)
+}
+
+/**
  * Structured output in two layers.
  *
  * 1. `generateText` + `Output.object` - the SDK's supported path as of v6, which
- *    deprecated `generateObject`. Every model offered in Settings reports
- *    `supportsStructuredOutput`, so the Anthropic provider sends a native
- *    `output_config.format` carrying the schema rather than asking in prose.
+ *    deprecated `generateObject`. Every model reached through a vendor SDK sends
+ *    a native format carrying the schema rather than asking in prose. Skipped
+ *    outright for a gateway upstream that cannot answer one, since there the
+ *    call is guaranteed to be wasted.
  * 2. A plain-text retry, parsed defensively. `Output.object` takes no repair
  *    hook, so salvaging a fenced or preamble-wrapped reply means asking again -
  *    which is why layer 1 failing for a *transport* reason must not land here.
@@ -202,17 +220,19 @@ export async function generateJson<T>(opts: {
   // Kept so a shape failure that also fails on the retry is reported as itself
   // rather than as the retry's generic "invalid JSON".
   let structuredFailure: unknown
-  try {
-    const { output } = await runText(opts.feature, {
-      system: opts.system,
-      prompt: opts.prompt,
-      output: Output.object({ schema: opts.schema }),
-      abortSignal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
-    })
-    if (output != null) return output as T
-  } catch (err) {
-    if (!isWorthRetrying(err)) throw err
-    structuredFailure = err
+  if (supportsStructuredOutput()) {
+    try {
+      const { output } = await runText(opts.feature, {
+        system: opts.system,
+        prompt: opts.prompt,
+        output: Output.object({ schema: opts.schema }),
+        abortSignal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
+      })
+      if (output != null) return output as T
+    } catch (err) {
+      if (!isWorthRetrying(err)) throw err
+      structuredFailure = err
+    }
   }
 
   const { text } = await runText(opts.feature, {

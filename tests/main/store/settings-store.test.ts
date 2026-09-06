@@ -101,6 +101,35 @@ describe('the API key', () => {
     expect(fileOnDisk().ai.keys.anthropic).toBe(sealed(KEY))
   })
 
+  it('follows a renamed model id instead of dropping to the default', async () => {
+    // The gateway's Gemini rows were `google/…` until the prefix turned out to
+    // have to be `google-ai-studio/…`. Treating that as a dropped model would
+    // quietly move the user from Gemini onto the Anthropic default.
+    writeFile({
+      version: 3,
+      ai: {
+        provider: 'cloudflare',
+        keys: {},
+        models: { cloudflare: 'google/gemini-3.6-flash' }
+      },
+      gateway: { accountId: 'acc', gatewayId: 'gw' }
+    })
+    store = await freshStore()
+
+    expect(store.getAiSettings().model).toBe('google-ai-studio/gemini-3.6-flash')
+  })
+
+  it('still falls back when a model was dropped rather than renamed', async () => {
+    writeFile({
+      version: 3,
+      ai: { provider: 'anthropic', keys: {}, models: { anthropic: 'claude-from-a-past-release' } },
+      gateway: { accountId: '', gatewayId: '' }
+    })
+    store = await freshStore()
+
+    expect(store.getAiSettings().model).toBe('claude-sonnet-5')
+  })
+
   it('survives being cleared and set again', () => {
     store.setAiApiKey('anthropic', KEY)
     store.clearAiApiKey('anthropic')

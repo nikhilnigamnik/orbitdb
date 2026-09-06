@@ -48,9 +48,8 @@ export const AI_PROVIDERS = [
     label: 'Cloudflare AI Gateway',
     keyPlaceholder: 'Cloudflare API token',
     /**
-     * `provider/model`, where the prefix is Cloudflare's (`google`, not
-     * `google-ai-studio` - that is the separate provider-native route) and the
-     * model part is **the vendor's own id**.
+     * `provider/model`, where the prefix is Cloudflare's own and the model part
+     * is **the vendor's own id**.
      *
      * That second half is load-bearing and was learned the hard way. Cloudflare's
      * catalog lists `anthropic/claude-haiku-4.5`, but with BYOK the gateway
@@ -58,6 +57,10 @@ export const AI_PROVIDERS = [
      * has no such model - the real id is `claude-haiku-4-5-20251001`. Catalog
      * names only apply when Unified Billing is supplying the credential. Vendor
      * ids work under both, so they are what this list uses.
+     *
+     * The prefix half bit too. Google's is `google-ai-studio`; a plain `google`
+     * is refused by the endpoint with `AiGatewayError 2008 Invalid provider`,
+     * which made both Gemini rows here unusable.
      */
     models: [
       { id: 'anthropic/claude-sonnet-5', label: 'Sonnet 5', hint: 'Anthropic - the default' },
@@ -69,8 +72,12 @@ export const AI_PROVIDERS = [
       { id: 'anthropic/claude-opus-5', label: 'Opus 5', hint: 'Anthropic - strongest' },
       { id: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra', hint: 'OpenAI - balanced' },
       { id: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna', hint: 'OpenAI - fast and cheap' },
-      { id: 'google/gemini-3.6-flash', label: 'Gemini 3.6 Flash', hint: 'Google - balanced' },
-      { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Google - cheap' }
+      {
+        id: 'google-ai-studio/gemini-3.6-flash',
+        label: 'Gemini 3.6 Flash',
+        hint: 'Google - balanced'
+      },
+      { id: 'google-ai-studio/gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Google - cheap' }
     ]
   }
 ] as const
@@ -132,6 +139,28 @@ export function isAiProviderId(value: unknown): value is AiProviderId {
  * real model but not a real *Anthropic* model, and sending it there would come
  * back as an opaque 404.
  */
+/**
+ * Model ids that were renamed, and what they are called now.
+ *
+ * A model *dropped* from the registry falls back to the provider's default, and
+ * that is right - it no longer exists. A model that was only *renamed* still
+ * does, so the same fallback silently moves the user onto a different vendor's
+ * model and orphans every usage row already recorded under the old name. The
+ * gateway's Gemini ids were `google/…` until the prefix turned out to have to be
+ * `google-ai-studio/…`.
+ *
+ * Read when settings.json is loaded and when a usage row is priced.
+ */
+export const RENAMED_AI_MODEL_IDS: Record<string, string> = {
+  'google/gemini-3.6-flash': 'google-ai-studio/gemini-3.6-flash',
+  'google/gemini-2.5-flash': 'google-ai-studio/gemini-2.5-flash'
+}
+
+/** The id a model goes by now, following at most one rename. */
+export function currentAiModelId(value: string): string {
+  return RENAMED_AI_MODEL_IDS[value] ?? value
+}
+
 export function isAiModelId(provider: AiProviderId, value: unknown): value is AiModelId {
   return isAiProviderId(provider) && aiProvider(provider).models.some((m) => m.id === value)
 }

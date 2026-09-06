@@ -8,7 +8,7 @@ const cloudflare = aiProvider('cloudflare')
 const PREFIX_OWNER: Record<string, AiProviderId> = {
   anthropic: 'anthropic',
   openai: 'openai',
-  google: 'google'
+  'google-ai-studio': 'google'
 }
 
 describe('the Cloudflare model list', () => {
@@ -19,7 +19,8 @@ describe('the Cloudflare model list', () => {
   })
 
   it('uses a prefix the unified endpoint knows', () => {
-    // `google`, not `google-ai-studio` - the latter is the provider-native route.
+    // A plain `google` is answered with `AiGatewayError 2008 Invalid provider`,
+    // so the slug has to be `google-ai-studio`.
     for (const model of cloudflare.models) {
       const prefix = model.id.slice(0, model.id.indexOf('/'))
       expect(PREFIX_OWNER[prefix], `unknown gateway prefix: ${prefix}`).toBeTruthy()

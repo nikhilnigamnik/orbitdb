@@ -9,6 +9,14 @@ describe('the rate for a model', () => {
     expect(rateFor('gemini-3.6-flash')).toEqual({ input: 1.5, output: 7.5 })
   })
 
+  it('still prices spend recorded under a model id that has since been renamed', () => {
+    // usage.json holds whatever id was current when the call was made. Without
+    // the rename map that history drops into `unpricedCalls` and the reported
+    // total silently shrinks.
+    expect(rateFor('google/gemini-3.6-flash')).toEqual(rateFor('google-ai-studio/gemini-3.6-flash'))
+    expect(isPricedModel('google/gemini-2.5-flash')).toBe(true)
+  })
+
   it('applies a launch discount to usage inside its window', () => {
     // Sonnet 5 lists at $3/$15 but runs at $2/$10 through 2026-08-31.
     expect(rateFor('claude-sonnet-5', '2026-08-10')).toEqual({ input: 2, output: 10 })
