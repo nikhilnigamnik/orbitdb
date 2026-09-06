@@ -8,7 +8,12 @@ import {
   IconSettings
 } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
-import { APP_NAME } from '@renderer/config/site'
+import {
+  APP_NAME,
+  CONNECTION_COLOR_CLASS,
+  DEFAULT_ENVIRONMENT,
+  ENVIRONMENT_LABEL
+} from '@renderer/config/site'
 import { ROUTES } from '@renderer/config/routes'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { useUpdateCheck } from '@renderer/features/settings/store'
@@ -25,7 +30,11 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const { pathname } = useLocation()
-  const { active } = useConnection()
+  const { active, connections } = useConnection()
+  const activeConnection = active
+    ? connections.find((c) => c.id === active.connectionId)
+    : undefined
+  const accent = activeConnection?.color ? CONNECTION_COLOR_CLASS[activeConnection.color] : null
   const { result } = useUpdateCheck()
   const hasUpdate = !!result?.hasUpdate
 
@@ -42,6 +51,25 @@ export function Sidebar() {
       <div className="flex items-center justify-center pt-4 pb-4">
         <img src={orbitdbLogo} alt={APP_NAME} className="h-6 w-6 object-contain" />
       </div>
+
+      {/* Which database you are typing into, in the one place that is on screen
+          whatever page you are on. Only when the connection was given a colour -
+          an untagged one has nothing to say here. */}
+      {accent && activeConnection && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="mb-2 flex w-full cursor-default justify-center px-3">
+              <span className={cn('h-1 w-full rounded-full', accent)} aria-hidden />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {activeConnection.name}
+            <span className="ml-1 text-text-subtle">
+              {ENVIRONMENT_LABEL[activeConnection.environment ?? DEFAULT_ENVIRONMENT]}
+            </span>
+          </TooltipContent>
+        </Tooltip>
+      )}
 
       <nav className="flex flex-1 flex-col items-center gap-1">
         {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => {

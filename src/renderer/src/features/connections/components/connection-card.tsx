@@ -13,7 +13,12 @@ import { Chip } from '@renderer/components/ui/chip'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { Popover } from '@renderer/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
-import { DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL, usesSshTunnel } from '@renderer/config/site'
+import {
+  CONNECTION_COLOR_CLASS,
+  DEFAULT_ENVIRONMENT,
+  ENVIRONMENT_LABEL,
+  usesSshTunnel
+} from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 import type { ConnectionHealth } from '../lib/use-connection-health'
@@ -94,6 +99,7 @@ export function ConnectionCard({
 
   const parts = metaParts(connection)
   const environment = connection.environment ?? DEFAULT_ENVIRONMENT
+  const accent = connection.color ? CONNECTION_COLOR_CLASS[connection.color] : null
 
   return (
     <div
@@ -102,6 +108,13 @@ export function ConnectionCard({
         isActive ? 'border-border-strong' : 'border-border  hover:bg-surface-elevated/30'
       )}
     >
+      {/* A rail rather than a tint on the engine tile: the tile already carries
+          the engine's colour, and overwriting it would trade one signal for
+          another instead of adding one. */}
+      {accent && (
+        <span aria-hidden className={cn('-ml-1 h-8 w-0.5 shrink-0 rounded-full', accent)} />
+      )}
+
       <div className="relative shrink-0">
         <div
           className={cn(

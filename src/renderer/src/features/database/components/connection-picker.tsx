@@ -16,7 +16,12 @@ import { LoadingState } from '@renderer/components/common/loading-state'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { ENGINE_ICON } from '@renderer/features/connections/components/engine-icons'
 import { ROUTES } from '@renderer/config/routes'
-import { DEFAULT_ENVIRONMENT, ENVIRONMENT_LABEL, usesSshTunnel } from '@renderer/config/site'
+import {
+  CONNECTION_COLOR_CLASS,
+  DEFAULT_ENVIRONMENT,
+  ENVIRONMENT_LABEL,
+  usesSshTunnel
+} from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 
@@ -126,6 +131,7 @@ export function ConnectionPicker() {
             const engine = ENGINE_STYLES[connection.engine] ?? ENGINE_FALLBACK
             const EngineIcon = ENGINE_ICON[connection.engine] ?? IconDatabase
             const environment = connection.environment ?? DEFAULT_ENVIRONMENT
+            const accent = connection.color ? CONNECTION_COLOR_CLASS[connection.color] : null
             const isPending = isConnecting && pendingId === connection.id
 
             return (
@@ -140,6 +146,13 @@ export function ConnectionPicker() {
                     'disabled:cursor-not-allowed disabled:opacity-60'
                   )}
                 >
+                  {accent && (
+                    <span
+                      aria-hidden
+                      className={cn('-ml-1 h-8 w-0.5 shrink-0 rounded-full', accent)}
+                    />
+                  )}
+
                   <div
                     className={cn(
                       'flex h-9 w-9 shrink-0 items-center justify-center rounded-md ring-1 ring-inset ring-white/5',

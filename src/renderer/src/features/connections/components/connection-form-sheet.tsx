@@ -25,6 +25,7 @@ import {
 import { cn } from '@renderer/lib/utils'
 import { connectionSchema, type ConnectionFormValues } from '../schema'
 import { ENGINE_ICON } from './engine-icons'
+import { ConnectionAppearanceFields } from './connection-appearance-fields'
 import { SshTunnelFields } from './ssh-tunnel-fields'
 import type {
   ConnectionEnvironment,
@@ -39,6 +40,11 @@ interface ConnectionFormSheetProps {
   onClose: () => void
   onSaved: (connection: SavedConnection) => void
   initial?: SavedConnection | null
+  /**
+   * Folders already in use. Passed down rather than read from the connection
+   * store, so the sheet still mounts in a test without the provider.
+   */
+  folders?: string[]
 }
 
 const ENGINES: DatabaseEngine[] = ['postgres', 'mysql', 'd1']
@@ -62,6 +68,8 @@ function toFormValues(initial?: SavedConnection | null): ConnectionFormValues {
     name: initial.name,
     engine: initial.engine,
     environment: initial.environment ?? DEFAULT_ENVIRONMENT,
+    folder: initial.folder ?? '',
+    color: initial.color,
     host: initial.host,
     port: initial.port,
     database: initial.database,
@@ -87,7 +95,8 @@ export function ConnectionFormSheet({
   isOpen,
   onClose,
   onSaved,
-  initial
+  initial,
+  folders = []
 }: ConnectionFormSheetProps) {
   const [values, setValues] = React.useState<ConnectionFormValues>(() => toFormValues(initial))
   const [errors, setErrors] = React.useState<Partial<Record<keyof ConnectionFormValues, string>>>(
@@ -371,6 +380,15 @@ export function ConnectionFormSheet({
                 onChange={(env) => update('environment', env)}
               />
             </FormField>
+
+            <ConnectionAppearanceFields
+              folder={values.folder}
+              color={values.color}
+              folders={folders}
+              error={errors.folder}
+              onChangeFolder={(folder) => update('folder', folder)}
+              onChangeColor={(color) => update('color', color)}
+            />
 
             {values.engine === 'd1' ? (
               <>
