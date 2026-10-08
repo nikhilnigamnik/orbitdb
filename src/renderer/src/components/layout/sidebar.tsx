@@ -18,7 +18,7 @@ import { ROUTES } from '@renderer/config/routes'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { useUpdateCheck } from '@renderer/features/settings/store'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
-import orbitdbLogo from '@renderer/assets/orbitdb-icon-transparent.png'
+import orbitdbLogo from '@renderer/assets/orbitdb-mark.svg'
 
 const NAV_ITEMS = [
   { to: ROUTES.connections, label: 'Connections', icon: IconPlug, end: true },

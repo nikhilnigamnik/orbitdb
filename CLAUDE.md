@@ -325,7 +325,7 @@ Routing is React Router v7 (`src/renderer/src/app.tsx` + `config/routes.ts`). Ac
 - **Window shortcuts use `before-input-event`, never `globalShortcut`.** A global registration captures the combination system-wide, so the browser the user alt-tabs to stops opening its own devtools while OrbitDB merely runs.
 - Selected/hover row colors in `data-grid.tsx` use neutral `surface-elevated` tones, not `accent` - see git history if you're tempted to use blue.
 - macOS code signing is **intentionally disabled** in `electron-builder.yml` (`identity: null`). Don't change this without a Developer ID Application cert in the keychain - builds will fail loudly otherwise.
-- App icons live in `build/icon.{png,icns}` (electron-builder source) and `resources/icon.png` (runtime BrowserWindow icon). Both must have ~12% transparent padding around the artwork or macOS will render them oversized.
+- App icons live in `build/icon.{png,icns}` (electron-builder source) and `resources/icon.png` (runtime BrowserWindow icon). Both must have ~12% transparent padding around the artwork or macOS will render them oversized. `build/icon.svg` is the source for all three (render with `rsvg-convert`, then `iconutil -c icns` over an iconset), and `src/renderer/src/assets/orbitdb-mark.svg` is the same mark without the tile, used in the sidebar and connections page.
 
 ## When in doubt
 

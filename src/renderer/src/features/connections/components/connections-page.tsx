@@ -35,7 +35,7 @@ import {
   UNGROUPED_FOLDER_LABEL
 } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
-import orbitdbLogo from '@renderer/assets/orbitdb-icon-transparent.png'
+import orbitdbLogo from '@renderer/assets/orbitdb-mark.svg'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 
 type SortMode = 'name-asc' | 'name-desc' | 'recent'
