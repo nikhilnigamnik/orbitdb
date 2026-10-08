@@ -5,7 +5,7 @@ import { currentAiModelId } from './ai-models'
  * tokens. Lives in `shared/` because main prices the usage rollup and the
  * renderer labels the result.
  *
- * Sourced from each vendor's own pricing page (checked 2026-08-10) - deliberately
+ * Sourced from each vendor's own pricing page (checked 2026-09-06) - deliberately
  * not from a third-party aggregator, several of which disagree with the vendor by
  * a factor of two. **These are hardcoded and will drift.** Nothing in the app can
  * detect that, so the figures are always presented as an estimate.
@@ -36,16 +36,22 @@ interface ModelPricing extends TokenRate {
  */
 const PRICING: Record<string, ModelPricing> = {
   // Anthropic - platform.claude.com/docs/en/about-claude/models/overview
+  'claude-fable-5-1': { input: 10, output: 50 },
   'claude-opus-5': { input: 5, output: 25 },
-  'claude-sonnet-5': {
-    input: 3,
-    output: 15,
-    promo: { input: 2, output: 10, through: '2026-08-31' }
-  },
+  // $2/$10 was announced as introductory pricing through 2026-08-31. Anthropic
+  // has since made it the standard rate and cancelled the increase to $3/$15,
+  // so this is flat rather than a promo - and every day of history prices the
+  // same, which is why removing the promo does not rewrite what was recorded.
+  'claude-sonnet-5': { input: 2, output: 10 },
   'claude-haiku-4-5-20251001': { input: 1, output: 5 },
 
   // OpenAI - developers.openai.com/api/docs/pricing
-  'gpt-5.6-sol': { input: 5, output: 30 },
+  'gpt-6-astra': { input: 10, output: 50 },
+  'gpt-5.6-sol': {
+    input: 5,
+    output: 30,
+    promo: { input: 4, output: 20, through: '2026-11-21' }
+  },
   'gpt-5.6-terra': { input: 2, output: 12 },
   'gpt-5.6-luna': { input: 0.2, output: 1.2 },
   'gpt-5.5': { input: 5, output: 30 },
@@ -67,16 +73,23 @@ const PRICING: Record<string, ModelPricing> = {
   // Inference is passed through at each vendor's own rate with no markup, so
   // these mirror the rows above. The 5% fee is charged when credits are bought,
   // not per call, so it cannot be priced per token here.
+  'anthropic/claude-fable-5-1': { input: 10, output: 50 },
   'anthropic/claude-opus-5': { input: 5, output: 25 },
-  'anthropic/claude-sonnet-5': {
-    input: 3,
-    output: 15,
-    promo: { input: 2, output: 10, through: '2026-08-31' }
-  },
+  'anthropic/claude-sonnet-5': { input: 2, output: 10 },
   'anthropic/claude-haiku-4-5-20251001': { input: 1, output: 5 },
+  'openai/gpt-6-astra': { input: 10, output: 50 },
   'openai/gpt-5.6-terra': { input: 2, output: 12 },
   'openai/gpt-5.6-luna': { input: 0.2, output: 1.2 },
+  'openai/gpt-5.6-sol': {
+    input: 5,
+    output: 30,
+    promo: { input: 4, output: 20, through: '2026-11-21' }
+  },
+  'openai/gpt-5.5': { input: 5, output: 30 },
   'google-ai-studio/gemini-3.6-flash': { input: 1.5, output: 7.5 },
+  'google-ai-studio/gemini-3.5-flash': { input: 1.5, output: 9 },
+  'google-ai-studio/gemini-3.5-flash-lite': { input: 0.3, output: 2.5 },
+  'google-ai-studio/gemini-3.1-pro-preview': { input: 2, output: 12 },
   'google-ai-studio/gemini-2.5-flash': { input: 0.3, output: 2.5 }
 }
 

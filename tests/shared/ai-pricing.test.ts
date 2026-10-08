@@ -18,18 +18,26 @@ describe('the rate for a model', () => {
   })
 
   it('applies a launch discount to usage inside its window', () => {
-    // Sonnet 5 lists at $3/$15 but runs at $2/$10 through 2026-08-31.
-    expect(rateFor('claude-sonnet-5', '2026-08-10')).toEqual({ input: 2, output: 10 })
-    expect(rateFor('claude-sonnet-5', '2026-08-31')).toEqual({ input: 2, output: 10 })
+    // GPT-5.6 Sol lists at $5/$30 but runs at $4/$20 through 2026-11-21.
+    expect(rateFor('gpt-5.6-sol', '2026-09-06')).toEqual({ input: 4, output: 20 })
+    expect(rateFor('gpt-5.6-sol', '2026-11-21')).toEqual({ input: 4, output: 20 })
   })
 
   it('reverts to the standard rate the day the discount ends', () => {
-    expect(rateFor('claude-sonnet-5', '2026-09-01')).toEqual({ input: 3, output: 15 })
+    expect(rateFor('gpt-5.6-sol', '2026-11-22')).toEqual({ input: 5, output: 30 })
   })
 
   it('falls back to the standard rate when no day is given', () => {
     // Better to overstate than to quietly bill a promo that may have expired.
-    expect(rateFor('claude-sonnet-5')).toEqual({ input: 3, output: 15 })
+    expect(rateFor('gpt-5.6-sol')).toEqual({ input: 5, output: 30 })
+  })
+
+  it('prices a discount that became permanent as the flat rate', () => {
+    // Sonnet 5's $2/$10 was introductory through 2026-08-31; Anthropic cancelled
+    // the step up to $3/$15, so no day either side of that date is dearer.
+    expect(rateFor('claude-sonnet-5', '2026-08-10')).toEqual({ input: 2, output: 10 })
+    expect(rateFor('claude-sonnet-5', '2026-09-01')).toEqual({ input: 2, output: 10 })
+    expect(rateFor('claude-sonnet-5')).toEqual({ input: 2, output: 10 })
   })
 
   it('returns null for a model it has no rate for', () => {
@@ -49,11 +57,11 @@ describe('costing a rollup row', () => {
   })
 
   it('prices at the rate in effect on the day of the usage', () => {
-    const promo = costOf('claude-sonnet-5', 1_000_000, 0, '2026-08-10')
-    const standard = costOf('claude-sonnet-5', 1_000_000, 0, '2026-09-01')
+    const promo = costOf('gpt-5.6-sol', 1_000_000, 0, '2026-11-21')
+    const standard = costOf('gpt-5.6-sol', 1_000_000, 0, '2026-11-22')
 
-    expect(promo).toBeCloseTo(2, 10)
-    expect(standard).toBeCloseTo(3, 10)
+    expect(promo).toBeCloseTo(4, 10)
+    expect(standard).toBeCloseTo(5, 10)
   })
 
   it('is null rather than zero for an unpriced model', () => {

@@ -11,7 +11,8 @@ export const AI_PROVIDERS = [
     models: [
       { id: 'claude-sonnet-5', label: 'Sonnet 5', hint: 'Balanced - the default' },
       { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', hint: 'Fastest and cheapest' },
-      { id: 'claude-opus-5', label: 'Opus 5', hint: 'Strongest on complex SQL' }
+      { id: 'claude-opus-5', label: 'Opus 5', hint: 'Strongest on complex SQL' },
+      { id: 'claude-fable-5-1', label: 'Fable 5.1', hint: 'Most capable - priciest' }
     ]
   },
   {
@@ -21,8 +22,9 @@ export const AI_PROVIDERS = [
     models: [
       { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', hint: 'Balanced - the default' },
       { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', hint: 'Fastest and cheapest' },
-      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', hint: 'Strongest on complex SQL' },
-      { id: 'gpt-5.5', label: 'GPT-5.5', hint: 'Previous flagship' },
+      { id: 'gpt-6-astra', label: 'GPT-6 Astra', hint: 'Most capable - priciest' },
+      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', hint: 'Strong on complex SQL' },
+      { id: 'gpt-5.5', label: 'GPT-5.5', hint: 'Older flagship' },
       { id: 'gpt-5.2', label: 'GPT-5.2', hint: 'Older, still capable' },
       { id: 'gpt-5.2-pro', label: 'GPT-5.2 Pro', hint: 'Older reasoning tier - costly' },
       { id: 'gpt-5-mini', label: 'GPT-5 mini', hint: 'Older, very cheap' }
@@ -70,12 +72,31 @@ export const AI_PROVIDERS = [
         hint: 'Anthropic - fast and cheap'
       },
       { id: 'anthropic/claude-opus-5', label: 'Opus 5', hint: 'Anthropic - strongest' },
+      { id: 'anthropic/claude-fable-5-1', label: 'Fable 5.1', hint: 'Anthropic - most capable' },
       { id: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra', hint: 'OpenAI - balanced' },
       { id: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna', hint: 'OpenAI - fast and cheap' },
+      { id: 'openai/gpt-6-astra', label: 'GPT-6 Astra', hint: 'OpenAI - most capable' },
+      { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol', hint: 'OpenAI - strong' },
+      { id: 'openai/gpt-5.5', label: 'GPT-5.5', hint: 'OpenAI - previous flagship' },
       {
         id: 'google-ai-studio/gemini-3.6-flash',
         label: 'Gemini 3.6 Flash',
         hint: 'Google - balanced'
+      },
+      {
+        id: 'google-ai-studio/gemini-3.5-flash',
+        label: 'Gemini 3.5 Flash',
+        hint: 'Google - previous Flash'
+      },
+      {
+        id: 'google-ai-studio/gemini-3.5-flash-lite',
+        label: 'Gemini 3.5 Flash-Lite',
+        hint: 'Google - fast and cheap'
+      },
+      {
+        id: 'google-ai-studio/gemini-3.1-pro-preview',
+        label: 'Gemini 3.1 Pro',
+        hint: 'Google - strongest, preview'
       },
       { id: 'google-ai-studio/gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Google - cheap' }
     ]
