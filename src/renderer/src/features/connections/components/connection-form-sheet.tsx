@@ -16,7 +16,6 @@ import {
   DEFAULT_DATABASES,
   DEFAULT_ENVIRONMENT,
   DEFAULT_PORTS,
-  DEFAULT_SSH_PORT,
   DEFAULT_USERS,
   ENGINE_LABEL,
   ENVIRONMENTS,
@@ -26,7 +25,6 @@ import { cn } from '@renderer/lib/utils'
 import { connectionSchema, type ConnectionFormValues } from '../schema'
 import { ENGINE_ICON } from './engine-icons'
 import { ConnectionAppearanceFields } from './connection-appearance-fields'
-import { SshTunnelFields } from './ssh-tunnel-fields'
 import type {
   ConnectionEnvironment,
   DatabaseEngine,
@@ -78,16 +76,7 @@ function toFormValues(initial?: SavedConnection | null): ConnectionFormValues {
     ssl: initial.ssl,
     accountId: initial.accountId ?? '',
     databaseId: initial.databaseId ?? '',
-    apiToken: initial.apiToken ?? '',
-    sshEnabled: initial.sshEnabled ?? false,
-    sshHost: initial.sshHost ?? '',
-    sshPort: initial.sshPort ?? DEFAULT_SSH_PORT,
-    sshUser: initial.sshUser ?? '',
-    sshAuthMethod: initial.sshAuthMethod ?? 'agent',
-    sshPassword: initial.sshPassword ?? '',
-    sshPrivateKey: initial.sshPrivateKey ?? '',
-    sshPassphrase: initial.sshPassphrase ?? '',
-    sshHostKeyFingerprint: initial.sshHostKeyFingerprint ?? ''
+    apiToken: initial.apiToken ?? ''
   }
 }
 
@@ -184,16 +173,6 @@ export function ConnectionFormSheet({
     try {
       const result = await unwrap(window.api.connections.test(parsed))
       setTestResult(result)
-      // The test opened its own tunnel, so it is the first thing that ever saw
-      // the host key. Carrying it into the form means saving pins it, rather
-      // than the next connect trusting whatever answers then.
-      if (result.sshHostKeyFingerprint) {
-        setValues((prev) =>
-          prev.sshHostKeyFingerprint
-            ? prev
-            : { ...prev, sshHostKeyFingerprint: result.sshHostKeyFingerprint ?? '' }
-        )
-      }
     } catch (err) {
       setTestResult({ success: false, error: err instanceof Error ? err.message : String(err) })
     } finally {
@@ -504,8 +483,6 @@ export function ConnectionFormSheet({
                     onCheckedChange={(checked) => update('ssl', checked)}
                   />
                 </label>
-
-                <SshTunnelFields values={values} errors={errors} onChange={update} />
               </>
             )}
 

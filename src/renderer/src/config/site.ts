@@ -1,14 +1,8 @@
-import type {
-  ConnectionColor,
-  ConnectionEnvironment,
-  DatabaseEngine,
-  SshAuthMethod
-} from '@renderer/types'
-import { SSH_DEFAULT_PORT } from '../../../shared/types'
+import type { ConnectionColor, ConnectionEnvironment, DatabaseEngine } from '@renderer/types'
 
 // Same rule as the AI re-exports above: a value crossing the shared boundary
 // comes through config/ rather than a relative path from a component.
-export { usesSshTunnel, normalizeFolder, CONNECTION_COLORS } from '../../../shared/types'
+export { normalizeFolder, CONNECTION_COLORS } from '../../../shared/types'
 
 // Re-exported so components follow the usual "constants come from config/" rule
 // rather than reaching across the shared boundary by relative path.
@@ -131,22 +125,6 @@ export const MAX_FOLDER_NAME_LENGTH = 40
 /** Heading for the connections that were never filed anywhere. */
 export const UNGROUPED_FOLDER_LABEL = 'Ungrouped'
 
-export const SSH_AUTH_METHODS: SshAuthMethod[] = ['agent', 'key', 'password']
-
-export const SSH_AUTH_LABEL: Record<SshAuthMethod, string> = {
-  agent: 'SSH agent',
-  key: 'Private key',
-  password: 'Password'
-}
-
-export const SSH_AUTH_HINT: Record<SshAuthMethod, string> = {
-  agent: 'Uses the key already loaded in your running ssh-agent. Nothing is stored.',
-  key: 'The key file is read once and stored encrypted - not referenced by path.',
-  password: 'Stored encrypted, the same way the database password is.'
-}
-
-export const DEFAULT_SSH_PORT = SSH_DEFAULT_PORT
-
 export const DEFAULT_CONNECTION_VALUES = {
   name: '',
   engine: 'postgres' as DatabaseEngine,
@@ -161,14 +139,5 @@ export const DEFAULT_CONNECTION_VALUES = {
   ssl: false,
   accountId: '',
   databaseId: '',
-  apiToken: '',
-  sshEnabled: false,
-  sshHost: '',
-  sshPort: DEFAULT_SSH_PORT,
-  sshUser: '',
-  sshAuthMethod: 'agent' as SshAuthMethod,
-  sshPassword: '',
-  sshPrivateKey: '',
-  sshPassphrase: '',
-  sshHostKeyFingerprint: ''
+  apiToken: ''
 }

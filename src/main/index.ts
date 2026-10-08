@@ -125,17 +125,17 @@ app.on('window-all-closed', () => {
     return
   }
   // macOS keeps the app in the dock with no window, and there is nothing left
-  // for the pools and their tunnels to serve until one reopens.
+  // for the pools to serve until one reopens.
   void disconnectAll().catch((err) => console.error('[app] could not close connections', err))
 })
 
 /**
- * Closing pools and tunnels belongs here, not on `window-all-closed`.
+ * Closing pools belongs here, not on `window-all-closed`.
  *
  * Electron does not emit `window-all-closed` when the app is quit by
  * `app.quit()` or Cmd+Q, which is the ordinary way to leave the app on macOS -
  * so the cleanup hung off it never ran on the path that needed it most, and
- * live SSH tunnels were torn down by process exit instead.
+ * live pools were torn down by process exit instead.
  */
 let hasClosedConnections = false
 app.on('before-quit', (event) => {

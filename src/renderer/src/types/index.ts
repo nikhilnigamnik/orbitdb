@@ -54,8 +54,6 @@ export type {
   SchemaGraphTable,
   SchemaInfo,
   SortDirection,
-  SshAuthMethod,
-  SshKeyPick,
   SuggestIndexesOptions,
   TableSize,
   SuggestIndexesResult,

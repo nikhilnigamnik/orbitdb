@@ -3,7 +3,6 @@ import {
   IconDatabase,
   IconDotsVertical,
   IconLock,
-  IconShieldLock,
   IconPencil,
   IconPlugOff,
   IconTrash
@@ -16,8 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui
 import {
   CONNECTION_COLOR_CLASS,
   DEFAULT_ENVIRONMENT,
-  ENVIRONMENT_LABEL,
-  usesSshTunnel
+  ENVIRONMENT_LABEL
 } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
@@ -166,18 +164,6 @@ export function ConnectionCard({
                 </span>
               </TooltipTrigger>
               <TooltipContent side="bottom">SSL enabled</TooltipContent>
-            </Tooltip>
-          )}
-          {usesSshTunnel(connection) && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="flex shrink-0 items-center text-text-subtle/70">
-                  <IconShieldLock size={11} />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                Tunnelled through {connection.sshHost || 'SSH'}
-              </TooltipContent>
             </Tooltip>
           )}
         </div>
