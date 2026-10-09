@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -94,17 +94,18 @@ describe('the API key', () => {
   })
 
   it('is migrated to sealed on first read of a plaintext file', async () => {
-    writeFile({ version: 1, ai: { apiKey: KEY, model: 'claude-sonnet-5' } })
+    writeFile({ version: 1, ai: { apiKey: KEY, model: 'claude-sonnet-5-5' } })
     store = await freshStore()
 
     expect(store.getAiSettings().apiKey).toBe(KEY)
     expect(fileOnDisk().ai.keys.anthropic).toBe(sealed(KEY))
   })
 
-  it('follows a renamed model id instead of dropping to the default', async () => {
+  it('follows a renamed model id, then falls back if the new name was retired', async () => {
     // The gateway's Gemini rows were `google/…` until the prefix turned out to
-    // have to be `google-ai-studio/…`. Treating that as a dropped model would
-    // quietly move the user from Gemini onto the Anthropic default.
+    // have to be `google-ai-studio/…`. Gemini 3.6 Flash has since left the
+    // picker, so the renamed id lands on the gateway's own default rather than
+    // being treated as unknown and moving the user off the gateway.
     writeFile({
       version: 3,
       ai: {
@@ -116,7 +117,8 @@ describe('the API key', () => {
     })
     store = await freshStore()
 
-    expect(store.getAiSettings().model).toBe('google-ai-studio/gemini-3.6-flash')
+    expect(store.getAiSettings().provider).toBe('cloudflare')
+    expect(store.getAiSettings().model).toBe('anthropic/claude-sonnet-5-5')
   })
 
   it('still falls back when a model was dropped rather than renamed', async () => {
@@ -127,7 +129,7 @@ describe('the API key', () => {
     })
     store = await freshStore()
 
-    expect(store.getAiSettings().model).toBe('claude-sonnet-5')
+    expect(store.getAiSettings().model).toBe('claude-sonnet-5-5')
   })
 
   it('survives being cleared and set again', () => {
@@ -143,7 +145,7 @@ describe('the API key', () => {
 
 describe('a key that cannot be unsealed on this machine', () => {
   beforeEach(async () => {
-    writeFile({ version: 1, ai: { apiKey: sealed(KEY), model: 'claude-opus-5' } })
+    writeFile({ version: 1, ai: { apiKey: sealed(KEY), model: 'claude-opus-5-5' } })
     stub.failDecrypt = true
     store = await freshStore()
   })
@@ -156,10 +158,10 @@ describe('a key that cannot be unsealed on this machine', () => {
   it('keeps its ciphertext when something else is saved', () => {
     // The unreadable key reads back as '' - writing that would destroy a key the
     // user could still recover by logging into the right OS account.
-    store.setAiModel('anthropic', 'claude-haiku-4-5-20251001')
+    store.setAiModel('anthropic', 'claude-haiku-5-5')
 
     expect(fileOnDisk().ai.keys.anthropic).toBe(sealed(KEY))
-    expect(fileOnDisk().ai.models.anthropic).toBe('claude-haiku-4-5-20251001')
+    expect(fileOnDisk().ai.models.anthropic).toBe('claude-haiku-5-5')
   })
 
   it('is replaced outright when the user types a new one', () => {
@@ -190,15 +192,15 @@ describe('the key hint', () => {
 })
 
 describe('the model', () => {
-  it('defaults to Sonnet 5', () => {
-    expect(store.getAiSettings().model).toBe('claude-sonnet-5')
+  it('defaults to Sonnet 5.5', () => {
+    expect(store.getAiSettings().model).toBe('claude-sonnet-5-5')
   })
 
   it('is rejected when unknown, rather than passed to the provider', () => {
     // An unrecognised id would come back from the API as an opaque 404.
     // gpt-4 is a real model, just not an Anthropic one.
     expect(() => store.setAiModel('anthropic', 'gpt-4')).toThrow(/unknown model/i)
-    expect(store.getAiSettings().model).toBe('claude-sonnet-5')
+    expect(store.getAiSettings().model).toBe('claude-sonnet-5-5')
   })
 
   it('falls back when the stored one is no longer offered', async () => {
@@ -209,14 +211,14 @@ describe('the model', () => {
     })
     store = await freshStore()
 
-    expect(store.getAiSettings().model).toBe('claude-sonnet-5')
+    expect(store.getAiSettings().model).toBe('claude-sonnet-5-5')
   })
 
   it('persists across a relaunch', async () => {
-    store.setAiModel('anthropic', 'claude-opus-5')
+    store.setAiModel('anthropic', 'claude-opus-5-5')
     store = await freshStore()
 
-    expect(store.getAiSettings().model).toBe('claude-opus-5')
+    expect(store.getAiSettings().model).toBe('claude-opus-5-5')
   })
 })
 
@@ -228,8 +230,21 @@ describe('a settings file that is missing or corrupt', () => {
     expect(store.getAiSettings()).toEqual({
       provider: 'anthropic',
       apiKey: '',
-      model: 'claude-sonnet-5'
+      model: 'claude-sonnet-5-5'
     })
+  })
+
+  it('keeps the unreadable file aside rather than saving over it', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    writeFile('not json at all')
+    store = await freshStore()
+    store.setAiApiKey('anthropic', KEY)
+
+    const aside = readdirSync(stub.userDataDir).find((name) => name.includes('.corrupt-'))
+    expect(aside).toBeDefined()
+    expect(readFileSync(join(stub.userDataDir, aside!), 'utf8')).toBe('"not json at all"')
+    expect(fileOnDisk().ai.keys.anthropic).toBe(sealed(KEY))
+    vi.restoreAllMocks()
   })
 })
 
@@ -245,14 +260,14 @@ describe('more than one provider', () => {
   it('hands the AI layer the key and model of whichever is selected', () => {
     store.setAiApiKey('anthropic', 'sk-ant-1111')
     store.setAiApiKey('google', 'AIza-3333')
-    store.setAiModel('google', 'gemini-2.5-flash')
+    store.setAiModel('google', 'gemini-3.5-flash-lite')
 
     store.setAiProvider('google')
 
     expect(store.getAiSettings()).toEqual({
       provider: 'google',
       apiKey: 'AIza-3333',
-      model: 'gemini-2.5-flash'
+      model: 'gemini-3.5-flash-lite'
     })
   })
 
@@ -280,7 +295,7 @@ describe('more than one provider', () => {
   it('refuses a model that belongs to a different provider', () => {
     // gemini-2.5-flash is a real model - just not an OpenAI one, and sending it
     // there returns an opaque 404.
-    expect(() => store.setAiModel('openai', 'gemini-2.5-flash')).toThrow(/unknown model/i)
+    expect(() => store.setAiModel('openai', 'gemini-3.5-flash-lite')).toThrow(/unknown model/i)
   })
 
   it('refuses a provider it does not have an SDK for', () => {
@@ -291,19 +306,19 @@ describe('more than one provider', () => {
 describe('a settings file written by the single-provider version', () => {
   it('reads its key and model as Anthropic’s', async () => {
     // v1 had no provider field because there was only one.
-    writeFile({ version: 1, ai: { apiKey: sealed(KEY), model: 'claude-opus-5' } })
+    writeFile({ version: 1, ai: { apiKey: sealed(KEY), model: 'claude-opus-5-5' } })
     store = await freshStore()
 
     expect(store.getAiSettings()).toEqual({
       provider: 'anthropic',
       apiKey: KEY,
-      model: 'claude-opus-5'
+      model: 'claude-opus-5-5'
     })
     expect(store.getProviderSettings('anthropic').apiKey).toBe(KEY)
   })
 
   it('leaves the other providers empty rather than inventing keys', async () => {
-    writeFile({ version: 1, ai: { apiKey: sealed(KEY), model: 'claude-opus-5' } })
+    writeFile({ version: 1, ai: { apiKey: sealed(KEY), model: 'claude-opus-5-5' } })
     store = await freshStore()
 
     store.setAiProvider('openai')
@@ -343,12 +358,12 @@ describe('the Cloudflare provider', () => {
   })
 
   it('defaults to a catalog slug, not one of our own model ids', () => {
-    expect(store.getProviderSettings('cloudflare').model).toBe('anthropic/claude-sonnet-5')
+    expect(store.getProviderSettings('cloudflare').model).toBe('anthropic/claude-sonnet-5-5')
   })
 
   it('refuses a model that is not in the catalog list', () => {
     // `claude-sonnet-5` is a real model but not a real Cloudflare slug.
-    expect(() => store.setAiModel('cloudflare', 'claude-sonnet-5')).toThrow(/Unknown model/)
+    expect(() => store.setAiModel('cloudflare', 'claude-sonnet-5-5')).toThrow(/Unknown model/)
   })
 
   it('survives a relaunch, ids and token together', async () => {
@@ -368,7 +383,7 @@ describe('a settings file written before Cloudflare was a provider', () => {
       ai: {
         provider: 'openai',
         keys: { anthropic: sealed(KEY), openai: '', google: '' },
-        models: { anthropic: 'claude-opus-5', openai: 'gpt-5.2', google: 'gemini-3.6-flash' }
+        models: { anthropic: 'claude-opus-5-5', openai: 'gpt-6-luna', google: 'gemini-3.8-flash' }
       }
     })
     store = await freshStore()

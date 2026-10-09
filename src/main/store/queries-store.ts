@@ -1,8 +1,9 @@
 import { app } from 'electron'
 import { randomUUID } from 'crypto'
 import { join } from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import type { RecordQueryRun, SavedQuery, SavedQueryPatch } from '../../shared/types'
+import { quarantineJsonFile, readJsonFile, writeJsonFileAtomic } from './json-file'
 
 const FILE_NAME = 'queries.json'
 
@@ -46,25 +47,27 @@ function isQuery(value: unknown): value is SavedQuery {
 function read(): StoreShape {
   if (cache) return cache
   const path = storePath()
-  if (!existsSync(path)) {
+  // A corrupt history file is not worth failing a launch over, but it is kept
+  // aside rather than overwritten by the next run.
+  const parsed = readJsonFile(path) as Partial<StoreShape> | null | undefined
+  if (parsed === undefined) {
     cache = emptyState()
     return cache
   }
-  try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<StoreShape>
-    // Filtering rather than trusting the file: one malformed entry would
-    // otherwise crash every render that reads `sql`.
-    cache = { version: 1, queries: (parsed?.queries ?? []).filter(isQuery) }
-  } catch {
-    // A corrupt history file is not worth failing a launch over.
+  if (!Array.isArray(parsed?.queries)) {
+    quarantineJsonFile(path, 'no queries list')
     cache = emptyState()
+    return cache
   }
+  // Filtering rather than trusting the file: one malformed entry would
+  // otherwise crash every render that reads `sql`.
+  cache = { version: 1, queries: parsed.queries.filter(isQuery) }
   return cache
 }
 
 function write(queries: SavedQuery[]): void {
   const state: StoreShape = { version: 1, queries }
-  writeFileSync(storePath(), JSON.stringify(state), 'utf8')
+  writeJsonFileAtomic(storePath(), state)
   cache = state
 }
 

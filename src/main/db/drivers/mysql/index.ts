@@ -18,6 +18,7 @@ import {
   CheckReferencesResult
 } from '../../../../shared/types'
 import { buildDdl } from '../../ddl'
+import { invalidateIntrospection } from '../../introspection-cache'
 import { toCount } from '../../coerce'
 import { sweepTables } from '../../value-search'
 import { sweepReferences } from '../../broken-refs'
@@ -35,13 +36,12 @@ import {
 } from './introspect'
 import {
   describeActive,
-  disconnectAll,
-  disconnectPool,
+  disconnectAll as disconnectAllPools,
+  disconnectPool as disconnectOnePool,
   getPool,
-  invalidateTableDetailsForConnection,
   test
 } from './pool'
-import { cancelQuery, runQuery } from './query'
+import { cancelQuery, mysqlEditorSessions, runQuery } from './query'
 import { countRows, deleteRow, getColumnDistinct, getRows, insertRow, updateRow } from './rows'
 
 async function getOverview(connectionId: string): Promise<ConnectionOverview> {
@@ -107,6 +107,12 @@ async function searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult>
     isCancelled: () => isSweepCancelled(opts.searchId)
   })
 }
+async function disconnectPool(connectionId: string): Promise<void> {
+  await Promise.all([mysqlEditorSessions.close(connectionId), disconnectOnePool(connectionId)])
+}
+async function disconnectAll(): Promise<void> {
+  await Promise.all([mysqlEditorSessions.closeAll(), disconnectAllPools()])
+}
 async function generateDdl(opts: DdlRequest): Promise<string> {
   return buildDdl(opts.operation, opts.schema, opts.table, ddlDialect)
 }
@@ -114,7 +120,7 @@ async function executeDdl(opts: DdlRequest): Promise<void> {
   const sql = buildDdl(opts.operation, opts.schema, opts.table, ddlDialect)
   const pool = await getPool(opts.connectionId)
   await pool.query(sql)
-  invalidateTableDetailsForConnection(opts.connectionId)
+  invalidateIntrospection(opts.connectionId)
 }
 async function checkReferences(opts: CheckReferencesOptions): Promise<CheckReferencesResult> {
   const pool = await getPool(opts.connectionId)

@@ -1,6 +1,6 @@
-import type { ColumnInfo, DatabaseEngine, TableDetails } from '../../shared/types'
+import type { ColumnInfo, DatabaseEngine, SchemaGraph, TableDetails } from '../../shared/types'
 import { getSchemaGraph, listSchemas } from '../db/manager'
-import { MAX_ENUM_LABELS, MAX_SCHEMA_TABLES } from './config'
+import { MAX_ENUM_LABELS, MAX_SCHEMA_TABLES, SCHEMA_FETCH_CONCURRENCY } from './config'
 
 const SYSTEM_SCHEMAS: Record<DatabaseEngine, string[]> = {
   postgres: ['information_schema', 'pg_catalog', 'pg_toast'],
@@ -47,13 +47,7 @@ export async function buildSchemaContext(
   let tableCount = 0
   let wasTruncated = false
 
-  for (const schema of schemas) {
-    if (tableCount >= MAX_SCHEMA_TABLES) {
-      wasTruncated = true
-      break
-    }
-    const graph = await getSchemaGraph(connectionId, schema.name)
-
+  function appendGraph(graph: SchemaGraph): void {
     for (const table of graph.tables) {
       if (tableCount >= MAX_SCHEMA_TABLES) {
         wasTruncated = true
@@ -78,6 +72,25 @@ export async function buildSchemaContext(
         `FK: ${edge.from.table}(${edge.from.columns.join(', ')}) -> ` +
           `${edge.to.table}(${edge.to.columns.join(', ')})`
       )
+    }
+  }
+
+  // Fetched a few schemas at a time rather than one after another, and in order,
+  // so the table cap still decides which ones make the cut - and once it is
+  // reached no further batch is fetched at all.
+  for (let start = 0; start < schemas.length && !wasTruncated; start += SCHEMA_FETCH_CONCURRENCY) {
+    if (tableCount >= MAX_SCHEMA_TABLES) {
+      wasTruncated = true
+      break
+    }
+    const batch = schemas.slice(start, start + SCHEMA_FETCH_CONCURRENCY)
+    const graphs = await Promise.all(batch.map((s) => getSchemaGraph(connectionId, s.name)))
+    for (const graph of graphs) {
+      if (tableCount >= MAX_SCHEMA_TABLES) {
+        wasTruncated = true
+        break
+      }
+      appendGraph(graph)
     }
   }
 

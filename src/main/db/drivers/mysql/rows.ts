@@ -16,6 +16,7 @@ import {
 } from '../../../../shared/types'
 import { buildOrderBySql } from '../../order-by'
 import { buildFilterSql } from '../../filters'
+import { toBindValue } from '../../json-bind'
 import { filterDialect, qualifiedTable, quoteIdent } from './dialect'
 import { tableDetails } from './introspect'
 import { getPool } from './pool'
@@ -94,9 +95,10 @@ export async function insertRow(opts: RowMutation): Promise<Record<string, unkno
   const cols: string[] = []
   const values: unknown[] = []
   for (const [key, value] of Object.entries(opts.values)) {
-    if (!validColumns.has(key)) continue
+    const column = validColumns.get(key)
+    if (!column) continue
     cols.push(quoteIdent(key))
-    values.push(value)
+    values.push(toBindValue(column, value))
   }
   if (cols.length === 0) throw new Error('No valid columns to insert')
 
@@ -125,7 +127,7 @@ export async function insertRow(opts: RowMutation): Promise<Record<string, unkno
 }
 export async function updateRow(opts: RowUpdate): Promise<Record<string, unknown>> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
-  const validColumns = new Set(details.columns.map((c) => c.name))
+  const validColumns = new Map(details.columns.map((c) => [c.name, c]))
   if (details.primaryKey.length === 0) {
     throw new Error(`Cannot update rows on ${opts.schema}.${opts.table}: no primary key`)
   }
@@ -133,9 +135,10 @@ export async function updateRow(opts: RowUpdate): Promise<Record<string, unknown
   const setClauses: string[] = []
   const params: unknown[] = []
   for (const [key, value] of Object.entries(opts.values)) {
-    if (!validColumns.has(key)) continue
+    const column = validColumns.get(key)
+    if (!column) continue
     setClauses.push(`${quoteIdent(key)} = ?`)
-    params.push(value)
+    params.push(toBindValue(column, value))
   }
   if (setClauses.length === 0) throw new Error('No columns to update')
 

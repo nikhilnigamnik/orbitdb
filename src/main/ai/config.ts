@@ -9,3 +9,8 @@ export const MAX_ENUM_LABELS = 24
 // A hung model call would otherwise leave the UI spinning with nothing to
 // cancel - the same reason the D1 driver has one.
 export const AI_REQUEST_TIMEOUT_MS = 60_000
+
+// Schemas fetched at once when building the whole-database map. Each one is
+// several catalogue queries - and on D1 several HTTPS calls per table - so a
+// database with dozens of schemas must not fire them all together.
+export const SCHEMA_FETCH_CONCURRENCY = 4

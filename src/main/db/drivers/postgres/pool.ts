@@ -5,39 +5,37 @@
  * the many call sites do not depend on how a pool is obtained.
  */
 
-import { Pool, type PoolConfig } from 'pg'
+import { Pool, type ClientConfig, type PoolConfig } from 'pg'
 import { recordQuery } from '../../query-log'
+import { invalidateIntrospection } from '../../introspection-cache'
+import { pgTlsOptions } from '../../tls'
 import {
   type ConnectionInput,
   type SavedConnection,
-  type TableDetails,
   type TestConnectionResult
 } from '../../../../shared/types'
 import { requireConnection } from '../../../store/connections-store'
 import type { ActiveMeta } from '.././types'
 
 const pools = new Map<string, Pool>()
-export const tableDetailsCache = new Map<string, TableDetails>()
-export function tableCacheKey(connectionId: string, schema: string, table: string): string {
-  return `${connectionId} ${schema} ${table}`
-}
-export function invalidateTableDetailsForConnection(connectionId: string): void {
-  const prefix = `${connectionId} `
-  for (const key of tableDetailsCache.keys()) {
-    if (key.startsWith(prefix)) tableDetailsCache.delete(key)
-  }
-}
-function toPoolConfig(input: ConnectionInput): PoolConfig {
+
+/** Exported for the SQL editor's session, which connects with the same settings. */
+export function toClientConfig(input: ConnectionInput): ClientConfig {
   return {
     host: input.host,
     port: input.port,
     database: input.database,
     user: input.user,
     password: input.password,
-    ssl: input.ssl ? { rejectUnauthorized: false } : false,
-    max: 5,
-    idleTimeoutMillis: 30_000,
+    ssl: pgTlsOptions(input),
     connectionTimeoutMillis: 8_000
+  }
+}
+function toPoolConfig(input: ConnectionInput): PoolConfig {
+  return {
+    ...toClientConfig(input),
+    max: 5,
+    idleTimeoutMillis: 30_000
   }
 }
 export function getPool(connectionId: string): Promise<Pool> {
@@ -96,7 +94,7 @@ function instrumentPgPool(pool: Pool, connectionId: string): void {
 }
 export async function disconnectPool(connectionId: string): Promise<void> {
   const pool = pools.get(connectionId)
-  invalidateTableDetailsForConnection(connectionId)
+  invalidateIntrospection(connectionId)
   if (!pool) return
   pools.delete(connectionId)
   try {

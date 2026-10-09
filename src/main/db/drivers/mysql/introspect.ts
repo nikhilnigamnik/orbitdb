@@ -15,7 +15,8 @@ import {
   type TableDetails,
   type TableInfo
 } from '../../../../shared/types'
-import { getPool, tableCacheKey, tableDetailsCache } from './pool'
+import { cachedSchemaGraph, cachedTableDetails } from '../../introspection-cache'
+import { getPool } from './pool'
 
 export const SYSTEM_SCHEMAS = new Set(['mysql', 'information_schema', 'performance_schema', 'sys'])
 export async function listSchemas(connectionId: string): Promise<SchemaInfo[]> {
@@ -71,41 +72,38 @@ export function parseEnumValues(columnType: string): string[] | null {
   }
   return labels.length > 0 ? labels : null
 }
-export async function tableDetails(
+export function tableDetails(
   connectionId: string,
   schema: string,
   table: string
 ): Promise<TableDetails> {
-  const cacheKey = tableCacheKey(connectionId, schema, table)
-  const cached = tableDetailsCache.get(cacheKey)
-  if (cached) return cached
-
+  return cachedTableDetails(connectionId, schema, table, () =>
+    loadTableDetails(connectionId, schema, table)
+  )
+}
+/** The five information_schema reads are independent, so they go out together. */
+async function loadTableDetails(
+  connectionId: string,
+  schema: string,
+  table: string
+): Promise<TableDetails> {
   const pool = await getPool(connectionId)
 
-  const [tableMeta] = await pool.query<RowDataPacket[]>(
+  const metaPromise = pool.query<RowDataPacket[]>(
     `select table_type as table_type, table_rows as estimated_rows
        from information_schema.tables
       where table_schema = ? and table_name = ?
       limit 1`,
     [schema, table]
   )
-  if (tableMeta.length === 0) {
-    throw new Error(`Table ${schema}.${table} not found`)
-  }
-  const type: TableDetails['type'] = tableMeta[0].table_type === 'VIEW' ? 'view' : 'table'
-  const estimatedRows =
-    tableMeta[0].estimated_rows == null ? null : Number(tableMeta[0].estimated_rows)
-
-  const [pkRows] = await pool.query<RowDataPacket[]>(
+  const pkPromise = pool.query<RowDataPacket[]>(
     `select column_name as column_name
        from information_schema.statistics
       where table_schema = ? and table_name = ? and index_name = 'PRIMARY'
       order by seq_in_index`,
     [schema, table]
   )
-  const primaryKey = pkRows.map((r) => String(r.column_name))
-
-  const [colRows] = await pool.query<RowDataPacket[]>(
+  const colsPromise = pool.query<RowDataPacket[]>(
     `select column_name as name,
             data_type as data_type,
             column_type as column_type,
@@ -118,21 +116,7 @@ export async function tableDetails(
       order by ordinal_position`,
     [schema, table]
   )
-  const pkSet = new Set(primaryKey)
-  const columns: ColumnInfo[] = colRows.map((r) => ({
-    name: String(r.name),
-    dataType: String(r.column_type),
-    udtName: normalizeUdtName(String(r.data_type), String(r.column_type)),
-    isNullable: r.is_nullable === 'YES',
-    isPrimaryKey: pkSet.has(String(r.name)),
-    defaultValue: r.default_value == null ? null : String(r.default_value),
-    ordinalPosition: Number(r.ordinal_position),
-    characterMaximumLength:
-      r.character_maximum_length == null ? null : Number(r.character_maximum_length),
-    enumValues: parseEnumValues(String(r.column_type))
-  }))
-
-  const [idxRows] = await pool.query<RowDataPacket[]>(
+  const idxPromise = pool.query<RowDataPacket[]>(
     `select index_name as name,
             max(non_unique) as non_unique,
             group_concat(column_name order by seq_in_index separator ',') as columns
@@ -142,21 +126,7 @@ export async function tableDetails(
       order by index_name`,
     [schema, table]
   )
-  const indexes: IndexInfo[] = idxRows.map((r) => {
-    const name = String(r.name)
-    const cols = String(r.columns ?? '')
-      .split(',')
-      .filter(Boolean)
-    return {
-      name,
-      isUnique: Number(r.non_unique) === 0,
-      isPrimary: name === 'PRIMARY',
-      columns: cols,
-      definition: ''
-    }
-  })
-
-  const [fkRows] = await pool.query<RowDataPacket[]>(
+  const fkPromise = pool.query<RowDataPacket[]>(
     `select kcu.constraint_name as name,
             group_concat(kcu.column_name order by kcu.ordinal_position separator ',') as columns,
             kcu.referenced_table_schema as referenced_schema,
@@ -179,6 +149,50 @@ export async function tableDetails(
       order by kcu.constraint_name`,
     [schema, table]
   )
+
+  const [[tableMeta], [pkRows], [colRows], [idxRows], [fkRows]] = await Promise.all([
+    metaPromise,
+    pkPromise,
+    colsPromise,
+    idxPromise,
+    fkPromise
+  ])
+  if (tableMeta.length === 0) {
+    throw new Error(`Table ${schema}.${table} not found`)
+  }
+  const type: TableDetails['type'] = tableMeta[0].table_type === 'VIEW' ? 'view' : 'table'
+  const estimatedRows =
+    tableMeta[0].estimated_rows == null ? null : Number(tableMeta[0].estimated_rows)
+  const primaryKey = pkRows.map((r) => String(r.column_name))
+
+  const pkSet = new Set(primaryKey)
+  const columns: ColumnInfo[] = colRows.map((r) => ({
+    name: String(r.name),
+    dataType: String(r.column_type),
+    udtName: normalizeUdtName(String(r.data_type), String(r.column_type)),
+    isNullable: r.is_nullable === 'YES',
+    isPrimaryKey: pkSet.has(String(r.name)),
+    defaultValue: r.default_value == null ? null : String(r.default_value),
+    ordinalPosition: Number(r.ordinal_position),
+    characterMaximumLength:
+      r.character_maximum_length == null ? null : Number(r.character_maximum_length),
+    enumValues: parseEnumValues(String(r.column_type))
+  }))
+
+  const indexes: IndexInfo[] = idxRows.map((r) => {
+    const name = String(r.name)
+    const cols = String(r.columns ?? '')
+      .split(',')
+      .filter(Boolean)
+    return {
+      name,
+      isUnique: Number(r.non_unique) === 0,
+      isPrimary: name === 'PRIMARY',
+      columns: cols,
+      definition: ''
+    }
+  })
+
   const foreignKeys: ForeignKeyInfo[] = fkRows.map((r) => ({
     name: String(r.name),
     columns: String(r.columns ?? '')
@@ -193,7 +207,7 @@ export async function tableDetails(
     onUpdate: String(r.on_update ?? 'NO ACTION')
   }))
 
-  const result: TableDetails = {
+  return {
     schema,
     name: table,
     type,
@@ -203,8 +217,6 @@ export async function tableDetails(
     foreignKeys,
     estimatedRows: Number.isFinite(estimatedRows ?? NaN) ? estimatedRows : null
   }
-  tableDetailsCache.set(cacheKey, result)
-  return result
 }
 /** The `tableDetails` FK query filtered on the referenced side - see the Postgres note. */
 export async function referencingKeys(
@@ -248,7 +260,10 @@ export async function referencingKeys(
     onUpdate: String(r.on_update ?? 'NO ACTION')
   }))
 }
-export async function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
+export function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
+  return cachedSchemaGraph(connectionId, schema, () => loadSchemaGraph(connectionId, schema))
+}
+async function loadSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
   const pool = await getPool(connectionId)
 
   const tablesPromise = pool.query<RowDataPacket[]>(

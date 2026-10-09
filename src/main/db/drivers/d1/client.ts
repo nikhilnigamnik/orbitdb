@@ -12,11 +12,11 @@ import {
   type SavedConnection,
   type TestConnectionResult
 } from '../../../../shared/types'
-import type { TableDetails } from '../../../../shared/types'
 import { requireConnection } from '../../../store/connections-store'
 import { quoteIdent, sqliteFilterDialect } from '../../sqlite-shared'
 import { type ValueSearchDialect } from '../../value-search'
 import { recordQuery } from '../../query-log'
+import { invalidateIntrospection } from '../../introspection-cache'
 import type { ActiveMeta } from '.././types'
 
 const CF_API = 'https://api.cloudflare.com/client/v4'
@@ -186,7 +186,7 @@ export async function describeActive(saved: SavedConnection): Promise<ActiveMeta
 }
 export async function disconnectPool(connectionId: string): Promise<void> {
   // D1 is stateless HTTP - nothing to close, but still flush cached schema.
-  invalidateTableDetailsForConnection(connectionId)
+  invalidateIntrospection(connectionId)
 }
 export async function disconnectAll(): Promise<void> {
   // Same - no-op.
@@ -201,22 +201,6 @@ export const searchDialect: ValueSearchDialect = {
   // SQLite has no schemas, so the qualified name is just the table.
   qualifiedTable: (_schema, table) => quoteIdent(table),
   castText: (expr) => `cast(${expr} as text)`
-}
-
-/**
- * The table-details cache, beside the transport rather than in introspect - the
- * same place `pool.ts` keeps it for the other two drivers, and the reason this
- * module can stay a leaf that nothing in the driver imports back into.
- */
-export const tableDetailsCache = new Map<string, TableDetails>()
-export function tableCacheKey(connectionId: string, schema: string, table: string): string {
-  return `${connectionId} ${schema} ${table}`
-}
-export function invalidateTableDetailsForConnection(connectionId: string): void {
-  const prefix = `${connectionId} `
-  for (const key of tableDetailsCache.keys()) {
-    if (key.startsWith(prefix)) tableDetailsCache.delete(key)
-  }
 }
 
 export class QueryCancelledError extends Error {

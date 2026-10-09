@@ -6,7 +6,6 @@ import type {
   AiSettingsView,
   UsageSummary,
   CascadeDeleteOptions,
-  ConnectionInput,
   CountRowsOptions,
   DdlRequest,
   DistinctValuesOptions,
@@ -53,13 +52,14 @@ import {
   setAiProvider,
   setGatewaySettings
 } from '../store/settings-store'
+import { requireConnection } from '../store/connections-store'
 import {
-  createConnection,
-  deleteConnection,
-  listConnections,
-  requireConnection,
-  updateConnection
-} from '../store/connections-store'
+  createConnectionForRenderer,
+  deleteConnectionForRenderer,
+  listConnectionsForRenderer,
+  testConnectionForRenderer,
+  updateConnectionForRenderer
+} from './connections'
 import {
   cancelQuery,
   cascadeDelete,
@@ -83,7 +83,6 @@ import {
   runQuery,
   searchValue,
   tableDetails,
-  testConnection,
   updateRow
 } from '../db/manager'
 import { clearQueryLogs, listQueryLogs } from '../db/query-log'
@@ -104,31 +103,29 @@ function wrap<TArgs extends unknown[], TResult>(
 }
 
 export function registerIpcHandlers(): void {
+  // Secrets never cross back to the renderer: each of these returns the
+  // redacted view, with `hasPassword`/`hasApiToken` in place of the values.
   ipcMain.handle(
     'connections:list',
-    wrap(async () => listConnections())
+    wrap(async () => listConnectionsForRenderer())
   )
   ipcMain.handle(
     'connections:create',
-    wrap(async (input: ConnectionInput) => createConnection(input))
+    wrap(async (input: unknown) => createConnectionForRenderer(input))
   )
   ipcMain.handle(
     'connections:update',
-    wrap(async (id: string, input: ConnectionInput) => {
-      await disconnectPool(id)
-      return updateConnection(id, input)
-    })
+    wrap(async (id: string, input: unknown) => updateConnectionForRenderer(id, input))
   )
   ipcMain.handle(
     'connections:delete',
-    wrap(async (id: string) => {
-      await disconnectPool(id)
-      deleteConnection(id)
-    })
+    wrap(async (id: string) => deleteConnectionForRenderer(id))
   )
   ipcMain.handle(
     'connections:test',
-    wrap(async (input: ConnectionInput) => testConnection(input))
+    wrap(async (input: unknown, connectionId?: string) =>
+      testConnectionForRenderer(input, connectionId)
+    )
   )
   ipcMain.handle(
     'db:connect',

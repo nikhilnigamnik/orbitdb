@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -205,5 +205,132 @@ describe('crud', () => {
     rmSync(join(stub.userDataDir, 'connections.json'), { force: true })
     store = await freshStore()
     expect(store.listConnections()).toEqual([])
+  })
+})
+
+describe('what the renderer is sent', () => {
+  it('blanks every secret and says which ones are stored', () => {
+    const pg = store.createConnection(PG)
+    const d1 = store.createConnection(D1)
+    const bare = store.createConnection({ ...PG, name: 'trust', password: '' })
+
+    const views = store.listConnectionViews()
+    expect(views.map((c) => [c.password, c.apiToken])).toEqual([
+      ['', ''],
+      ['', ''],
+      ['', '']
+    ])
+    const byId = new Map(views.map((c) => [c.id, c]))
+    expect(byId.get(pg.id)).toMatchObject({ hasPassword: true, hasApiToken: false })
+    expect(byId.get(d1.id)).toMatchObject({ hasPassword: false, hasApiToken: true })
+    expect(byId.get(bare.id)).toMatchObject({ hasPassword: false, hasApiToken: false })
+    expect(JSON.stringify(views)).not.toMatch(/s3cret|tok3n/)
+  })
+
+  it('still reports a secret that cannot be unsealed as stored', async () => {
+    const pg = store.createConnection(PG)
+    stub.failDecrypt = true
+    store = await freshStore()
+
+    expect(store.toConnectionView(store.getConnection(pg.id)!).hasPassword).toBe(true)
+  })
+
+  it('never persists the view flags it hands out', () => {
+    const pg = store.createConnection(PG)
+    const [view] = store.listConnectionViews()
+    store.updateConnection(pg.id, view)
+
+    expect(onDisk()[0]).not.toHaveProperty('hasPassword')
+    expect(onDisk()[0]).not.toHaveProperty('hasApiToken')
+  })
+})
+
+describe('saving an edit with a blank secret', () => {
+  it('keeps the stored password and token', () => {
+    const pg = store.createConnection(PG)
+    const d1 = store.createConnection(D1)
+
+    store.updateConnection(pg.id, { ...PG, name: 'renamed', password: '' })
+    store.updateConnection(d1.id, { ...D1, apiToken: '' })
+
+    expect(store.requireConnection(pg.id)).toMatchObject({ name: 'renamed', password: 's3cret' })
+    expect(store.requireConnection(d1.id).apiToken).toBe('tok3n')
+    expect(onDisk()[0].password).toBe(sealed('s3cret'))
+  })
+
+  it('replaces it when one is typed', () => {
+    const pg = store.createConnection(PG)
+    store.updateConnection(pg.id, { ...PG, password: 'n3w' })
+    expect(store.requireConnection(pg.id).password).toBe('n3w')
+  })
+
+  it('drops it when the edit points the connection at another server', () => {
+    // Otherwise a changed host - a typo, or a compromised renderer that never
+    // held the password - would receive the stored one on the next connect.
+    const pg = store.createConnection(PG)
+    store.updateConnection(pg.id, { ...PG, host: 'elsewhere.example.com', password: '' })
+    expect(store.requireConnection(pg.id).password).toBe('')
+
+    const d1 = store.createConnection(D1)
+    store.updateConnection(d1.id, { ...D1, accountId: 'other-account', apiToken: '' })
+    expect(store.requireConnection(d1.id).apiToken).toBe('')
+  })
+
+  it('still keeps it across a change of host case or surrounding spaces', () => {
+    const pg = store.createConnection(PG)
+    store.updateConnection(pg.id, { ...PG, host: ` ${PG.host.toUpperCase()} `, password: '' })
+    expect(store.requireConnection(pg.id).password).toBe('s3cret')
+  })
+})
+
+describe('filling secrets for a test', () => {
+  it('fills a blank secret from the saved connection', () => {
+    const pg = store.createConnection(PG)
+    const filled = store.fillStoredSecrets({ ...PG, password: '' }, pg.id)
+    expect(filled.password).toBe('s3cret')
+  })
+
+  it('prefers what the user typed', () => {
+    const pg = store.createConnection(PG)
+    expect(store.fillStoredSecrets({ ...PG, password: 'typed' }, pg.id).password).toBe('typed')
+  })
+
+  it('fills nothing when the test points at another server, port or user', () => {
+    const pg = store.createConnection(PG)
+    for (const change of [{ host: 'evil.example.com' }, { port: 6543 }, { user: 'root' }]) {
+      expect(store.fillStoredSecrets({ ...PG, ...change, password: '' }, pg.id).password).toBe('')
+    }
+  })
+
+  it('fills nothing for an unknown id', () => {
+    expect(store.fillStoredSecrets({ ...PG, password: '' }, 'nope').password).toBe('')
+  })
+
+  it('names the real cause when the saved secret cannot be unsealed', async () => {
+    const pg = store.createConnection(PG)
+    stub.failDecrypt = true
+    store = await freshStore()
+
+    expect(() => store.fillStoredSecrets({ ...PG, password: '' }, pg.id)).toThrow(
+      /could not be decrypted/
+    )
+  })
+})
+
+describe('a connections file that does not parse', () => {
+  it('is kept aside, and the next save does not overwrite it', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const path = join(stub.userDataDir, 'connections.json')
+    writeFileSync(path, '{"connections": [ torn', 'utf8')
+    store = await freshStore()
+
+    expect(store.listConnections()).toEqual([])
+    store.createConnection(PG)
+
+    const aside = readdirSync(stub.userDataDir).find((name) => name.includes('.corrupt-'))
+    expect(aside).toBeDefined()
+    expect(readFileSync(join(stub.userDataDir, aside!), 'utf8')).toBe('{"connections": [ torn')
+    expect(onDisk()).toHaveLength(1)
+    vi.restoreAllMocks()
   })
 })

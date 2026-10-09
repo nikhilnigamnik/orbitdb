@@ -1,0 +1,211 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MAX_QUERY_RESULT_ROWS, type SavedConnection } from '../../../src/shared/types'
+
+interface FakeConnectionHandle {
+  threadId: number
+  isEnded: boolean
+  emit: (event: string, ...args: unknown[]) => boolean
+}
+
+/** What a query on the editor session emits, in mysql2's own event order. */
+type Script = { kind: 'rows'; count: number } | { kind: 'ok'; affectedRows: number }
+
+const state = vi.hoisted(() => ({
+  poolQueries: [] as { sql: string; params: unknown[] }[],
+  poolConfigs: [] as Record<string, unknown>[],
+  connections: [] as FakeConnectionHandle[],
+  script: { kind: 'rows', count: 0 } as Script,
+  queriesStarted: 0,
+  queryGate: null as Promise<void> | null
+}))
+
+const SAVED: SavedConnection = {
+  id: 'my-1',
+  name: 'mysql',
+  engine: 'mysql',
+  environment: 'dev',
+  host: 'db.example.com',
+  port: 3306,
+  database: 'app',
+  user: 'app',
+  password: 'secret',
+  ssl: true,
+  sslVerify: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z'
+}
+
+vi.mock('../../../src/main/store/connections-store', () => ({
+  requireConnection: () => SAVED,
+  getConnection: () => SAVED
+}))
+
+function respond(sql: string): unknown {
+  if (sql.includes('information_schema.tables') && sql.includes('limit 1')) {
+    return [{ table_type: 'BASE TABLE', estimated_rows: 1 }]
+  }
+  if (sql.includes("index_name = 'PRIMARY'")) return [{ column_name: 'id' }]
+  if (sql.includes('information_schema.columns')) {
+    return [
+      { name: 'id', data_type: 'int', column_type: 'int' },
+      { name: 'doc', data_type: 'json', column_type: 'json' }
+    ].map((c, i) => ({
+      ...c,
+      is_nullable: 'YES',
+      default_value: null,
+      ordinal_position: i + 1,
+      character_maximum_length: null
+    }))
+  }
+  if (sql.startsWith('update ')) return { affectedRows: 1 }
+  if (sql.startsWith('select * from')) return [{ id: 1 }]
+  return []
+}
+
+vi.mock('mysql2/promise', () => ({
+  default: {
+    createPool: (config: Record<string, unknown>) => {
+      state.poolConfigs.push(config)
+      return {
+        async query(sql: string, params: unknown[] = []) {
+          state.poolQueries.push({ sql, params })
+          return [respond(sql), []]
+        },
+        end: () => Promise.resolve()
+      }
+    }
+  }
+}))
+
+vi.mock('mysql2', async () => {
+  const { EventEmitter } = await import('node:events')
+  class Connection extends EventEmitter {
+    threadId = 77
+    isEnded = false
+    connect(cb: (err: Error | null) => void): void {
+      setImmediate(() => cb(null))
+    }
+    query(): InstanceType<typeof EventEmitter> {
+      const query = new EventEmitter()
+      const script = state.script
+      state.queriesStarted += 1
+      void (async () => {
+        await (state.queryGate ?? Promise.resolve())
+        if (script.kind === 'ok') {
+          query.emit('fields', undefined)
+          query.emit('result', { affectedRows: script.affectedRows })
+        } else {
+          query.emit('fields', [{ name: 'id', columnType: 3 }])
+          for (let id = 0; id < script.count; id += 1) query.emit('result', { id }, 0)
+        }
+        query.emit('end')
+      })()
+      return query
+    }
+    end(cb: (err: Error | null) => void): void {
+      this.isEnded = true
+      cb(null)
+    }
+    destroy(): void {
+      this.isEnded = true
+    }
+  }
+  return {
+    createConnection: () => {
+      const connection = new Connection()
+      state.connections.push(connection)
+      return connection
+    }
+  }
+})
+
+type Driver = (typeof import('../../../src/main/db/drivers/mysql'))['mysqlDriver']
+let driver: Driver
+
+beforeEach(async () => {
+  state.poolQueries = []
+  state.poolConfigs = []
+  state.connections = []
+  state.script = { kind: 'rows', count: 0 }
+  state.queriesStarted = 0
+  state.queryGate = null
+  vi.resetModules()
+  driver = (await import('../../../src/main/db/drivers/mysql')).mysqlDriver
+})
+
+describe('TLS', () => {
+  it('checks the chain and the host name when the connection asks for it', async () => {
+    await driver.listSchemas(SAVED.id)
+    expect(state.poolConfigs[0].ssl).toEqual({ rejectUnauthorized: true, verifyIdentity: true })
+  })
+})
+
+describe('editor results', () => {
+  it('keeps the rows up to the cap and drops the rest as they stream in', async () => {
+    state.script = { kind: 'rows', count: MAX_QUERY_RESULT_ROWS + 25 }
+
+    const result = await driver.runQuery({ connectionId: SAVED.id, sql: 'select * from big' })
+
+    expect(result.rows).toHaveLength(MAX_QUERY_RESULT_ROWS)
+    expect(result.truncated).toBe(true)
+    expect(result.fields).toEqual([{ name: 'id', dataTypeID: 3 }])
+  })
+
+  it('reports a result exactly at the cap as complete', async () => {
+    state.script = { kind: 'rows', count: MAX_QUERY_RESULT_ROWS }
+
+    const result = await driver.runQuery({ connectionId: SAVED.id, sql: 'select * from t' })
+
+    expect(result.truncated).toBe(false)
+    expect(result.rowCount).toBe(MAX_QUERY_RESULT_ROWS)
+  })
+
+  it('reports affected rows and no fields for a statement without a row set', async () => {
+    state.script = { kind: 'ok', affectedRows: 4 }
+
+    const result = await driver.runQuery({ connectionId: SAVED.id, sql: 'update t set a = 1' })
+
+    expect(result).toMatchObject({ success: true, rowCount: 4, fields: [], command: 'UPDATE' })
+  })
+
+  it('runs on one dedicated connection, reused across runs and closed on disconnect', async () => {
+    await driver.runQuery({ connectionId: SAVED.id, sql: 'start transaction' })
+    await driver.runQuery({ connectionId: SAVED.id, sql: 'select 1' })
+    expect(state.connections).toHaveLength(1)
+    expect(state.poolQueries).toEqual([])
+
+    await driver.disconnectPool(SAVED.id)
+    expect(state.connections[0].isEnded).toBe(true)
+  })
+
+  it('kills the running query by the session thread id', async () => {
+    let finish = (): void => undefined
+    state.queryGate = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    state.script = { kind: 'rows', count: 1 }
+    const running = driver.runQuery({ connectionId: SAVED.id, sql: 'select 1', queryId: 'q1' })
+    await vi.waitFor(() => expect(state.queriesStarted).toBe(1))
+
+    await driver.cancelQuery(SAVED.id, 'q1')
+    finish()
+    await running
+
+    expect(state.poolQueries.map((q) => q.sql)).toContain('KILL QUERY 77')
+  })
+})
+
+describe('writing JSON columns', () => {
+  it('serialises an object headed for a json column instead of sending [object Object]', async () => {
+    await driver.updateRow({
+      connectionId: SAVED.id,
+      schema: 'app',
+      table: 'docs',
+      values: { doc: { a: [1, 2] } },
+      pk: { id: 1 }
+    })
+
+    const update = state.poolQueries.find((q) => q.sql.startsWith('update '))
+    expect(update?.params).toEqual(['{"a":[1,2]}', 1])
+  })
+})

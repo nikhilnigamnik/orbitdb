@@ -50,11 +50,19 @@ export interface ConnectionInput {
   port: number
   database: string
   user: string
+  /** Never sent to the renderer: it receives '' and reads `hasPassword` instead. */
   password: string
   ssl: boolean
+  /**
+   * Verify the server certificate and host name when `ssl` is on. Optional, and
+   * absent reads as false: connections saved before it existed connected
+   * without verification, and must keep connecting the same way.
+   */
+  sslVerify?: boolean
   // D1-only credentials
   accountId?: string
   databaseId?: string
+  /** Same rule as `password`; the renderer reads `hasApiToken`. */
   apiToken?: string
 }
 
@@ -62,6 +70,13 @@ export interface SavedConnection extends ConnectionInput {
   id: string
   createdAt: string
   updatedAt: string
+  /**
+   * Set on the copy sent across IPC, where the secrets themselves are blanked.
+   * Inside main the secrets are present and these are absent. Saving a blank
+   * secret back keeps the stored one.
+   */
+  hasPassword?: boolean
+  hasApiToken?: boolean
 }
 
 export interface TestConnectionResult {
@@ -75,4 +90,28 @@ export interface ActiveConnectionMeta {
   serverVersion: string
   currentDatabase: string
   currentUser: string
+}
+
+/**
+ * Whether a saved secret may stand in for a blank one in `next`. Only while the
+ * connection still points at the same server and account: otherwise an edited
+ * host would receive the old password - from a typo, or from a compromised
+ * renderer that never held the password in the first place.
+ */
+export function canReuseStoredSecrets(
+  previous: Pick<ConnectionInput, 'engine' | 'host' | 'port' | 'user' | 'accountId' | 'databaseId'>,
+  next: Pick<ConnectionInput, 'engine' | 'host' | 'port' | 'user' | 'accountId' | 'databaseId'>
+): boolean {
+  if (previous.engine !== next.engine) return false
+  if (next.engine === 'd1') {
+    return (
+      (previous.accountId ?? '') === (next.accountId ?? '') &&
+      (previous.databaseId ?? '') === (next.databaseId ?? '')
+    )
+  }
+  return (
+    previous.host.trim().toLowerCase() === next.host.trim().toLowerCase() &&
+    previous.port === next.port &&
+    previous.user === next.user
+  )
 }

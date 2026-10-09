@@ -27,14 +27,8 @@ import {
   type IndexListRow,
   type TableInfoRow
 } from '../../sqlite-shared'
-import {
-  D1_MAX_CONCURRENT_REQUESTS,
-  callD1,
-  loadSaved,
-  mapWithConcurrency,
-  tableCacheKey,
-  tableDetailsCache
-} from './client'
+import { cachedSchemaGraph, cachedTableDetails } from '../../introspection-cache'
+import { D1_MAX_CONCURRENT_REQUESTS, callD1, loadSaved, mapWithConcurrency } from './client'
 
 export async function listSchemas(connectionId: string): Promise<SchemaInfo[]> {
   void connectionId
@@ -51,37 +45,42 @@ export async function listTables(connectionId: string, schema: string): Promise<
     estimatedRows: null
   }))
 }
-export async function tableDetails(
+export function tableDetails(
   connectionId: string,
   schema: string,
   table: string
 ): Promise<TableDetails> {
-  const cacheKey = tableCacheKey(connectionId, schema, table)
-  const cached = tableDetailsCache.get(cacheKey)
-  if (cached) return cached
-
-  const saved = loadSaved(connectionId)
-
-  const metaEntry = await callD1<{ type: string; sql: string | null }>(
-    saved,
-    `select type, sql from sqlite_master where type in ('table', 'view') and name = ? limit 1`,
-    [table]
+  return cachedTableDetails(connectionId, schema, table, () =>
+    loadTableDetails(connectionId, schema, table)
   )
-  if (metaEntry.results.length === 0) {
-    throw new Error(`Table ${table} not found`)
-  }
-  const type: TableDetails['type'] = metaEntry.results[0].type === 'view' ? 'view' : 'table'
+}
+async function loadTableDetails(
+  connectionId: string,
+  schema: string,
+  table: string
+): Promise<TableDetails> {
+  const saved = loadSaved(connectionId)
 
   // PRAGMAs don't accept bind params; embed quoted identifier literally.
   const tableIdent = quoteIdent(table)
 
-  // Every pragma is a separate HTTP round-trip to Cloudflare - issue the
-  // independent ones together instead of paying the latency three times over.
-  const [colEntry, idxListEntry, fkEntry] = await Promise.all([
+  // Every request is a separate HTTP round-trip to Cloudflare - issue the
+  // independent ones together instead of paying the latency four times over. A
+  // pragma on a missing table answers empty, so the existence check can ride along.
+  const [metaEntry, colEntry, idxListEntry, fkEntry] = await Promise.all([
+    callD1<{ type: string; sql: string | null }>(
+      saved,
+      `select type, sql from sqlite_master where type in ('table', 'view') and name = ? limit 1`,
+      [table]
+    ),
     callD1<TableInfoRow>(saved, `pragma table_info(${tableIdent})`),
     callD1<IndexListRow>(saved, `pragma index_list(${tableIdent})`),
     callD1<ForeignKeyRow>(saved, `pragma foreign_key_list(${tableIdent})`)
   ])
+  if (metaEntry.results.length === 0) {
+    throw new Error(`Table ${table} not found`)
+  }
+  const type: TableDetails['type'] = metaEntry.results[0].type === 'view' ? 'view' : 'table'
 
   const columns = toColumns(colEntry.results)
   const primaryKey = toPrimaryKey(colEntry.results)
@@ -96,7 +95,7 @@ export async function tableDetails(
 
   const foreignKeys = toForeignKeys(fkEntry.results)
 
-  const result: TableDetails = {
+  return {
     schema,
     name: table,
     type,
@@ -106,8 +105,6 @@ export async function tableDetails(
     foreignKeys,
     estimatedRows: null
   }
-  tableDetailsCache.set(cacheKey, result)
-  return result
 }
 /**
  * SQLite has no reverse foreign-key catalogue - `pragma foreign_key_list` only
@@ -152,7 +149,10 @@ export async function referencingKeys(
   }
   return out
 }
-export async function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
+export function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
+  return cachedSchemaGraph(connectionId, schema, () => loadSchemaGraph(connectionId, schema))
+}
+async function loadSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
   const saved = loadSaved(connectionId)
 
   const tableList = await callD1<{ name: string }>(saved, LIST_BASE_TABLES_SQL)

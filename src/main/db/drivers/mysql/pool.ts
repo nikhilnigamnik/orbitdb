@@ -5,42 +5,42 @@
  * the many call sites do not depend on how a pool is obtained.
  */
 
-import mysql, { type Pool, type PoolOptions, type RowDataPacket } from 'mysql2/promise'
+import mysql, {
+  type ConnectionOptions,
+  type Pool,
+  type PoolOptions,
+  type RowDataPacket
+} from 'mysql2/promise'
 import {
   type ConnectionInput,
   type SavedConnection,
-  type TableDetails,
   type TestConnectionResult
 } from '../../../../shared/types'
 import { requireConnection } from '../../../store/connections-store'
 import { recordQuery } from '../../query-log'
+import { invalidateIntrospection } from '../../introspection-cache'
+import { mysqlTlsOptions } from '../../tls'
 import type { ActiveMeta } from '.././types'
 
 const pools = new Map<string, Pool>()
-export const tableDetailsCache = new Map<string, TableDetails>()
-export function tableCacheKey(connectionId: string, schema: string, table: string): string {
-  return `${connectionId} ${schema} ${table}`
-}
-export function invalidateTableDetailsForConnection(connectionId: string): void {
-  const prefix = `${connectionId} `
-  for (const key of tableDetailsCache.keys()) {
-    if (key.startsWith(prefix)) tableDetailsCache.delete(key)
-  }
-}
-function toPoolConfig(input: ConnectionInput): PoolOptions {
+
+/** Exported for the SQL editor's session, which connects with the same settings. */
+export function toConnectionConfig(input: ConnectionInput): ConnectionOptions {
   return {
     host: input.host,
     port: input.port,
     database: input.database || undefined,
     user: input.user,
     password: input.password,
-    ssl: input.ssl ? { rejectUnauthorized: false } : undefined,
-    connectionLimit: 5,
+    ssl: mysqlTlsOptions(input),
     connectTimeout: 8_000,
     dateStrings: false,
     supportBigNumbers: true,
     bigNumberStrings: true
   }
+}
+function toPoolConfig(input: ConnectionInput): PoolOptions {
+  return { ...toConnectionConfig(input), connectionLimit: 5 }
 }
 export function getPool(connectionId: string): Promise<Pool> {
   const existing = pools.get(connectionId)
@@ -101,7 +101,7 @@ function instrumentMysqlPool(pool: Pool, connectionId: string): void {
 }
 export async function disconnectPool(connectionId: string): Promise<void> {
   const pool = pools.get(connectionId)
-  invalidateTableDetailsForConnection(connectionId)
+  invalidateIntrospection(connectionId)
   if (!pool) return
   pools.delete(connectionId)
   try {

@@ -1,9 +1,14 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import { randomUUID } from 'crypto'
-import type { ConnectionInput, SavedConnection } from '../../shared/types'
+import {
+  canReuseStoredSecrets,
+  type ConnectionInput,
+  type SavedConnection
+} from '../../shared/types'
 import { decryptString, encryptString, isEncrypted, isEncryptionAvailable } from './crypto'
+import { quarantineJsonFile, readJsonFile, writeJsonFileAtomic } from './json-file'
 
 const FILE_NAME = 'connections.json'
 const SENSITIVE_FIELDS = ['password', 'apiToken'] as const
@@ -75,17 +80,10 @@ function hasPlaintextSecrets(conn: SavedConnection): boolean {
 
 function parseFile(): StoreShape {
   const path = storePath()
-  if (!existsSync(path)) {
-    return { version: 1, connections: [] }
-  }
-  let parsed: StoreShape
-  try {
-    const raw = readFileSync(path, 'utf8')
-    parsed = JSON.parse(raw) as StoreShape
-    if (!parsed || !Array.isArray(parsed.connections)) {
-      return { version: 1, connections: [] }
-    }
-  } catch {
+  const parsed = readJsonFile(path) as StoreShape | undefined
+  if (parsed === undefined) return { version: 1, connections: [] }
+  if (!parsed || !Array.isArray(parsed.connections)) {
+    quarantineJsonFile(path, 'no connections list')
     return { version: 1, connections: [] }
   }
   return {
@@ -119,7 +117,7 @@ function read(): StoreShape {
 }
 
 function writeRaw(state: StoreShape): void {
-  writeFileSync(storePath(), JSON.stringify(state, null, 2), 'utf8')
+  writeJsonFileAtomic(storePath(), state, 2)
   rawCache = state
   decryptedCache = null
 }
@@ -146,8 +144,49 @@ function clone(conn: SavedConnection): SavedConnection {
   return { ...conn }
 }
 
+/**
+ * The renderer hands back whatever it was given, so a view flag or an id must
+ * not ride along into the stored record and go stale there.
+ */
+function withoutViewFields(input: ConnectionInput): ConnectionInput {
+  const out: ConnectionInput & Partial<SavedConnection> = { ...input }
+  delete out.id
+  delete out.createdAt
+  delete out.updatedAt
+  delete out.hasPassword
+  delete out.hasApiToken
+  return out
+}
+
+function unreadableError(name: string, failed: Iterable<SensitiveField>): Error {
+  return new Error(
+    `Saved ${[...failed].join(' and ')} for "${name}" could not be decrypted on this ` +
+      `machine. Open the connection and re-enter it.`
+  )
+}
+
 export function listConnections(): SavedConnection[] {
   return read().connections.map(clone)
+}
+
+/**
+ * What the renderer is allowed to see: every secret blanked, and a flag saying
+ * whether one is stored. The flag reads the disk, so a secret that exists but
+ * cannot be unsealed still shows as saved - re-entering it is how it recovers.
+ */
+export function toConnectionView(conn: SavedConnection): SavedConnection {
+  const stored = readRaw().connections.find((c) => c.id === conn.id) ?? conn
+  return {
+    ...conn,
+    password: '',
+    apiToken: '',
+    hasPassword: Boolean(stored.password),
+    hasApiToken: Boolean(stored.apiToken)
+  }
+}
+
+export function listConnectionViews(): SavedConnection[] {
+  return read().connections.map(toConnectionView)
 }
 
 export function getConnection(id: string): SavedConnection | undefined {
@@ -164,43 +203,71 @@ export function requireConnection(id: string): SavedConnection {
   const found = read().connections.find((c) => c.id === id)
   if (!found) throw new Error(`Connection ${id} is not saved`)
   const failed = undecryptable.get(id)
-  if (failed?.size) {
-    throw new Error(
-      `Saved ${[...failed].join(' and ')} for "${found.name}" could not be decrypted on this ` +
-        `machine. Open the connection and re-enter it.`
-    )
-  }
+  if (failed?.size) throw unreadableError(found.name, failed)
   return clone(found)
+}
+
+/**
+ * Fill the secrets a form left blank from the saved connection, so a connection
+ * can be tested without its password ever having been sent to the renderer.
+ * An unknown id fills nothing: the input is tested as typed.
+ */
+export function fillStoredSecrets(input: ConnectionInput, id: string): ConnectionInput {
+  const out = withoutViewFields(input)
+  const stored = read().connections.find((c) => c.id === id)
+  if (!stored || !canReuseStoredSecrets(stored, out)) return out
+  const failed = undecryptable.get(id)
+  for (const field of SENSITIVE_FIELDS) {
+    if (out[field]) continue
+    if (failed?.has(field)) throw unreadableError(stored.name, [field])
+    const kept = stored[field]
+    if (kept) out[field] = kept
+  }
+  return out
 }
 
 export function createConnection(input: ConnectionInput): SavedConnection {
   const state = read()
   const now = new Date().toISOString()
   const next: SavedConnection = {
-    ...input,
+    ...withoutViewFields(input),
     id: randomUUID(),
     createdAt: now,
     updatedAt: now
   }
   write({ ...state, connections: [...state.connections, next] })
-  return next
+  return clone(next)
 }
 
+/**
+ * An empty secret means "unchanged": the renderer never holds the stored one,
+ * so it cannot send it back. A secret that could not be unsealed reads as ''
+ * here too, and write() then keeps its ciphertext rather than blanking it.
+ */
 export function updateConnection(id: string, input: ConnectionInput): SavedConnection {
   const state = read()
   const idx = state.connections.findIndex((c) => c.id === id)
   if (idx === -1) throw new Error(`Connection ${id} not found`)
+  const previous = state.connections[idx]
   const updated: SavedConnection = {
-    ...state.connections[idx],
-    ...input,
+    ...previous,
+    ...withoutViewFields(input),
+    id,
     updatedAt: new Date().toISOString()
+  }
+  // A blank secret keeps the stored one only while the connection still points
+  // at the same server; otherwise it is dropped and has to be re-entered.
+  const canKeep = canReuseStoredSecrets(previous, updated)
+  for (const field of SENSITIVE_FIELDS) {
+    const kept = previous[field]
+    if (!updated[field] && kept && canKeep) updated[field] = kept
   }
   const connections = [...state.connections]
   connections[idx] = updated
   // write() dropped the decrypted cache; the next read re-derives which secrets
   // are still unreadable, so a re-entered one clears itself.
   write({ ...state, connections })
-  return updated
+  return clone(updated)
 }
 
 export function deleteConnection(id: string): void {
