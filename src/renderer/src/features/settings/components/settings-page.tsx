@@ -10,7 +10,8 @@ import {
   IconInfoCircle,
   IconSparkles,
   IconChartBar,
-  IconCloudDownload
+  IconCloudDownload,
+  IconPalette
 } from '@tabler/icons-react'
 import { format, isValid, parseISO } from 'date-fns'
 
@@ -26,6 +27,7 @@ import { formatShortAgo } from '@renderer/features/logs/lib/relative-time'
 import { useUpdateCheck } from '@renderer/features/settings/store'
 
 import { AiSettings } from './ai-settings'
+import { AppearanceSettings } from './appearance-settings'
 import { UsageSettings } from './usage-settings'
 import { SettingFooter, SettingRow, SettingsCard } from './settings-card'
 import { SettingsNav, type SettingsNavItem } from './settings-nav'
@@ -38,6 +40,7 @@ function formatPublishedAt(iso: string | null): string {
 
 const SECTIONS: SettingsNavItem[] = [
   { id: 'about', label: 'About', icon: IconInfoCircle },
+  { id: 'appearance', label: 'Appearance', icon: IconPalette },
   { id: 'ai', label: 'AI', icon: IconSparkles },
   { id: 'usage', label: 'AI usage', icon: IconChartBar },
   { id: 'updates', label: 'Updates', icon: IconCloudDownload }
@@ -140,6 +143,14 @@ export function SettingsPage() {
                   </Button>
                 </SettingRow>
               </SettingsCard>
+            </Section>
+
+            <Section
+              id="appearance"
+              title="Appearance"
+              description="How the app looks on this machine."
+            >
+              <AppearanceSettings />
             </Section>
 
             <Section

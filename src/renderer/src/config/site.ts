@@ -2,7 +2,14 @@ import type { ConnectionColor, ConnectionEnvironment, DatabaseEngine } from '@re
 
 // Same rule as the AI re-exports above: a value crossing the shared boundary
 // comes through config/ rather than a relative path from a component.
-export { normalizeFolder, CONNECTION_COLORS, canReuseStoredSecrets } from '../../../shared/types'
+export {
+  normalizeFolder,
+  CONNECTION_COLORS,
+  canReuseStoredSecrets,
+  THEME_PREFERENCES,
+  DEFAULT_THEME_PREFERENCE,
+  isThemePreference
+} from '../../../shared/types'
 
 // Re-exported so components follow the usual "constants come from config/" rule
 // rather than reaching across the shared boundary by relative path.
@@ -114,13 +121,13 @@ export const CONNECTION_COLOR_CLASS: Record<ConnectionColor, string> = {
  * dark ones, and green and rose - which carry neither - on deeper fills.
  */
 export const CONNECTION_TILE_CLASS: Record<ConnectionColor, string> = {
-  slate: 'bg-tag-slate text-text',
+  slate: 'bg-tag-slate text-tag-ink',
   blue: 'bg-tag-blue text-white',
   violet: 'bg-tag-violet text-white',
-  cyan: 'bg-tag-cyan text-text',
+  cyan: 'bg-tag-cyan text-tag-ink',
   green: 'bg-tag-green-deep text-white',
-  amber: 'bg-tag-amber text-text',
-  orange: 'bg-tag-orange text-text',
+  amber: 'bg-tag-amber text-tag-ink',
+  orange: 'bg-tag-orange text-tag-ink',
   rose: 'bg-tag-rose-deep text-white'
 }
 

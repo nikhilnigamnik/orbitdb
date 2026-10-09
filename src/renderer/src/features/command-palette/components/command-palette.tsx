@@ -9,7 +9,10 @@ import {
   IconPlugOff,
   IconSearch,
   IconCornerDownLeft,
-  IconClock
+  IconClock,
+  IconSun,
+  IconMoon,
+  IconDeviceDesktop
 } from '@tabler/icons-react'
 import { Chip } from '@renderer/components/ui/chip'
 import { Kbd } from '@renderer/components/ui/kbd'
@@ -17,11 +20,17 @@ import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import { formatNumber } from '@renderer/lib/format'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
+import { useTheme } from '@renderer/features/settings/theme'
 import { ENGINE_ICON } from '@renderer/features/connections/components/engine-icons'
 import { ROUTES, tableRoute } from '@renderer/config/routes'
-import { CONNECTION_COLOR_CLASS } from '@renderer/config/site'
+import { CONNECTION_TILE_CLASS } from '@renderer/config/site'
 import { loadRecent, type TableRef } from '@renderer/features/database/lib/table-prefs'
-import type { ActiveConnectionMeta, SavedConnection, TableInfo } from '@renderer/types'
+import type {
+  ActiveConnectionMeta,
+  SavedConnection,
+  TableInfo,
+  ThemePreference
+} from '@renderer/types'
 
 import { PALETTE_TABLE_LIMIT, filterItems } from '../lib/palette-filter'
 
@@ -40,6 +49,32 @@ interface PaletteAction {
   tone?: 'default' | 'danger'
 }
 
+const THEME_ACTIONS: {
+  theme: ThemePreference
+  icon: React.ReactNode
+  label: string
+  keywords: string[]
+}[] = [
+  {
+    theme: 'dark',
+    icon: <IconMoon size={16} />,
+    label: 'Switch to dark theme',
+    keywords: ['dark']
+  },
+  {
+    theme: 'light',
+    icon: <IconSun size={16} />,
+    label: 'Switch to light theme',
+    keywords: ['light']
+  },
+  {
+    theme: 'system',
+    icon: <IconDeviceDesktop size={16} />,
+    label: 'Use system theme',
+    keywords: ['system', 'auto']
+  }
+]
+
 interface CommandPaletteProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -47,11 +82,11 @@ interface CommandPaletteProps {
 
 // Same scrim as the Dialog primitive, so the palette dims the app the way every
 // other modal does.
-const OVERLAY_CLASSES = 'fixed inset-0 z-40 bg-[rgba(28,40,64,0.18)] animate-fade-in'
+const OVERLAY_CLASSES = 'fixed inset-0 z-40 bg-overlay animate-fade-in'
 
 const CONTENT_CLASSES = [
   'fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(640px,calc(100vw-2rem))]',
-  'overflow-hidden rounded-2xl bg-surface text-text shadow-pop',
+  'overflow-hidden rounded-2xl bg-popover text-text shadow-pop',
   'animate-scale-in'
 ].join(' ')
 
@@ -71,6 +106,7 @@ const COMMAND_CLASSES = [
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate()
   const { connections, active, connect, disconnect, isConnecting } = useConnection()
+  const { theme, setTheme } = useTheme()
 
   const [tables, setTables] = React.useState<PaletteTable[]>([])
   const [tablesError, setTablesError] = React.useState<string | null>(null)
@@ -127,6 +163,21 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     navigate(path)
   }
 
+  function runSetTheme(next: ThemePreference) {
+    close()
+    // A failed save already put the old theme back; the palette has closed,
+    // so there is nowhere left to report it.
+    void setTheme(next).catch(() => undefined)
+  }
+
+  const themeActions: PaletteAction[] = THEME_ACTIONS.filter((a) => a.theme !== theme).map((a) => ({
+    id: `action:theme-${a.theme}`,
+    icon: a.icon,
+    label: a.label,
+    keywords: ['theme', 'appearance', 'mode', ...a.keywords],
+    onSelect: () => runSetTheme(a.theme)
+  }))
+
   const actions: PaletteAction[] = [
     {
       id: 'action:sql',
@@ -163,7 +214,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             tone: 'danger' as const
           }
         ]
-      : [])
+      : []),
+    // Found by typing ("dark", "theme"), not listed on an empty palette, where
+    // they would push the actions people open it for further down.
+    ...(search.trim() ? themeActions : [])
   ]
 
   // Filtering is done here rather than by cmdk: it scores and reorders every
@@ -393,8 +447,8 @@ function ConnectionTile({ connection }: { connection: SavedConnection }) {
     return (
       <span
         className={cn(
-          'flex size-5 items-center justify-center rounded-md text-[12px] font-semibold text-white',
-          CONNECTION_COLOR_CLASS[connection.color]
+          'flex size-5 items-center justify-center rounded-md text-[12px] font-semibold',
+          CONNECTION_TILE_CLASS[connection.color]
         )}
       >
         {connection.name.trim().charAt(0).toUpperCase() || '?'}
@@ -403,7 +457,7 @@ function ConnectionTile({ connection }: { connection: SavedConnection }) {
   }
   const EngineIcon = ENGINE_ICON[connection.engine]
   return (
-    <span className="flex size-5 items-center justify-center rounded-md bg-surface shadow-control">
+    <span className="flex size-5 items-center justify-center rounded-md bg-control shadow-control">
       <EngineIcon className="size-3.5" />
     </span>
   )

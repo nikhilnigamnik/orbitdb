@@ -29,8 +29,8 @@ interface SqlEditorProps {
 
 /**
  * Colours come from the app's CSS variables rather than a packaged CodeMirror
- * theme, so the editor cannot drift from the rest of the UI when a token changes.
- * The palette is a light one: every colour here has to read on a white page.
+ * theme, so the editor cannot drift from the rest of the UI when a token changes -
+ * and follows the light and dark themes without knowing there are two.
  */
 const highlightStyle = HighlightStyle.define([
   { tag: tags.keyword, color: 'var(--color-accent-text)', fontWeight: '500' },
@@ -80,7 +80,7 @@ const editorTheme = EditorView.theme(
       backgroundColor: 'color-mix(in oklab, var(--color-accent) 14%, transparent)',
       outline: 'none'
     },
-    '.cm-tooltip': { border: 'none', backgroundColor: 'var(--color-surface)' },
+    '.cm-tooltip': { border: 'none', backgroundColor: 'var(--color-popover)' },
     '.cm-tooltip-autocomplete': {
       borderRadius: '10px',
       overflow: 'hidden',

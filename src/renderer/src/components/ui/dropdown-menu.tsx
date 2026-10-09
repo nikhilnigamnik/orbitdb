@@ -9,7 +9,7 @@ const DropdownMenuGroup = DropdownMenuPrimitive.Group
 const DropdownMenuSub = DropdownMenuPrimitive.Sub
 
 const MENU_PANEL =
-  'z-50 min-w-[12rem] overflow-hidden rounded-xl bg-surface p-1 text-text shadow-pop'
+  'z-50 min-w-[12rem] overflow-hidden rounded-xl bg-popover p-1 text-text shadow-pop'
 
 function DropdownMenuContent({
   className,

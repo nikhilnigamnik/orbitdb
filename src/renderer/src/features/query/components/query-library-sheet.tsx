@@ -206,7 +206,7 @@ function QueryRow({ query, onPick, onToggleStar, onRename, onDelete }: QueryRowP
             }}
             placeholder="Name this query"
             aria-label="Query name"
-            className="-ml-1 w-[calc(100%+0.25rem)] cursor-text rounded-md bg-transparent px-1 text-sm font-medium text-text outline-none placeholder:font-normal placeholder:text-text-subtle hover:bg-surface-elevated focus:bg-surface focus:shadow-control"
+            className="-ml-1 w-[calc(100%+0.25rem)] cursor-text rounded-md bg-transparent px-1 text-sm font-medium text-text outline-none placeholder:font-normal placeholder:text-text-subtle hover:bg-control-hover focus:bg-control focus:shadow-control"
           />
         </div>
       )}

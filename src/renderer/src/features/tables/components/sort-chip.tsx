@@ -123,13 +123,13 @@ export function SortChip({ columns, orderBy, orderDir, onChange }: SortChipProps
   }
 
   return (
-    <span className="inline-flex h-7 shrink-0 items-stretch overflow-hidden rounded-lg bg-surface text-xs shadow-control">
+    <span className="inline-flex h-7 shrink-0 items-stretch overflow-hidden rounded-lg bg-control text-xs shadow-control">
       <Popover {...popoverProps}>
         <button
           type="button"
           title="Change the sort"
           className={cn(
-            'flex cursor-pointer items-center gap-1.5 pr-1.5 pl-2 font-medium text-text transition-colors hover:bg-surface-elevated',
+            'flex cursor-pointer items-center gap-1.5 pr-1.5 pl-2 font-medium text-text transition-colors hover:bg-control-hover',
             isOpen && 'bg-surface-elevated'
           )}
         >
@@ -144,7 +144,7 @@ export function SortChip({ columns, orderBy, orderDir, onChange }: SortChipProps
         type="button"
         aria-label="Remove sort"
         onClick={() => onChange(null, 'asc')}
-        className="flex cursor-pointer items-center border-l border-border px-1.5 text-text-subtle transition-colors hover:bg-surface-elevated hover:text-text"
+        className="flex cursor-pointer items-center border-l border-border px-1.5 text-text-subtle transition-colors hover:bg-control-hover hover:text-text"
       >
         <IconX size={14} />
       </button>

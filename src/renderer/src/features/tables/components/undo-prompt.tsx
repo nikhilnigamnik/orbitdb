@@ -26,7 +26,7 @@ export function UndoPrompt({ edit, isUndoing, onUndo }: UndoPromptProps) {
     // Sits where the selection bar sits, and only when that is absent - two
     // stacked floating bars would fight for the same corner.
     <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
-      <div className="animate-slide-up-fade pointer-events-auto flex min-w-0 items-center gap-1 rounded-xl bg-surface p-1.5 pl-2 text-xs shadow-pop">
+      <div className="animate-slide-up-fade pointer-events-auto flex min-w-0 items-center gap-1 rounded-xl bg-popover p-1.5 pl-2 text-xs shadow-pop">
         <span className="flex min-w-0 items-center gap-1.5">
           {/* A real identifier, and in Postgres case is load-bearing - so it is
               shown as written, in the face used for raw values. */}
@@ -45,7 +45,7 @@ export function UndoPrompt({ edit, isUndoing, onUndo }: UndoPromptProps) {
           type="button"
           onClick={onUndo}
           disabled={isUndoing}
-          className="ml-1 flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-surface pr-1.5 pl-2 font-medium text-text shadow-control transition-colors hover:bg-surface-elevated focus-visible:ring-[3px] focus-visible:ring-accent/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="ml-1 flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-control pr-1.5 pl-2 font-medium text-text shadow-control transition-colors hover:bg-control-hover focus-visible:ring-[3px] focus-visible:ring-accent/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           <IconArrowBackUp size={14} className="shrink-0 text-text-subtle" />
           {isUndoing ? 'Undoing…' : 'Undo'}

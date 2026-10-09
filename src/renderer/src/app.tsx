@@ -9,6 +9,7 @@ import { ToastProvider } from '@renderer/components/ui/toast'
 import { ConnectionProvider } from '@renderer/features/connections/store/connection-store'
 import { CommandPaletteProvider } from '@renderer/features/command-palette/store'
 import { UpdateCheckProvider } from '@renderer/features/settings/store'
+import { ThemeProvider } from '@renderer/features/settings/theme'
 import { ConnectionsPage } from '@renderer/features/connections/components/connections-page'
 import { DatabasePage } from '@renderer/features/database/components/database-page'
 import { ROUTES } from '@renderer/config/routes'
@@ -50,17 +51,19 @@ function AppRoutes() {
 
 export function App() {
   return (
-    <ToastProvider>
-      <ConnectionProvider>
-        <UpdateCheckProvider>
-          <CommandPaletteProvider>
-            <AppShell>
-              <AppRoutes />
-            </AppShell>
-            <ShortcutsOverlay />
-          </CommandPaletteProvider>
-        </UpdateCheckProvider>
-      </ConnectionProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <ConnectionProvider>
+          <UpdateCheckProvider>
+            <CommandPaletteProvider>
+              <AppShell>
+                <AppRoutes />
+              </AppShell>
+              <ShortcutsOverlay />
+            </CommandPaletteProvider>
+          </UpdateCheckProvider>
+        </ConnectionProvider>
+      </ToastProvider>
+    </ThemeProvider>
   )
 }

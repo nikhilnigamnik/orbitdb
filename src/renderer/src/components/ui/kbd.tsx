@@ -9,7 +9,7 @@ const kbdVariants = cva(
   {
     variants: {
       tone: {
-        default: 'bg-surface-sunken text-text-subtle shadow-[inset_0_0_0_0.5px_rgba(0,0,0,0.1)]',
+        default: 'bg-surface-sunken text-text-subtle shadow-kbd',
         accent: 'bg-white/20 text-white shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.25)]'
       }
     },

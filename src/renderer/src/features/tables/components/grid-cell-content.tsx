@@ -19,13 +19,13 @@ import type { ForeignKeyTarget } from '../lib/grid-types'
  * class names statically - an interpolated `bg-tag-${color}` compiles to nothing.
  */
 const ENUM_TINTS = [
-  'bg-tag-blue/10 text-tag-blue',
-  'bg-tag-green/10 text-tag-green',
-  'bg-tag-violet/10 text-tag-violet',
-  'bg-tag-amber/12 text-tag-amber',
-  'bg-tag-cyan/10 text-tag-cyan',
-  'bg-tag-rose/10 text-tag-rose',
-  'bg-tag-orange/10 text-tag-orange',
+  'bg-tag-blue/10 text-tag-blue-text',
+  'bg-tag-green/10 text-tag-green-text',
+  'bg-tag-violet/10 text-tag-violet-text',
+  'bg-tag-amber/12 text-tag-amber-text',
+  'bg-tag-cyan/10 text-tag-cyan-text',
+  'bg-tag-rose/10 text-tag-rose-text',
+  'bg-tag-orange/10 text-tag-orange-text',
   'bg-tag-slate/12 text-text-muted'
 ]
 

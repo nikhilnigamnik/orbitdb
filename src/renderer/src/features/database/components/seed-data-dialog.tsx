@@ -137,7 +137,7 @@ export function SeedDataDialog({
                         className={cn(
                           'h-7 min-w-11 cursor-pointer rounded-md px-2.5 text-xs font-medium tabular-nums transition-colors disabled:opacity-50',
                           rowCount === n
-                            ? 'bg-surface text-text shadow-control'
+                            ? 'bg-control text-text shadow-control'
                             : 'text-text-muted hover:text-text'
                         )}
                       >

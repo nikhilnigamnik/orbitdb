@@ -274,7 +274,7 @@ export function DdlDialog({
                   />
                 </Field>
                 <Field label="Columns" hint="Pick one or more, in index order">
-                  <div className="flex max-h-48 flex-col overflow-auto rounded-lg bg-input p-1 shadow-control">
+                  <div className="flex max-h-48 flex-col overflow-auto rounded-lg bg-control p-1 shadow-control">
                     {columns.map((col) => {
                       const checked = indexColumns.includes(col.name)
                       return (

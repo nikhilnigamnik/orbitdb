@@ -98,7 +98,7 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         if (!open) onDismiss()
       }}
       className={cn(
-        'animate-slide-up-fade flex items-start gap-2.5 rounded-xl bg-surface p-3 text-text shadow-pop',
+        'animate-slide-up-fade flex items-start gap-2.5 rounded-xl bg-popover p-3 text-text shadow-pop',
         'data-[swipe=move]:translate-x-(--radix-toast-swipe-move-x) data-[swipe=cancel]:translate-x-0 data-[state=closed]:opacity-0'
       )}
     >
@@ -129,7 +129,7 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
             <button
               type="button"
               className={cn(
-                'mt-1 h-6 w-fit cursor-pointer rounded-md bg-surface px-2 text-xs font-medium text-text shadow-control transition-colors outline-none hover:bg-surface-elevated',
+                'mt-1 h-6 w-fit cursor-pointer rounded-md bg-control px-2 text-xs font-medium text-text shadow-control transition-colors outline-none hover:bg-control-hover',
                 FOCUS_RING
               )}
             >

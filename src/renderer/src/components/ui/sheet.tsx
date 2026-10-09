@@ -84,7 +84,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'fixed inset-0 z-50 bg-[rgba(28,40,64,0.12)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:duration-150 data-[state=open]:duration-200',
+        'fixed inset-0 z-50 bg-overlay-soft data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:duration-150 data-[state=open]:duration-200',
         className
       )}
       {...props}
@@ -125,7 +125,7 @@ function SheetContent({
           // `overflow-hidden` is load-bearing, not cosmetic: without it a taller
           // child spills past the rounded edge and the inner `overflow-auto`
           // region never becomes the thing that scrolls.
-          'fixed z-50 m-1.5 flex flex-col overflow-hidden rounded-xl bg-surface text-text shadow-[0_0_0_1px_rgba(28,40,64,0.06),0_24px_48px_-12px_rgba(28,40,64,0.24)] transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-150 data-[state=open]:duration-200',
+          'fixed z-50 m-1.5 flex flex-col overflow-hidden rounded-xl bg-surface text-text shadow-dialog transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-150 data-[state=open]:duration-200',
           side === 'right' && floatingStyles.right,
           side === 'left' && floatingStyles.left,
           side === 'top' &&

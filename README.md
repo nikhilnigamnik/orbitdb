@@ -18,6 +18,7 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 - **Keyboard and clipboard** - a cell cursor driven by the arrow keys, shift to extend a block, Enter to edit, and `Cmd+C` to copy it as spreadsheet-ready text (`Cmd+Shift+C` for JSON). Selected rows can be copied as JSON or as `INSERT` statements from the export menu.
 - **A view that stays put** - sort, page size, hidden columns, frozen columns and column widths are remembered per table.
 - **Shortcuts** - press `?` anywhere for the full list.
+- **Light and dark themes** - or follow your system. Settings → Appearance, or type "dark" in Quick actions.
 - **Inline cell editing** - edit in place with type-aware editors (dropdowns for enums and booleans, a date picker for dates, an expanding pane for JSON and long text), keyboard navigation across cells, and undo on a committed edit.
 - **Filters** - pick a column, then build the predicate. Filters combine with AND or OR, live in the URL so a filtered view can be shared, and suggest real values from the column.
 - **Structure editing** - add, rename and drop columns, create and drop indexes, rename and truncate tables. Every statement is previewed before it runs.

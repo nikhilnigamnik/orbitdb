@@ -387,6 +387,8 @@ function Flow({ graph, schema, connectionId = '' }: SchemaGraphCanvasProps) {
       minZoom={0.1}
       maxZoom={2}
       proOptions={{ hideAttribution: true }}
+      // xyflow's own chrome follows prefers-color-scheme, as the app's tokens do.
+      colorMode="system"
     >
       <Background gap={20} size={1.25} color="var(--color-border-strong)" />
       <Controls showInteractive={false} className="overflow-hidden rounded-lg" />
@@ -395,7 +397,7 @@ function Flow({ graph, schema, connectionId = '' }: SchemaGraphCanvasProps) {
         <div
           role="toolbar"
           aria-label="Diagram"
-          className="flex items-center gap-0.5 rounded-lg bg-surface p-1 shadow-pop"
+          className="flex items-center gap-0.5 rounded-lg bg-popover p-1 shadow-pop"
         >
           <ToolButton title="Fit view" onClick={() => fitView({ padding: 0.2, duration: 300 })}>
             <IconArrowsMaximize size={16} />

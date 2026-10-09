@@ -267,7 +267,7 @@ export function ConnectionsPage() {
             className={cn(
               'flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors',
               isSorted
-                ? 'bg-surface text-text shadow-control hover:bg-surface-elevated'
+                ? 'bg-control text-text shadow-control hover:bg-control-hover'
                 : 'border border-dashed border-border-strong text-text-muted hover:bg-surface-elevated hover:text-text'
             )}
           >
@@ -376,7 +376,7 @@ export function ConnectionsPage() {
         isLoading={isDeleting}
       />
       {deleteError && (
-        <div className="fixed right-4 bottom-4 z-50 max-w-md rounded-lg bg-surface shadow-pop">
+        <div className="fixed right-4 bottom-4 z-50 max-w-md rounded-lg bg-popover shadow-pop">
           <ErrorState title="Delete failed" message={deleteError} />
         </div>
       )}

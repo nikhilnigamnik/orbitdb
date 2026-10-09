@@ -191,7 +191,7 @@ export function AiProviderCard({
             >
               {view.hasKey ? (
                 <div className="flex items-center gap-1.5">
-                  <span className="flex h-7 items-center gap-1.5 rounded-lg bg-surface px-2.5 font-mono text-xs text-text-muted shadow-control">
+                  <span className="flex h-7 items-center gap-1.5 rounded-lg bg-control px-2.5 font-mono text-xs text-text-muted shadow-control">
                     <IconKey size={14} className="shrink-0 text-text-subtle" />
                     {view.keyHint}
                   </span>

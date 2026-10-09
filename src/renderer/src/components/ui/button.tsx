@@ -16,11 +16,11 @@ const buttonVariants = cva(
         // The secondary family has no border at all - the hairline halo in
         // shadow-control draws the edge, which is what keeps Attio's controls light.
         outline:
-          'bg-surface text-text shadow-control hover:bg-surface-elevated aria-expanded:bg-surface-elevated',
+          'bg-control text-text shadow-control hover:bg-control-hover aria-expanded:bg-control-hover',
         secondary:
-          'bg-surface text-text shadow-control hover:bg-surface-elevated aria-expanded:bg-surface-elevated',
+          'bg-control text-text shadow-control hover:bg-control-hover aria-expanded:bg-control-hover',
         ghost:
-          'bg-surface text-text shadow-control hover:bg-surface-elevated aria-expanded:bg-surface-elevated',
+          'bg-control text-text shadow-control hover:bg-control-hover aria-expanded:bg-control-hover',
         subtle:
           'bg-transparent text-text-muted hover:bg-surface-elevated hover:text-text aria-expanded:bg-surface-elevated aria-expanded:text-text',
         destructive:

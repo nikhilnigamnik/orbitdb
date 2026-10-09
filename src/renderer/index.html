@@ -54,6 +54,25 @@
         letter-spacing: -0.01em;
         color: #6e7074;
       }
+      /* Mirrors the dark tokens in main.css, which have not loaded yet. Main sets
+         the theme before the window opens, so this already matches. */
+      @media (prefers-color-scheme: dark) {
+        html,
+        body,
+        #splash {
+          background: #1c1d20;
+          color: #eeeff1;
+        }
+        #splash .brand {
+          color: #8f9298;
+        }
+        #splash .logo stop:first-child {
+          stop-color: #c9cbd0;
+        }
+        #splash .logo stop:last-child {
+          stop-color: #8f9298;
+        }
+      }
     </style>
   </head>
 

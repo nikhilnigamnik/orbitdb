@@ -47,7 +47,7 @@ function Dialog({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           data-slot="dialog-overlay"
-          className="animate-fade-in fixed inset-0 z-40 bg-[rgba(28,40,64,0.18)]"
+          className="animate-fade-in fixed inset-0 z-40 bg-overlay"
         />
         <DialogPrimitive.Content
           data-slot="dialog-content"
@@ -56,7 +56,7 @@ function Dialog({
           onEscapeKeyDown={onEscapeKeyDown}
           {...heading.contentProps}
           className={cn(
-            'animate-scale-in fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(600px,calc(100vw-2rem))] overflow-hidden rounded-2xl bg-surface text-text shadow-[0_0_0_1px_rgba(28,40,64,0.06),0_24px_48px_-12px_rgba(28,40,64,0.28)]',
+            'animate-scale-in fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(600px,calc(100vw-2rem))] overflow-hidden rounded-2xl bg-surface text-text shadow-dialog',
             className
           )}
         >

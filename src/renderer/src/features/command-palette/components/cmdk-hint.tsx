@@ -49,7 +49,7 @@ export function CmdKHint({
           onClick={open}
           aria-label={label}
           className={cn(
-            'flex h-7 cursor-pointer items-center gap-0.5 rounded-lg bg-surface px-1.5 shadow-control transition-colors hover:bg-surface-elevated',
+            'flex h-7 cursor-pointer items-center gap-0.5 rounded-lg bg-control px-1.5 shadow-control transition-colors hover:bg-control-hover',
             className
           )}
         >

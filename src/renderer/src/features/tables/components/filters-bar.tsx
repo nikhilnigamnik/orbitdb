@@ -180,7 +180,7 @@ export function FiltersBar({
                 type="button"
                 onClick={() => onChangeJoin(join === 'and' ? 'or' : 'and')}
                 title="Switch between matching all filters and any of them"
-                className="h-7 cursor-pointer rounded-lg bg-surface px-2 text-xs font-medium text-text-muted capitalize shadow-control transition-colors hover:bg-surface-elevated hover:text-text"
+                className="h-7 cursor-pointer rounded-lg bg-control px-2 text-xs font-medium text-text-muted capitalize shadow-control transition-colors hover:bg-control-hover hover:text-text"
               >
                 {join}
               </button>
@@ -195,12 +195,12 @@ export function FiltersBar({
           return (
             <React.Fragment key={i}>
               {connector}
-              <div className="inline-flex h-7 items-stretch overflow-hidden rounded-lg bg-surface text-xs text-text shadow-control">
+              <div className="inline-flex h-7 items-stretch overflow-hidden rounded-lg bg-control text-xs text-text shadow-control">
                 <button
                   type="button"
                   onClick={() => editFilter(i)}
                   aria-label={`Edit filter: ${summary}`}
-                  className="group/edit flex cursor-pointer items-stretch transition-colors hover:bg-surface-elevated"
+                  className="group/edit flex cursor-pointer items-stretch transition-colors hover:bg-control-hover"
                 >
                   <span className="flex items-center gap-1.5 pr-1.5 pl-2 font-medium">
                     {column ? (
@@ -223,7 +223,7 @@ export function FiltersBar({
                   type="button"
                   onClick={() => removeFilter(i)}
                   aria-label={`Remove filter on ${f.column}`}
-                  className="flex cursor-pointer items-center border-l border-border px-1.5 text-text-subtle transition-colors hover:bg-surface-elevated hover:text-danger"
+                  className="flex cursor-pointer items-center border-l border-border px-1.5 text-text-subtle transition-colors hover:bg-control-hover hover:text-danger"
                 >
                   <IconX size={14} />
                 </button>
@@ -282,7 +282,7 @@ export function FiltersBar({
                           className={cn(
                             'h-7 min-w-7 cursor-pointer rounded-lg px-2 text-xs font-medium transition-colors',
                             op.value === operator
-                              ? 'bg-surface text-text shadow-control'
+                              ? 'bg-control text-text shadow-control'
                               : 'text-text-muted hover:bg-surface-elevated hover:text-text'
                           )}
                         >
@@ -348,7 +348,7 @@ export function FiltersBar({
                                     type="button"
                                     onClick={() => commitFilter(value)}
                                     className={cn(
-                                      'h-6 max-w-full cursor-pointer truncate rounded-md bg-surface px-2 font-mono text-xs shadow-control transition-colors hover:bg-surface-elevated',
+                                      'h-6 max-w-full cursor-pointer truncate rounded-md bg-control px-2 font-mono text-xs shadow-control transition-colors hover:bg-control-hover',
                                       value === null
                                         ? 'italic text-text-subtle'
                                         : 'text-text-muted hover:text-text'

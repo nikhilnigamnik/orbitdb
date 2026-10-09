@@ -26,7 +26,7 @@ function ErrorBubble({ children }: { children: React.ReactNode }) {
         align="start"
         sideOffset={6}
         onOpenAutoFocus={(e) => e.preventDefault()}
-        className="animate-slide-up-fade z-50 max-w-72 rounded-lg bg-surface px-2.5 py-1.5 text-xs leading-snug text-danger shadow-pop"
+        className="animate-slide-up-fade z-50 max-w-72 rounded-lg bg-popover px-2.5 py-1.5 text-xs leading-snug text-danger shadow-pop"
       >
         {children}
       </PopoverPrimitive.Content>
@@ -229,7 +229,7 @@ export function CellInlineEditor({
                   side="bottom"
                   align="start"
                   sideOffset={6}
-                  className="animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-xl bg-surface text-text shadow-pop"
+                  className="animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-xl bg-popover text-text shadow-pop"
                 >
                   <SelectPrimitive.Viewport className="p-1">
                     {selectOptions.map((option) => (
@@ -282,7 +282,7 @@ export function CellInlineEditor({
             align="start"
             sideOffset={4}
             collisionPadding={12}
-            className="animate-slide-up-fade z-50 w-96 overflow-hidden rounded-xl bg-surface shadow-pop"
+            className="animate-slide-up-fade z-50 w-96 overflow-hidden rounded-xl bg-popover shadow-pop"
           >
             <textarea
               ref={textareaRef}

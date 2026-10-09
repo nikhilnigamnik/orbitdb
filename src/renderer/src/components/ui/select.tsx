@@ -92,7 +92,7 @@ export function Select<T extends string = string>({
           align={align}
           sideOffset={6}
           className={cn(
-            'animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-xl bg-surface text-text shadow-pop',
+            'animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-xl bg-popover text-text shadow-pop',
             contentClassName
           )}
         >

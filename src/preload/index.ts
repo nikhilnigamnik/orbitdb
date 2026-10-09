@@ -8,6 +8,7 @@ import type {
   ExplainSqlResult,
   FixSqlOptions,
   FixSqlResult,
+  ThemePreference,
   AiModelId,
   AiProviderId,
   AiGatewayIds,
@@ -145,7 +146,9 @@ const api = {
   app: {
     getVersion: () => invoke<string>('app:get-version'),
     checkUpdate: () => invoke<UpdateCheckResult>('app:check-update'),
-    openExternal: (url: string) => invoke<void>('app:open-external', url)
+    openExternal: (url: string) => invoke<void>('app:open-external', url),
+    getTheme: () => invoke<ThemePreference>('app:get-theme'),
+    setTheme: (theme: ThemePreference) => invoke<ThemePreference>('app:set-theme', theme)
   }
 }
 

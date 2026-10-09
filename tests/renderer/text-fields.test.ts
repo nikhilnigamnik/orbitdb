@@ -234,9 +234,11 @@ describe('the filter row', () => {
     expect(empty).toContain('Filter')
   })
 
-  it('draws an applied filter as a white chip on the hairline halo, not a grey fill', () => {
+  it('draws an applied filter as a control chip on the hairline halo, not a grey fill', () => {
+    // bg-control: white in the light theme, a lifted fill in the dark one, where
+    // the halo alone left the chip invisible against the toolbar.
     const chip = /class="(inline-flex[^"]*)"/.exec(markup())![1].split(/\s+/)
-    expect(chip).toContain('bg-surface')
+    expect(chip).toContain('bg-control')
     expect(chip).toContain('shadow-control')
     expect(chip.filter((c) => c.startsWith('bg-surface-elevated'))).toEqual([])
   })
@@ -247,13 +249,14 @@ describe('the floating selection toolbar', () => {
   const source = () =>
     readFileSync(resolve('src/renderer/src/features/tables/components/selection-bar.tsx'), 'utf8')
 
-  it('floats as a light card: white, soft shadow, rounded rather than a pill', () => {
+  it('floats as a card: the popover surface, soft shadow, rounded rather than a pill', () => {
     // Keyed on the entrance animation the bar is the only user of.
     const bar = /className="(animate-slide-up-fade pointer-events-auto[^"]*)"/.exec(source())
     expect(bar, 'could not find the floating selection bar').not.toBeNull()
     const classes = bar![1].split(/\s+/)
     expect(classes).toContain('rounded-xl')
-    expect(classes).toContain('bg-surface')
+    // bg-popover: white in the light theme, lifted off the canvas in the dark.
+    expect(classes).toContain('bg-popover')
     expect(classes).toContain('shadow-pop')
     expect(source(), 'nothing in this view should be a pill any more').not.toMatch(/rounded-full/)
   })

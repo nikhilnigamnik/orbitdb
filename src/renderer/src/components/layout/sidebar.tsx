@@ -80,7 +80,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={openPalette}
-          className="flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg bg-surface pr-1 pl-2 text-left text-sm font-medium text-text shadow-control transition-colors hover:bg-surface-elevated"
+          className="flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg bg-control pr-1 pl-2 text-left text-sm font-medium text-text shadow-control transition-colors hover:bg-control-hover"
         >
           <IconSquareLetterK size={16} stroke={1.75} className="shrink-0 text-text-muted" />
           <span className="flex-1 truncate">Quick actions</span>
@@ -91,7 +91,7 @@ export function Sidebar() {
           onClick={() => (active ? requestValueSearch() : openPalette())}
           aria-label="Search"
           title={active ? 'Find a value anywhere' : 'Search'}
-          className="flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-lg bg-surface pr-1 pl-1.5 text-text-muted shadow-control transition-colors hover:bg-surface-elevated hover:text-text"
+          className="flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-lg bg-control pr-1 pl-1.5 text-text-muted shadow-control transition-colors hover:bg-control-hover hover:text-text"
         >
           <IconSearch size={15} stroke={1.75} />
           {active && <Kbd>/</Kbd>}
@@ -113,7 +113,7 @@ export function Sidebar() {
         {active && <SidebarTables connectionId={active.connectionId} />}
       </div>
 
-      <div className="shrink-0 border-t border-border px-2 py-2">
+      <div className="shrink-0 px-2 py-2">
         <SidebarLink
           item={{
             to: ROUTES.settings,
@@ -172,7 +172,7 @@ function ConnectionTile({ connection }: { connection: SavedConnection | null }) 
   if (!connection) {
     return (
       <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-text">
-        <img src={orbitdbLogo} alt="" className="size-3.5 brightness-0 invert" />
+        <img src={orbitdbLogo} alt="" className="size-3.5 brightness-0 invert dark:invert-0" />
       </span>
     )
   }
@@ -190,7 +190,7 @@ function ConnectionTile({ connection }: { connection: SavedConnection | null }) 
   }
   const EngineIcon = ENGINE_ICON[connection.engine]
   return (
-    <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-surface shadow-control">
+    <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-control shadow-control">
       <EngineIcon className="size-3.5" />
     </span>
   )

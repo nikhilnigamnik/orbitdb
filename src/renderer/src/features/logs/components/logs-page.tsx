@@ -406,7 +406,7 @@ export function LogsPage() {
                       onClick={() => void copySql()}
                       title="Copy SQL"
                       aria-label="Copy SQL"
-                      className="absolute top-2 right-2 z-10 flex h-6 cursor-pointer items-center gap-1 rounded-md bg-surface px-2 text-xs font-medium text-text-muted opacity-0 shadow-control transition-all group-hover/sql:opacity-100 hover:bg-surface-elevated focus-visible:opacity-100 hover:text-text"
+                      className="absolute top-2 right-2 z-10 flex h-6 cursor-pointer items-center gap-1 rounded-md bg-control px-2 text-xs font-medium text-text-muted opacity-0 shadow-control transition-all group-hover/sql:opacity-100 hover:bg-control-hover focus-visible:opacity-100 hover:text-text"
                     >
                       {copied ? (
                         <IconCheck size={14} className="text-success" />

@@ -107,7 +107,7 @@ export function PaginationBar({
             <button
               type="button"
               aria-label="Rows per page"
-              className="flex h-7 cursor-pointer items-center gap-1 rounded-lg bg-surface pr-1.5 pl-2 text-xs font-medium text-text shadow-control transition-colors hover:bg-surface-elevated aria-expanded:bg-surface-elevated"
+              className="flex h-7 cursor-pointer items-center gap-1 rounded-lg bg-control pr-1.5 pl-2 text-xs font-medium text-text shadow-control transition-colors hover:bg-control-hover aria-expanded:bg-control-hover"
             >
               <span className="tabular-nums">{pageSize}</span>
               <IconSelector size={14} className="text-text-subtle" />

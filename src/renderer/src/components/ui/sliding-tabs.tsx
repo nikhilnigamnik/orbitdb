@@ -36,13 +36,13 @@ export function SlidingTabs<T extends string = string>({
   return (
     <div
       ref={ref}
-      className={cn('relative inline-flex gap-0.5 rounded-lg bg-surface-elevated p-0.5', className)}
+      className={cn('relative inline-flex gap-0.5 rounded-lg bg-track p-0.5', className)}
     >
       <div
         aria-hidden
         style={style}
         className={cn(
-          'pointer-events-none absolute top-0.5 bottom-0.5 rounded-md bg-surface shadow-control transition-[left,width,background-color] duration-120 ease-out',
+          'pointer-events-none absolute top-0.5 bottom-0.5 rounded-md bg-control shadow-control transition-[left,width,background-color] duration-120 ease-out',
           activeTab?.indicatorClassName
         )}
       />
@@ -53,6 +53,7 @@ export function SlidingTabs<T extends string = string>({
             key={tab.id}
             data-id={tab.id}
             type="button"
+            aria-pressed={isActive}
             onClick={() => onChange(tab.id)}
             className={cn(
               'relative z-10 flex h-6 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',

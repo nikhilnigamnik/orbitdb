@@ -62,6 +62,7 @@ export type {
   TableDetails,
   TableInfo,
   TestConnectionResult,
+  ThemePreference,
   UpdateCheckResult,
   UsageBreakdown,
   UsageSummary,

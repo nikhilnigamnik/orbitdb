@@ -6,6 +6,7 @@ import icon from '../../resources/icon.png?asset'
 import { safeExternalUrl } from './app/open-external'
 import { registerIpcHandlers } from './ipc'
 import { disconnectAll } from './db/manager'
+import { applyStoredTheme, windowBackground } from './app/theme'
 import { configureNetwork } from './app/network'
 
 const APP_NAME = 'OrbitDB'
@@ -82,7 +83,7 @@ function createWindow(): void {
     minHeight: 640,
     autoHideMenuBar: true,
     title: APP_NAME,
-    backgroundColor: '#ffffff',
+    backgroundColor: windowBackground(),
     // macOS: the traffic lights sit inside the sidebar's top row, as in Attio's
     // desktop app. The renderer leaves room for them and makes that row, and
     // each page header, the drag handle. Other platforms keep their frame.
@@ -145,6 +146,8 @@ app.whenReady().then(() => {
   })
 
   restrictPermissions()
+  // Before the window, so its first paint is already in the right theme.
+  applyStoredTheme()
   registerIpcHandlers()
   createWindow()
 

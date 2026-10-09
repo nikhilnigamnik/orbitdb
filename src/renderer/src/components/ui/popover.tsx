@@ -41,7 +41,7 @@ export function Popover({
           align={align}
           side={side}
           className={cn(
-            'animate-slide-up-fade z-50 items-center overflow-hidden rounded-xl bg-surface text-text shadow-pop',
+            'animate-slide-up-fade z-50 items-center overflow-hidden rounded-xl bg-popover text-text shadow-pop',
             popoverContentClassName
           )}
           sticky={sticky}

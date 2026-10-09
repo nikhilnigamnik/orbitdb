@@ -39,7 +39,7 @@ export function SelectionBar({
 }: SelectionBarProps) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
-      <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-xl bg-surface p-1.5 pl-3 shadow-pop">
+      <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-xl bg-popover p-1.5 pl-3 shadow-pop">
         <span className="flex items-center gap-1.5 pr-1 text-xs text-text-muted">
           <span className="font-medium text-text tabular-nums">{count}</span>
           row{count === 1 ? '' : 's'} selected

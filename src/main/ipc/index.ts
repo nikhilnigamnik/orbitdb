@@ -2,6 +2,8 @@ import { ipcMain, app, shell } from 'electron'
 import { safeExternalUrl } from '../app/open-external'
 import { checkForUpdate } from '../app/update-check'
 import { describeError } from '../db/describe-error'
+import { changeTheme } from '../app/theme'
+import { getThemePreference } from '../store/appearance-store'
 import type {
   AiGatewayIds,
   AiSettingsView,
@@ -25,7 +27,8 @@ import type {
   SavedQueryPatch,
   SuggestIndexesOptions,
   ValueSearchOptions,
-  CheckReferencesOptions
+  CheckReferencesOptions,
+  ThemePreference
 } from '../../shared/types'
 import { generateSql } from '../ai/generate-sql'
 import { fixSql } from '../ai/fix-sql'
@@ -386,6 +389,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'app:check-update',
     wrap(async () => checkForUpdate())
+  )
+  ipcMain.handle(
+    'app:get-theme',
+    wrap((): ThemePreference => getThemePreference())
+  )
+  ipcMain.handle(
+    'app:set-theme',
+    wrap((theme: ThemePreference) => changeTheme(theme))
   )
   ipcMain.handle(
     'app:open-external',
