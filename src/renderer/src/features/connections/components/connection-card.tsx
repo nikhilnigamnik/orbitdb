@@ -1,15 +1,14 @@
 import * as React from 'react'
 import {
+  IconAlertCircle,
   IconDatabase,
   IconDots,
   IconLock,
   IconPencil,
-  IconPlugOff,
   IconTrash
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Chip } from '@renderer/components/ui/chip'
-import { Spinner } from '@renderer/components/ui/spinner'
 import { Popover } from '@renderer/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import {
@@ -21,6 +20,7 @@ import { cn } from '@renderer/lib/utils'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 import type { ConnectionHealth } from '../lib/use-connection-health'
 import { ENGINE_ICON } from './engine-icons'
+import { ConnectionActions } from './connection-actions'
 
 type ChipTone = React.ComponentProps<typeof Chip>['tone']
 
@@ -28,9 +28,16 @@ interface ConnectionCardProps {
   connection: SavedConnection
   isActive: boolean
   isConnecting: boolean
+  /** Another connection is mid-connect, so this row's Connect waits. */
+  isBusy?: boolean
+  /** Why this connection's last attempt failed. Shown on the row, with Retry. */
+  connectError?: string
+  /** The connection open right now, named on this row's Connect as a switch. */
+  activeName?: string | null
   health?: ConnectionHealth
   healthError?: string
   onConnect: () => void
+  onOpen: () => void
   onDisconnect: () => void
   onEdit: () => void
   onDelete: () => void
@@ -83,9 +90,13 @@ export function ConnectionCard({
   connection,
   isActive,
   isConnecting,
+  isBusy = false,
+  connectError,
+  activeName = null,
   health = 'unknown',
   healthError,
   onConnect,
+  onOpen,
   onDisconnect,
   onEdit,
   onDelete,
@@ -108,7 +119,7 @@ export function ConnectionCard({
     // hover grey rather than a card edge.
     <div
       className={cn(
-        'group relative flex h-14 items-center gap-3 border-b border-border px-4 transition-colors',
+        'group relative flex min-h-14 items-center gap-3 border-b border-border px-4 py-2 transition-colors',
         isActive ? 'bg-surface-active/40' : 'hover:bg-surface-elevated/60'
       )}
     >
@@ -192,38 +203,27 @@ export function ConnectionCard({
             parts.join(' · ')
           )}
         </div>
+        {/* On the row that failed, beside the Retry that acts on it - not in a
+            banner at the top of the page, which named no connection. */}
+        {connectError && (
+          <p role="alert" className="flex items-start gap-1.5 pt-0.5 text-[12px] text-danger-text">
+            <IconAlertCircle size={13} className="mt-px shrink-0" aria-hidden />
+            <span className="min-w-0 break-words">{connectError}</span>
+          </p>
+        )}
       </div>
 
-      <Button
-        variant="outline"
-        onClick={isActive ? onDisconnect : onConnect}
-        disabled={isConnecting}
-        aria-label={isActive ? 'Disconnect' : isConnecting ? 'Connecting' : 'Connect'}
-        className={cn('w-28 justify-center', isActive && 'hover:bg-danger/10 hover:text-danger')}
-      >
-        {isConnecting ? (
-          <>
-            <Spinner size={12} />
-            <span>Connecting…</span>
-          </>
-        ) : isActive ? (
-          // The button reads as the state it is in, and as the action it performs
-          // once you reach for it - a green "Connected" button said neither, and
-          // gave no hint that clicking it disconnects.
-          <>
-            <span className="flex items-center gap-1.5 group-hover/button:hidden group-focus-visible/button:hidden">
-              <span className="size-1.5 shrink-0 rounded-full bg-success" aria-hidden />
-              Connected
-            </span>
-            <span className="hidden items-center gap-1.5 group-hover/button:flex group-focus-visible/button:flex">
-              <IconPlugOff size={14} />
-              Disconnect
-            </span>
-          </>
-        ) : (
-          <span>Connect</span>
-        )}
-      </Button>
+      <ConnectionActions
+        name={connection.name}
+        isActive={isActive}
+        isConnecting={isConnecting}
+        isBusy={isBusy}
+        hasFailed={!!connectError}
+        activeName={activeName}
+        onConnect={onConnect}
+        onOpen={onOpen}
+        onDisconnect={onDisconnect}
+      />
 
       <div className="shrink-0">
         <Popover

@@ -333,6 +333,10 @@ Two optional fields on `ConnectionInput`: `folder` (free text) and `color` (a fi
 
 The accent draws as a rail on the card and picker row (not a tint on the engine tile, which already carries the engine's own colour) and as the tile of the connection switcher at the top of the sidebar - a solid square in that colour holding the connection's initial. That is the one place on screen whatever page you are on, and the answer to "which database am I typing into". An untagged connection shows its engine icon on a white tile instead. Collapsed folders live in `localStorage`; that one _is_ view state.
 
+### Connecting from the list
+
+The row's right-hand controls are `ConnectionActions` (`features/connections/components/connection-actions.tsx`), one control per state rather than one button whose label changes under the pointer - the old "Connected" turned into "Disconnect" on hover, so what a click would do was only knowable once the cursor was on it. Connected: a primary **Open** back into the database plus a separate Disconnect icon. Otherwise **Connect**, a disabled spinner while connecting, and **Retry** after a failure. Connect is disabled while another row is mid-connect (a second connect would race the first for the active slot) and carries a "Switch from X" tooltip when something else is open, since the store swaps over only once the new connection answers. A failed attempt's error is shown **on the row that failed** (`failedConnectId` in `connections-page.tsx`, since the store's `connectError` names no connection), beside the Retry that acts on it, rather than in a banner at the top of the page.
+
 ### Design system (Attio's product UI)
 
 The renderer copies Attio's product UI, in both its light and dark themes - a deliberate, user-requested redesign (2026-10-09; dark theme added the same day). Match Attio for anything new; never copy Attio's logo or brand assets.

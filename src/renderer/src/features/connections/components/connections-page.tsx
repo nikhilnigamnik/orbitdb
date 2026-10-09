@@ -70,6 +70,7 @@ export function ConnectionsPage() {
     error,
     refresh,
     active,
+    current,
     connect,
     disconnect,
     isConnecting,
@@ -83,6 +84,8 @@ export function ConnectionsPage() {
   const confirmModal = useDisclosure(false)
   const [editing, setEditing] = React.useState<SavedConnection | null>(null)
   const [pendingConnectId, setPendingConnectId] = React.useState<string | null>(null)
+  // The store's connectError names no connection; this says whose row it belongs on.
+  const [failedConnectId, setFailedConnectId] = React.useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = React.useState<SavedConnection | null>(null)
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
@@ -143,11 +146,13 @@ export function ConnectionsPage() {
 
   async function handleConnect(connection: SavedConnection) {
     setPendingConnectId(connection.id)
+    setFailedConnectId(null)
     try {
       await connect(connection.id)
       navigate(ROUTES.database)
     } catch {
-      // surfaced via connectError
+      // The message is connectError in the store; the row shows it with Retry.
+      setFailedConnectId(connection.id)
     } finally {
       setPendingConnectId(null)
     }
@@ -180,9 +185,13 @@ export function ConnectionsPage() {
         connection={connection}
         isActive={active?.connectionId === connection.id}
         isConnecting={isConnecting && pendingConnectId === connection.id}
+        isBusy={isConnecting && pendingConnectId !== connection.id}
+        connectError={failedConnectId === connection.id ? (connectError ?? undefined) : undefined}
+        activeName={current && current.id !== connection.id ? current.name : null}
         health={health[connection.id] ?? 'unknown'}
         healthError={healthErrors[connection.id]}
         onConnect={() => handleConnect(connection)}
+        onOpen={() => navigate(ROUTES.database)}
         onDisconnect={() => void disconnect()}
         onEdit={() => openEdit(connection)}
         onDelete={() => confirmDelete(connection)}
@@ -278,9 +287,8 @@ export function ConnectionsPage() {
       </PageToolbar>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-        {(connectError || disconnectError || error) && (
+        {(disconnectError || error) && (
           <div className="flex flex-col gap-3 px-4 pt-4">
-            {connectError && <ErrorState title="Failed to connect" message={connectError} />}
             {disconnectError && (
               <ErrorState title="Failed to disconnect" message={disconnectError} />
             )}
