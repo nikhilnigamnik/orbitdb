@@ -26,28 +26,28 @@ export function UndoPrompt({ edit, isUndoing, onUndo }: UndoPromptProps) {
     // Sits where the selection bar sits, and only when that is absent - two
     // stacked floating bars would fight for the same corner.
     <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
-      <div className="animate-slide-up-fade pointer-events-auto flex min-w-0 items-center gap-1 rounded-lg border border-border-strong/70 bg-surface/95 py-1 pl-3 pr-1 text-xs shadow-2xl shadow-black/60 backdrop-blur-xl">
+      <div className="animate-slide-up-fade pointer-events-auto flex min-w-0 items-center gap-1 rounded-xl bg-surface p-1.5 pl-2 text-xs shadow-pop">
         <span className="flex min-w-0 items-center gap-1.5">
-          {/* Not uppercased or letter-spaced like the categorical chips: this is
-              a real identifier, and in Postgres case is load-bearing. */}
+          {/* A real identifier, and in Postgres case is load-bearing - so it is
+              shown as written, in the face used for raw values. */}
           <Chip
             tone="neutral"
-            className="h-5 max-w-32 truncate rounded-md font-mono text-[11px] font-medium normal-case tracking-normal"
+            className="max-w-32 truncate font-mono text-[12px]"
             title={edit.column}
           >
             {edit.column}
           </Chip>
           <UndoValue value={edit.previousValue} muted />
-          <IconArrowNarrowRight size={12} className="shrink-0 text-text-subtle/60" />
+          <IconArrowNarrowRight size={14} className="shrink-0 text-text-subtle" />
           <UndoValue value={edit.newValue} />
         </span>
         <button
           type="button"
           onClick={onUndo}
           disabled={isUndoing}
-          className="ml-1 flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 text-text-muted transition-colors hover:bg-surface-elevated hover:text-text focus-visible:bg-surface-elevated focus-visible:text-text focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="ml-1 flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-surface pr-1.5 pl-2 font-medium text-text shadow-control transition-colors hover:bg-surface-elevated focus-visible:ring-[3px] focus-visible:ring-accent/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <IconArrowBackUp size={12} className="shrink-0" />
+          <IconArrowBackUp size={14} className="shrink-0 text-text-subtle" />
           {isUndoing ? 'Undoing…' : 'Undo'}
           <Kbd className="ml-0.5">{isMac ? '⌘' : 'Ctrl'}Z</Kbd>
         </button>
@@ -67,7 +67,7 @@ function UndoValue({ value, muted }: { value: unknown; muted?: boolean }) {
     <span
       title={display}
       className={cn(
-        'max-w-28 truncate font-mono text-[11px]',
+        'max-w-28 truncate font-mono text-xs',
         isNull && 'italic',
         muted ? 'text-text-subtle' : 'text-text'
       )}

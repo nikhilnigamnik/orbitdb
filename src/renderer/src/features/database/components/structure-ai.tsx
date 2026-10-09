@@ -4,12 +4,18 @@ import { Button } from '@renderer/components/ui/button'
 import { Chip } from '@renderer/components/ui/chip'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { Sheet } from '@renderer/components/ui/sheet'
-import { MarkdownView } from '@renderer/components/common/markdown'
 import { unwrap } from '@renderer/lib/ipc'
 import { errorMessage } from '@renderer/lib/errors'
 import { AiKeyRequired, isMissingAiKeyError } from '@renderer/components/common/ai-key-required'
+import { LoadingState } from '@renderer/components/common/loading-state'
 import { cn } from '@renderer/lib/utils'
 import type { IndexSuggestion } from '@renderer/types'
+
+// The markdown renderer (react-markdown and the micromark/mdast/hast stack, about
+// 150 KB) is only needed once someone asks for an explanation, so it loads then.
+const MarkdownView = React.lazy(async () => ({
+  default: (await import('@renderer/components/common/markdown')).MarkdownView
+}))
 
 interface StructureAiProps {
   connectionId: string
@@ -26,14 +32,16 @@ export function StructureAi({ connectionId, schema, table, canEdit, onApplied }:
 
   return (
     <>
-      <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-elevated/20 px-4 py-2.5">
-        <AiBarButton icon={<IconSparkles size={12} />} onClick={() => setPanel('explain')}>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={() => setPanel('explain')}>
+          <IconSparkles size={14} className="text-text-subtle" />
           Explain table
-        </AiBarButton>
+        </Button>
         {canEdit && (
-          <AiBarButton icon={<IconBulb size={12} />} onClick={() => setPanel('indexes')}>
+          <Button size="sm" variant="outline" onClick={() => setPanel('indexes')}>
+            <IconBulb size={14} className="text-text-subtle" />
             Suggest indexes
-          </AiBarButton>
+          </Button>
         )}
       </div>
 
@@ -56,39 +64,18 @@ export function StructureAi({ connectionId, schema, table, canEdit, onApplied }:
   )
 }
 
-function AiBarButton({
-  icon,
-  onClick,
-  children
-}: {
-  icon: React.ReactNode
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
-    >
-      {icon}
-      {children}
-    </button>
-  )
-}
-
 function PanelHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3 pr-12">
-      <span className="shrink-0 ">{icon}</span>
-      <h2 className="truncate text-xs font-semibold text-text">{title}</h2>
+    <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 pr-12">
+      <span className="flex shrink-0 text-text-subtle">{icon}</span>
+      <h2 className="truncate text-sm font-semibold text-text">{title}</h2>
     </div>
   )
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center gap-2 px-4 text-text-subtle">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-4 text-center text-text-muted">
       {children}
     </div>
   )
@@ -96,9 +83,9 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 function ErrorLine({ message }: { message: string }) {
   return (
-    <div className="flex shrink-0 items-start gap-2 px-4 py-3 text-xs text-danger">
+    <div className="m-4 flex shrink-0 items-start gap-2 rounded-lg border border-danger/15 bg-danger/5 px-3 py-2.5 text-xs text-danger">
       <IconAlertTriangle size={14} className="mt-0.5 shrink-0" />
-      <span>{message}</span>
+      <span className="min-w-0 wrap-break-word">{message}</span>
     </div>
   )
 }
@@ -143,16 +130,17 @@ function ExplainSheet({
 
   return (
     <Sheet
+      title={`Explain ${table}`}
       openSheet={open}
       setOpenSheet={(o) => !o && onClose()}
       side="right"
       sheetContentClassName="bg-surface"
       content={
         <div className="flex h-full min-h-0 flex-col">
-          <PanelHeader icon={<IconSparkles size={15} />} title={`Explain ${table}`} />
+          <PanelHeader icon={<IconSparkles size={16} />} title={`Explain ${table}`} />
           {isLoading ? (
             <Centered>
-              <Spinner size={15} className="text-current" />
+              <Spinner size={16} className="text-text-subtle" />
               <span className="text-xs">Analyzing table…</span>
             </Centered>
           ) : isMissingAiKeyError(error) ? (
@@ -160,9 +148,9 @@ function ExplainSheet({
           ) : error ? (
             <ErrorLine message={error} />
           ) : (
-            <MarkdownView className="min-h-0 flex-1 overflow-auto px-4 py-3.5">
-              {text ?? ''}
-            </MarkdownView>
+            <React.Suspense fallback={<LoadingState />}>
+              <MarkdownView className="min-h-0 flex-1 overflow-auto p-4">{text ?? ''}</MarkdownView>
+            </React.Suspense>
           )}
         </div>
       }
@@ -259,16 +247,17 @@ function IndexesSheet({
 
   return (
     <Sheet
+      title={`Index suggestions for ${table}`}
       openSheet={open}
       setOpenSheet={(o) => !o && onClose()}
       side="right"
       sheetContentClassName="bg-surface"
       content={
         <div className="flex h-full min-h-0 flex-col">
-          <PanelHeader icon={<IconBulb size={15} />} title={`Index suggestions for ${table}`} />
+          <PanelHeader icon={<IconBulb size={16} />} title={`Index suggestions for ${table}`} />
           {isLoading ? (
             <Centered>
-              <Spinner size={15} className="text-current" />
+              <Spinner size={16} className="text-text-subtle" />
               <span className="text-xs">Analyzing structure…</span>
             </Centered>
           ) : isMissingAiKeyError(error) ? (
@@ -277,43 +266,40 @@ function IndexesSheet({
             <ErrorLine message={error} />
           ) : suggestions.length === 0 ? (
             <Centered>
-              <IconCheck size={15} className="text-success" />
-              <span className="text-xs">No useful indexes are missing.</span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-elevated">
+                <IconCheck size={20} className="text-success" />
+              </div>
+              <span className="text-sm font-medium text-text">No useful indexes are missing.</span>
             </Centered>
           ) : (
-            <div className="min-h-0 flex-1 divide-y divide-border/60 overflow-auto">
+            <div className="min-h-0 flex-1 divide-y divide-border overflow-auto">
               {suggestions.map((s) => {
                 const state = applied[s.name]
                 return (
-                  <div key={s.name} className="flex flex-col gap-2 px-4 py-3.5">
+                  <div key={s.name} className="flex flex-col gap-2.5 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <span className="flex items-center gap-1.5">
-                          <span className="min-w-0 truncate font-mono text-xs font-medium text-text">
+                          <span className="min-w-0 truncate text-sm font-medium text-text">
                             {s.name}
                           </span>
-                          {s.isUnique && <Chip tone="neutral">Unique</Chip>}
+                          {s.isUnique && <Chip tone="sky">Unique</Chip>}
                         </span>
-                        <span className="font-mono text-xs text-text-subtle">
+                        <span className="font-mono text-[12px] text-text-subtle">
                           ({s.columns.join(', ')})
                         </span>
                       </div>
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="outline"
                         disabled={state === 'applying' || state === 'done'}
-                        className={cn(
-                          'shrink-0',
-                          state === 'done'
-                            ? 'text-success'
-                            : 'text-text-muted hover:bg-surface-elevated hover:text-text'
-                        )}
+                        className={cn('shrink-0', state === 'done' && 'text-success')}
                         onClick={() => apply(s)}
                       >
                         {state === 'applying' ? (
                           <Spinner size={12} className="text-current" />
                         ) : state === 'done' ? (
-                          <IconCheck size={12} />
+                          <IconCheck size={14} />
                         ) : null}
                         {state === 'done'
                           ? 'Created'
@@ -323,12 +309,12 @@ function IndexesSheet({
                       </Button>
                     </div>
 
-                    <p className="text-xs leading-relaxed text-text-subtle">{s.rationale}</p>
+                    <p className="text-xs text-text-muted">{s.rationale}</p>
 
                     {preview[s.name] && (
                       // Wrapped, not scrolled: a statement you have to drag
                       // sideways to read is not a preview of anything.
-                      <pre className="rounded-md border border-border bg-input px-2.5 py-2 font-mono text-[11px] leading-relaxed break-words whitespace-pre-wrap text-text-muted">
+                      <pre className="rounded-lg border border-border bg-surface-sunken px-3 py-2.5 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap text-text">
                         {preview[s.name]}
                       </pre>
                     )}

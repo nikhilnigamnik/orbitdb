@@ -3,6 +3,7 @@ import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { unwrap } from '@renderer/lib/ipc'
 import type { DdlOperation } from '@renderer/types'
 import { emitSchemaTablesChanged } from './schema-events'
+import { forgetTableRef } from './table-prefs'
 
 interface UseTableDestructiveActionsOptions {
   connectionId: string
@@ -68,6 +69,8 @@ export function useTableDestructiveActions({
       const wasDrop = pending.kind === 'drop'
       setPending(null)
       setIsExecuting(false)
+      // Before the event, so a listener re-reading the pins sees the table gone.
+      if (wasDrop) forgetTableRef(connectionId, { schema, table })
       emitSchemaTablesChanged(connectionId, schema)
       if (wasDrop) onDropped?.()
     } catch (err) {

@@ -9,6 +9,15 @@ export interface SavedLayout {
 }
 
 /**
+ * Bumped when auto-layout changes enough that arrangements saved under the old
+ * one are worse than a fresh layout. A drag saves every table's position, not
+ * only the one moved, so an old arrangement would otherwise pin the old
+ * algorithm's output for good - version 2 replaced a single column hundreds of
+ * tables tall, which fitting to the window shrank past reading.
+ */
+export const LAYOUT_VERSION = 2
+
+/**
  * Where the diagram's tables were left, per connection and schema.
  *
  * Auto-layout is a starting point, not an answer: the arrangement someone drags
@@ -35,7 +44,8 @@ export function loadLayout(connectionId: string, schema: string): SavedLayout | 
   try {
     const raw = localStorage.getItem(key(connectionId, schema))
     if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<SavedLayout>
+    const parsed = JSON.parse(raw) as Partial<SavedLayout> & { version?: number }
+    if (parsed?.version !== LAYOUT_VERSION) return null
     const positions: Record<string, NodePosition> = {}
     for (const [id, position] of Object.entries(parsed?.positions ?? {})) {
       if (isPosition(position)) positions[id] = { x: position.x, y: position.y }
@@ -50,7 +60,10 @@ export function loadLayout(connectionId: string, schema: string): SavedLayout | 
 export function saveLayout(connectionId: string, schema: string, layout: SavedLayout): void {
   if (!connectionId) return
   try {
-    localStorage.setItem(key(connectionId, schema), JSON.stringify(layout))
+    localStorage.setItem(
+      key(connectionId, schema),
+      JSON.stringify({ ...layout, version: LAYOUT_VERSION })
+    )
   } catch {
     // quota / private mode - the layout just won't be remembered
   }

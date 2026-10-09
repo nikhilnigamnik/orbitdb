@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { IconKey, IconLink } from '@tabler/icons-react'
+import { IconKey, IconLink, IconTable } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
 import { NODE_HEADER_HEIGHT, NODE_ROW_HEIGHT, NODE_WIDTH } from '../lib/auto-layout'
 
@@ -38,31 +38,41 @@ export interface TableNodeData {
   [key: string]: unknown
 }
 
+// Handles only anchor the edges - nothing here can be connected by dragging -
+// so they stay invisible rather than dotting both sides of every row.
+const HANDLE_CLASS = 'h-2! w-2! min-w-0! border-0! bg-transparent! opacity-0!'
+
 export function TableNode({ data, selected }: NodeProps) {
   const node = data as TableNodeData
   return (
     <div
       style={{ width: NODE_WIDTH }}
       className={cn(
-        'overflow-hidden rounded-md border bg-surface text-text shadow-lg shadow-black/40 ring-1 ring-inset ring-white/5',
-        selected ? 'border-accent' : 'border-border',
-        node.isExternal && 'opacity-70'
+        'overflow-hidden rounded-xl border bg-surface text-text shadow-card transition-[border-color,box-shadow]',
+        selected ? 'border-accent ring-2 ring-accent/15' : 'border-border',
+        node.isExternal && 'border-dashed border-border-strong opacity-70'
       )}
     >
       <div
-        className="flex items-center justify-between gap-2 border-b border-border bg-surface-elevated/60 px-2.5 font-mono text-xs font-semibold text-text"
+        className="flex items-center gap-2 border-b border-border px-3"
         style={{ height: NODE_HEADER_HEIGHT }}
       >
-        <span className="truncate">{node.name}</span>
-        <span className="shrink-0 text-xs font-normal uppercase tracking-[0.08em] text-text-subtle">
-          {node.schema}
+        <span
+          className={cn(
+            'flex size-5 shrink-0 items-center justify-center rounded-md text-white',
+            node.isExternal ? 'bg-tag-slate' : 'bg-tag-blue'
+          )}
+        >
+          <IconTable size={12} stroke={2} />
         </span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text">{node.name}</span>
+        <span className="shrink-0 text-[12px] text-text-subtle">{node.schema}</span>
       </div>
 
-      <div>
+      <div className="py-1">
         {node.columns.length === 0 ? (
           <div
-            className="flex items-center px-2.5 font-mono text-xs italic text-text-subtle"
+            className="flex items-center px-3 text-xs text-text-subtle"
             style={{ height: NODE_ROW_HEIGHT }}
           >
             no columns
@@ -72,34 +82,34 @@ export function TableNode({ data, selected }: NodeProps) {
             <div
               key={col.name}
               style={{ height: NODE_ROW_HEIGHT }}
-              className="relative flex min-w-0 items-center gap-1.5 px-2.5 font-mono text-xs text-text-muted hover:bg-surface-elevated/40"
+              className="relative flex min-w-0 items-center gap-1.5 px-3 text-xs hover:bg-surface-elevated/60"
             >
               <Handle
                 type="target"
                 position={Position.Left}
                 id={col.name}
-                className="h-2! w-2! min-w-0! border-0! bg-accent/60!"
+                className={HANDLE_CLASS}
                 style={{ left: -4 }}
               />
-              <span className="flex w-3 shrink-0 items-center justify-center text-text-subtle">
+              <span className="flex w-3.5 shrink-0 items-center justify-center">
                 {col.isPrimaryKey ? (
-                  <IconKey size={9} className="text-warning" />
+                  <IconKey size={12} className="text-warning" />
                 ) : col.isForeignKey ? (
-                  <IconLink size={9} className="text-info" />
+                  <IconLink size={12} className="text-info" />
                 ) : null}
               </span>
               <span
                 title={col.name}
                 className={cn(
                   'min-w-0 flex-1 truncate',
-                  col.isPrimaryKey ? 'font-semibold text-text' : 'text-text-muted'
+                  col.isPrimaryKey ? 'font-medium text-text' : 'text-text-muted'
                 )}
               >
                 {col.name}
               </span>
               <span
                 title={col.dataType}
-                className="ml-1 max-w-[45%] shrink-0 truncate text-xs uppercase text-text-subtle"
+                className="ml-1 max-w-[45%] shrink-0 truncate text-text-subtle"
               >
                 {shortenDataType(col.dataType)}
               </span>
@@ -107,7 +117,7 @@ export function TableNode({ data, selected }: NodeProps) {
                 type="source"
                 position={Position.Right}
                 id={col.name}
-                className="h-2! w-2! min-w-0! border-0! bg-accent/60!"
+                className={HANDLE_CLASS}
                 style={{ right: -4 }}
               />
             </div>

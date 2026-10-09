@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { UsageSettings } from '@renderer/features/settings/components/usage-settings'
 import { ToastProvider } from '@renderer/components/ui/toast'
@@ -25,7 +25,7 @@ const BUSY: UsageSummary = {
     byModel: [
       {
         provider: 'anthropic',
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-5-5',
         feature: '',
         calls: 2,
         input: 3000,
@@ -54,7 +54,7 @@ const BUSY: UsageSummary = {
     byModel: [
       {
         provider: 'anthropic',
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-5-5',
         feature: '',
         calls: 9,
         input: 40000,
@@ -63,7 +63,7 @@ const BUSY: UsageSummary = {
       },
       {
         provider: 'openai',
-        model: 'gpt-5.2',
+        model: 'gpt-6-luna',
         feature: '',
         calls: 3,
         input: 5000,
@@ -126,18 +126,24 @@ function setup(summary: UsageSummary, overrides: Record<string, unknown> = {}) {
   return { api }
 }
 
+/** The call count in the stat tile - the headline figure for the selected timeframe. */
+async function callCount(): Promise<string | null> {
+  const tile = await screen.findByRole('group', { name: 'Calls' })
+  return within(tile).getByText(/^\d/).textContent
+}
+
 describe('what is shown', () => {
   it('opens on the thirty-day window, which is the useful default', async () => {
     setup(BUSY)
-    expect(await screen.findByText(/12 calls/)).toBeTruthy()
+    expect(await callCount()).toBe('12')
   })
 
   it('breaks usage down by model, naming the provider too', async () => {
-    // Sonnet 5 and GPT-5.2 are different bills.
+    // Sonnet 5.5 and GPT-6 Luna are different bills.
     setup(BUSY)
 
-    expect(await screen.findByText('Sonnet 5')).toBeTruthy()
-    expect(screen.getByText('GPT-5.2')).toBeTruthy()
+    expect(await screen.findByText('Sonnet 5.5')).toBeTruthy()
+    expect(screen.getByText('GPT-6 Luna')).toBeTruthy()
     expect(screen.getByText('OpenAI')).toBeTruthy()
   })
 
@@ -151,7 +157,7 @@ describe('what is shown', () => {
         byModel: [
           {
             provider: 'anthropic',
-            model: 'claude-haiku-4-5-20251001',
+            model: 'claude-haiku-5-5',
             feature: '',
             calls: 3,
             input: 2610,
@@ -162,8 +168,8 @@ describe('what is shown', () => {
       }
     })
 
-    const label = await screen.findByText('Haiku 4.5')
-    expect(label.closest('[title]')?.getAttribute('title')).toBe('claude-haiku-4-5-20251001')
+    const label = await screen.findByText('Haiku 5.5')
+    expect(label.closest('[title]')?.getAttribute('title')).toBe('claude-haiku-5-5')
   })
 
   it('breaks it down by feature, under readable names', async () => {
@@ -183,11 +189,11 @@ describe('the timeframe', () => {
     // The whole summary arrives in one call; re-fetching per tab would be a
     // round-trip for data already in hand.
     const { api } = setup(BUSY)
-    await screen.findByText(/12 calls/)
+    expect(await callCount()).toBe('12')
 
     fireEvent.click(screen.getByText('Today'))
 
-    expect(await screen.findByText(/2 calls/)).toBeTruthy()
+    expect(await callCount()).toBe('2')
     expect(api.summary).toHaveBeenCalledTimes(1)
   })
 })
@@ -209,7 +215,7 @@ describe('with nothing recorded', () => {
 describe('clearing', () => {
   it('asks first, since the counts exist nowhere else', async () => {
     const { api } = setup(BUSY)
-    await screen.findByText(/12 calls/)
+    await callCount()
 
     fireEvent.click(screen.getByText('Clear'))
 
@@ -219,13 +225,57 @@ describe('clearing', () => {
 
   it('goes through once confirmed', async () => {
     const { api } = setup(BUSY)
-    await screen.findByText(/12 calls/)
+    await callCount()
     fireEvent.click(screen.getByText('Clear'))
 
     const dialog = await screen.findByText(/Clear usage history\?/)
-    const confirm = dialog.closest('[role="dialog"]')!.querySelectorAll('button')
+    // A confirmation is announced as an alertdialog, not a plain dialog.
+    const confirm = dialog
+      .closest('[role="dialog"], [role="alertdialog"]')!
+      .querySelectorAll('button')
     fireEvent.click([...confirm].find((b) => b.textContent === 'Clear')!)
 
     await waitFor(() => expect(api.clear).toHaveBeenCalled())
+  })
+})
+
+describe('a usage file main no longer fully understands', () => {
+  it('names an unknown provider by its id instead of taking the page down', async () => {
+    // usage.json outlives the registry: a provider removed from it used to make
+    // aiProvider() throw during render, blanking the whole app.
+    setup({
+      ...BUSY,
+      last30: {
+        ...BUSY.last30,
+        byModel: [
+          {
+            provider: 'retired-vendor',
+            model: 'old-model',
+            feature: '',
+            calls: 1,
+            input: 10,
+            output: 5,
+            cost: 0
+          }
+        ]
+      }
+    })
+    expect(await screen.findByText('retired-vendor')).toBeTruthy()
+  })
+})
+
+describe('a read that fails', () => {
+  it('says so and offers a retry, rather than rendering an empty section', async () => {
+    const summary = vi
+      .fn()
+      .mockResolvedValueOnce({ success: false, error: 'usage.json is unreadable' })
+      .mockImplementation(() => ok(BUSY))
+    setup(BUSY, { summary })
+
+    expect(await screen.findByText('Could not read AI usage')).toBeTruthy()
+    expect(screen.getByText('usage.json is unreadable')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await callCount()).toBe('12')
   })
 })

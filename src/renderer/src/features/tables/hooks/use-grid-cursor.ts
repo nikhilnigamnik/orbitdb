@@ -27,6 +27,12 @@ interface UseGridCursorOptions {
   insertTarget: InsertTarget
   onCopied?: (format: CopyFormat, cellCount: number) => void
   onCopyFailed?: (error: unknown) => void
+  /** Space on the cursor row. */
+  onToggleRow?: (rowIndex: number) => void
+  /** Shift+Enter on the cursor row. */
+  onOpenRow?: (rowIndex: number) => void
+  /** Delete or Backspace on the cursor row. Must ask first - it is one key away. */
+  onDeleteRow?: (rowIndex: number) => void
 }
 
 const MOVES: Record<string, CursorMove> = {
@@ -53,7 +59,10 @@ export function useGridCursor({
   isEditing,
   insertTarget,
   onCopied,
-  onCopyFailed
+  onCopyFailed,
+  onToggleRow,
+  onOpenRow,
+  onDeleteRow
 }: UseGridCursorOptions) {
   const [cursor, setCursor] = React.useState<CellCursor | null>(null)
   // Where a shift-extended selection started. Null means the range is just the
@@ -148,7 +157,28 @@ export function useGridCursor({
 
       if (bounds.rowCount === 0 || bounds.columnCount === 0) return
 
+      // Row keys only while the grid itself has focus: Space on a checkbox or
+      // button inside it already means that control's own thing.
+      if (cursor && event.target === event.currentTarget && !isMeta && !event.altKey) {
+        const rowAction =
+          event.key === ' '
+            ? onToggleRow
+            : event.key === 'Enter' && event.shiftKey
+              ? onOpenRow
+              : event.key === 'Delete' || event.key === 'Backspace'
+                ? onDeleteRow
+                : undefined
+        if (rowAction) {
+          event.preventDefault()
+          rowAction(cursor.rowIndex)
+          return
+        }
+      }
+
       if (event.key === 'Enter') {
+        // Shift+Enter opens the record; without a record view it does nothing
+        // rather than falling through to editing.
+        if (event.shiftKey) return
         if (!cursor || !onStartEditing) return
         event.preventDefault()
         onStartEditing(cursor)
@@ -179,7 +209,18 @@ export function useGridCursor({
       }
       setCursor(next)
     },
-    [bounds, clear, copy, cursor, isEditing, onStartEditing, range]
+    [
+      bounds,
+      clear,
+      copy,
+      cursor,
+      isEditing,
+      onStartEditing,
+      onToggleRow,
+      onOpenRow,
+      onDeleteRow,
+      range
+    ]
   )
 
   return { cursor, range, selectCell, clear, isCellInRange, handleKeyDown, copy }

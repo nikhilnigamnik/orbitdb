@@ -1,14 +1,13 @@
 import * as React from 'react'
 import { z } from 'zod'
-import { IconLink } from '@tabler/icons-react'
+import { IconLink, IconPlugConnected } from '@tabler/icons-react'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
-import { Switch } from '@renderer/components/ui/switch'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { FormField } from '@renderer/components/forms/form-field'
 import { SubmitButton } from '@renderer/components/forms/submit-button'
-import { Chip } from '@renderer/components/ui/chip'
+import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { unwrap } from '@renderer/lib/ipc'
 import { parseConnectionUrl } from '../lib/parse-connection-url'
 import {
@@ -19,19 +18,21 @@ import {
   DEFAULT_USERS,
   ENGINE_LABEL,
   ENVIRONMENTS,
-  ENVIRONMENT_LABEL
+  ENVIRONMENT_LABEL,
+  canReuseStoredSecrets
 } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
-import { connectionSchema, type ConnectionFormValues } from '../schema'
-import { ENGINE_ICON } from './engine-icons'
+import { createConnectionSchema, type ConnectionFormValues } from '../schema'
+import { ConnectionEnginePicker } from './connection-engine-picker'
 import { ConnectionAppearanceFields } from './connection-appearance-fields'
+import { ConnectionSslFields } from './connection-ssl-fields'
+import { ConnectionTestResult } from './connection-test-result'
 import type {
   ConnectionEnvironment,
   DatabaseEngine,
   SavedConnection,
   TestConnectionResult
 } from '@renderer/types'
-import { shortServerVersion } from '@renderer/lib/format'
 
 interface ConnectionFormSheetProps {
   isOpen: boolean
@@ -45,23 +46,24 @@ interface ConnectionFormSheetProps {
   folders?: string[]
 }
 
-const ENGINES: DatabaseEngine[] = ['postgres', 'mysql', 'd1']
-
-const ENGINE_STYLES: Record<DatabaseEngine, { bg: string; iconClass: string; tagline: string }> = {
-  postgres: { bg: 'bg-info/10', iconClass: 'text-info', tagline: 'PostgreSQL' },
-  mysql: { bg: 'bg-orange/10', iconClass: 'text-orange', tagline: 'MySQL / MariaDB' },
-  d1: { bg: 'bg-warning/10', iconClass: 'text-warning', tagline: 'Cloudflare SQLite' }
+// The segmented control keeps its white thumb; the environment's colour is
+// carried by the label and its dot, so the thumb stays an opaque surface.
+const ENVIRONMENT_ACTIVE: Record<ConnectionEnvironment, { text: string; dot: string }> = {
+  dev: { text: 'text-success', dot: 'bg-success' },
+  stage: { text: 'text-warning', dot: 'bg-warning' },
+  prod: { text: 'text-danger', dot: 'bg-danger' }
 }
 
-const ENVIRONMENT_ACTIVE: Record<ConnectionEnvironment, { bg: string; text: string; dot: string }> =
-  {
-    dev: { bg: 'bg-success/10', text: 'text-success', dot: 'bg-success' },
-    stage: { bg: 'bg-warning/10', text: 'text-warning', dot: 'bg-warning' },
-    prod: { bg: 'bg-danger/10', text: 'text-danger', dot: 'bg-danger' }
-  }
+const SAVED_SECRET_PLACEHOLDER = 'Saved - type to replace'
 
+/**
+ * Secrets start blank even when editing: the renderer is never sent them, and a
+ * blank one is saved as "unchanged". `sslVerify` defaults on for a new
+ * connection; an existing SSL one without the field keeps connecting the way it
+ * always has, unverified, until the user turns verification on.
+ */
 function toFormValues(initial?: SavedConnection | null): ConnectionFormValues {
-  if (!initial) return { ...DEFAULT_CONNECTION_VALUES }
+  if (!initial) return { ...DEFAULT_CONNECTION_VALUES, sslVerify: true }
   return {
     name: initial.name,
     engine: initial.engine,
@@ -72,12 +74,18 @@ function toFormValues(initial?: SavedConnection | null): ConnectionFormValues {
     port: initial.port,
     database: initial.database,
     user: initial.user,
-    password: initial.password,
+    password: '',
     ssl: initial.ssl,
+    sslVerify: initial.sslVerify ?? !initial.ssl,
     accountId: initial.accountId ?? '',
     databaseId: initial.databaseId ?? '',
-    apiToken: initial.apiToken ?? ''
+    apiToken: ''
   }
+}
+
+function isSameValues(a: ConnectionFormValues, b: ConnectionFormValues): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)] as (keyof ConnectionFormValues)[])
+  return [...keys].every((key) => a[key] === b[key])
 }
 
 export function ConnectionFormSheet({
@@ -96,6 +104,17 @@ export function ConnectionFormSheet({
   const [isTesting, setIsTesting] = React.useState(false)
   const [testResult, setTestResult] = React.useState<TestConnectionResult | null>(null)
   const [urlInput, setUrlInput] = React.useState('')
+  const [isDiscardOpen, setIsDiscardOpen] = React.useState(false)
+
+  const baseline = React.useMemo(() => toFormValues(initial), [initial])
+  const isDirty = !isSameValues(values, baseline) || urlInput.trim().length > 0
+  // A saved secret only carries over while the connection still points at the
+  // same server (see canReuseStoredSecrets); once host, port, user or the D1 ids
+  // change, the form asks for it again rather than offering to keep it.
+  const isSameServer = initial ? canReuseStoredSecrets(initial, values) : false
+  const hasSavedPassword = Boolean(initial?.hasPassword) && isSameServer
+  const hasSavedApiToken = Boolean(initial?.hasApiToken) && isSameServer
+  const hasDroppedSecret = Boolean(initial?.hasPassword || initial?.hasApiToken) && !isSameServer
 
   const urlIsInvalid = urlInput.trim().length > 0 && parseConnectionUrl(urlInput) === null
 
@@ -125,8 +144,17 @@ export function ConnectionFormSheet({
       setErrors({})
       setFormError(null)
       setTestResult(null)
+      setUrlInput('')
+      setIsDiscardOpen(false)
     }
   }, [isOpen, initial])
+
+  // Escape, a click outside, the close button and Cancel all land here, so
+  // none of them can drop an edit without asking.
+  function requestClose() {
+    if (isDirty && !isSubmitting) setIsDiscardOpen(true)
+    else onClose()
+  }
 
   function update<K extends keyof ConnectionFormValues>(key: K, value: ConnectionFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }))
@@ -151,7 +179,7 @@ export function ConnectionFormSheet({
   }
 
   function validate(): ConnectionFormValues | null {
-    const result = connectionSchema.safeParse(values)
+    const result = createConnectionSchema({ hasSavedApiToken }).safeParse(values)
     if (result.success) {
       setErrors({})
       return result.data
@@ -171,7 +199,8 @@ export function ConnectionFormSheet({
     setIsTesting(true)
     setTestResult(null)
     try {
-      const result = await unwrap(window.api.connections.test(parsed))
+      // The id lets main fill in a saved secret the form was never given.
+      const result = await unwrap(window.api.connections.test(parsed, initial?.id))
       setTestResult(result)
     } catch (err) {
       setTestResult({ success: false, error: err instanceof Error ? err.message : String(err) })
@@ -200,366 +229,307 @@ export function ConnectionFormSheet({
   }
 
   return (
-    <Sheet
-      openSheet={isOpen}
-      setOpenSheet={(open) => {
-        if (!open) onClose()
-      }}
-      side="right"
-      sheetContentClassName="sm:max-w-md"
-      content={
-        <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
-          <div className="flex shrink-0 flex-col gap-0.5 border-b border-border px-4 py-3 pr-12">
-            <h2 className="text-xs font-semibold text-text">
-              {initial ? 'Edit connection' : 'New connection'}
-            </h2>
-            <p className="text-xs text-text-subtle">
-              Connect to a {ENGINE_LABEL[values.engine]} database.
-            </p>
-          </div>
+    <>
+      <Sheet
+        title={initial ? 'Edit connection' : 'New connection'}
+        openSheet={isOpen}
+        setOpenSheet={(open) => {
+          if (!open) requestClose()
+        }}
+        side="right"
+        sheetContentClassName="sm:max-w-md"
+        content={
+          <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
+            <div className="flex h-12 shrink-0 items-center border-b border-border px-4 pr-12">
+              <h2 className="truncate text-sm font-semibold text-text">
+                {initial ? 'Edit connection' : 'New connection'}
+              </h2>
+            </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-4">
-            <FormField label="Engine">
-              <div className="grid grid-cols-3 gap-2">
-                {ENGINES.map((engine) => {
-                  const style = ENGINE_STYLES[engine]
-                  const Icon = ENGINE_ICON[engine]
-                  const isSelected = values.engine === engine
-                  return (
-                    <button
-                      key={engine}
-                      type="button"
-                      onClick={() => changeEngine(engine)}
-                      aria-pressed={isSelected}
-                      className={cn(
-                        'group relative flex cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border bg-surface px-2 py-3 text-center transition-all',
-                        isSelected
-                          ? 'border-border-strong bg-surface-elevated/60'
-                          : 'border-border hover:border-border-strong hover:bg-surface-elevated/50'
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          'flex h-8 w-8 items-center justify-center rounded-lg ring-1 ring-inset ring-white/5 transition-transform group-hover:scale-105',
-                          style.bg,
-                          style.iconClass
-                        )}
-                        aria-hidden
-                      >
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <p
-                        className={cn(
-                          'truncate text-xs font-semibold transition-colors',
-                          isSelected ? 'text-text' : 'text-text-muted group-hover:text-text'
-                        )}
-                      >
-                        {ENGINE_LABEL[engine]}
-                      </p>
-                      <span
-                        aria-hidden
-                        className={cn(
-                          'absolute right-1.5 top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-accent text-accent-fg transition-all',
-                          isSelected ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
-                        )}
-                      >
-                        <svg
-                          viewBox="0 0 12 12"
-                          className="h-2.5 w-2.5"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M2.5 6.5L5 9l4.5-5" />
-                        </svg>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </FormField>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4">
+              <p className="-mb-1 text-xs text-text-muted">
+                Connect to a {ENGINE_LABEL[values.engine]} database.
+              </p>
 
-            {values.engine !== 'd1' && (
-              <FormField
-                label="Connection URL"
-                htmlFor="conn-url"
-                hint={`Paste a ${values.engine === 'mysql' ? 'mysql://' : 'postgres://'} URL to autofill the fields below.`}
-                error={
-                  urlIsInvalid
-                    ? `Not a valid ${values.engine === 'mysql' ? 'mysql://' : 'postgres://'} URL`
-                    : undefined
-                }
-              >
-                <div className="relative">
-                  <IconLink
-                    size={13}
-                    className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
-                  />
-                  <Input
-                    id="conn-url"
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    onPaste={(e) => {
-                      const text = e.clipboardData.getData('text')
-                      if (text && parseConnectionUrl(text)) {
-                        e.preventDefault()
-                        applyConnectionUrl(text)
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        applyConnectionUrl(urlInput)
-                      }
-                    }}
-                    placeholder={
-                      values.engine === 'mysql'
-                        ? 'mysql://user:password@host:3306/db'
-                        : 'postgres://user:password@host:5432/db'
-                    }
-                    className="pl-8 font-mono"
-                  />
-                </div>
+              <FormField label="Engine">
+                <ConnectionEnginePicker value={values.engine} onChange={changeEngine} />
               </FormField>
-            )}
 
-            <FormField label="Display name" htmlFor="conn-name" error={errors.name}>
-              <Input
-                id="conn-name"
-                value={values.name}
-                onChange={(e) => update('name', e.target.value)}
-                placeholder={`My local ${ENGINE_LABEL[values.engine]}`}
-                autoFocus
-              />
-            </FormField>
-
-            <FormField label="Environment" error={errors.environment}>
-              <SlidingTabs
-                tabs={ENVIRONMENTS.map((env) => {
-                  const active = ENVIRONMENT_ACTIVE[env]
-                  return {
-                    id: env,
-                    label: ENVIRONMENT_LABEL[env],
-                    leading: (isActive) => (
-                      <span
-                        aria-hidden
-                        className={cn(
-                          'h-1.5 w-1.5 rounded-full',
-                          isActive ? active.dot : 'bg-text-subtle/60'
-                        )}
-                      />
-                    ),
-                    activeClassName: active.text,
-                    indicatorClassName: active.bg
-                  }
-                })}
-                value={values.environment}
-                onChange={(env) => update('environment', env)}
-              />
-            </FormField>
-
-            <ConnectionAppearanceFields
-              folder={values.folder}
-              color={values.color}
-              folders={folders}
-              error={errors.folder}
-              onChangeFolder={(folder) => update('folder', folder)}
-              onChangeColor={(color) => update('color', color)}
-            />
-
-            {values.engine === 'd1' ? (
-              <>
+              {values.engine !== 'd1' && (
                 <FormField
-                  label="Account ID"
-                  htmlFor="conn-account"
-                  error={errors.accountId}
-                  hint="Found in the Cloudflare dashboard sidebar."
-                >
-                  <Input
-                    id="conn-account"
-                    value={values.accountId}
-                    onChange={(e) => update('accountId', e.target.value)}
-                    placeholder="abcdef0123456789abcdef0123456789"
-                    className="font-mono"
-                  />
-                </FormField>
-                <FormField
-                  label="Database ID"
-                  htmlFor="conn-db-id"
-                  error={errors.databaseId}
-                  hint="The UUID of the D1 database, not its name."
-                >
-                  <Input
-                    id="conn-db-id"
-                    value={values.databaseId}
-                    onChange={(e) => update('databaseId', e.target.value)}
-                    placeholder="11111111-2222-3333-4444-555555555555"
-                    className="font-mono"
-                  />
-                </FormField>
-                <FormField
-                  label="API token"
-                  htmlFor="conn-token"
-                  error={errors.apiToken}
-                  hint="Create an API token with the D1 Edit permission."
-                >
-                  <Input
-                    id="conn-token"
-                    type="password"
-                    value={values.apiToken}
-                    onChange={(e) => update('apiToken', e.target.value)}
-                    placeholder="••••••••"
-                    className="font-mono"
-                  />
-                </FormField>
-              </>
-            ) : (
-              <>
-                <div className="grid grid-cols-[1fr_120px] gap-3">
-                  <FormField label="Host" htmlFor="conn-host" error={errors.host}>
-                    <Input
-                      id="conn-host"
-                      value={values.host}
-                      onChange={(e) => update('host', e.target.value)}
-                      placeholder="localhost"
-                    />
-                  </FormField>
-                  <FormField label="Port" htmlFor="conn-port" error={errors.port}>
-                    <Input
-                      id="conn-port"
-                      type="number"
-                      value={values.port}
-                      onChange={(e) => update('port', Number(e.target.value))}
-                      min={1}
-                      max={65535}
-                    />
-                  </FormField>
-                </div>
-
-                <FormField
-                  label="Database"
-                  htmlFor="conn-db"
-                  error={errors.database}
-                  hint={
-                    values.engine === 'mysql'
-                      ? 'Optional - leave empty to browse all databases.'
+                  label="Connection URL"
+                  htmlFor="conn-url"
+                  hint={`Paste a ${values.engine === 'mysql' ? 'mysql://' : 'postgres://'} URL to autofill the fields below.`}
+                  error={
+                    urlIsInvalid
+                      ? `Not a valid ${values.engine === 'mysql' ? 'mysql://' : 'postgres://'} URL`
                       : undefined
                   }
                 >
-                  <Input
-                    id="conn-db"
-                    value={values.database}
-                    onChange={(e) => update('database', e.target.value)}
-                    placeholder={values.engine === 'mysql' ? '(optional)' : 'postgres'}
-                  />
+                  <div className="relative">
+                    <IconLink
+                      size={14}
+                      className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-subtle"
+                    />
+                    <Input
+                      id="conn-url"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      onPaste={(e) => {
+                        const text = e.clipboardData.getData('text')
+                        if (text && parseConnectionUrl(text)) {
+                          e.preventDefault()
+                          applyConnectionUrl(text)
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          applyConnectionUrl(urlInput)
+                        }
+                      }}
+                      placeholder={
+                        values.engine === 'mysql'
+                          ? 'mysql://user:password@host:3306/db'
+                          : 'postgres://user:password@host:5432/db'
+                      }
+                      className="pl-8 font-mono"
+                    />
+                  </div>
                 </FormField>
+              )}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField label="User" htmlFor="conn-user" error={errors.user}>
+              <FormField label="Display name" htmlFor="conn-name" error={errors.name}>
+                <Input
+                  id="conn-name"
+                  value={values.name}
+                  onChange={(e) => update('name', e.target.value)}
+                  placeholder={`My local ${ENGINE_LABEL[values.engine]}`}
+                  autoFocus
+                />
+              </FormField>
+
+              <FormField label="Environment" error={errors.environment}>
+                <SlidingTabs
+                  tabs={ENVIRONMENTS.map((env) => {
+                    const active = ENVIRONMENT_ACTIVE[env]
+                    return {
+                      id: env,
+                      label: ENVIRONMENT_LABEL[env],
+                      leading: (isActive) => (
+                        <span
+                          aria-hidden
+                          className={cn(
+                            'size-1.5 rounded-full',
+                            isActive ? active.dot : 'bg-text-subtle/60'
+                          )}
+                        />
+                      ),
+                      activeClassName: active.text
+                    }
+                  })}
+                  value={values.environment}
+                  onChange={(env) => update('environment', env)}
+                />
+              </FormField>
+
+              <ConnectionAppearanceFields
+                folder={values.folder}
+                color={values.color}
+                folders={folders}
+                error={errors.folder}
+                onChangeFolder={(folder) => update('folder', folder)}
+                onChangeColor={(color) => update('color', color)}
+              />
+
+              {values.engine === 'd1' ? (
+                <>
+                  <FormField
+                    label="Account ID"
+                    htmlFor="conn-account"
+                    error={errors.accountId}
+                    hint="Found in the Cloudflare dashboard sidebar."
+                  >
                     <Input
-                      id="conn-user"
-                      value={values.user}
-                      onChange={(e) => update('user', e.target.value)}
-                      placeholder={DEFAULT_USERS[values.engine]}
+                      id="conn-account"
+                      value={values.accountId}
+                      onChange={(e) => update('accountId', e.target.value)}
+                      placeholder="abcdef0123456789abcdef0123456789"
+                      className="font-mono"
                     />
                   </FormField>
-                  <FormField label="Password" htmlFor="conn-password" error={errors.password}>
+                  <FormField
+                    label="Database ID"
+                    htmlFor="conn-db-id"
+                    error={errors.databaseId}
+                    hint="The UUID of the D1 database, not its name."
+                  >
                     <Input
-                      id="conn-password"
+                      id="conn-db-id"
+                      value={values.databaseId}
+                      onChange={(e) => update('databaseId', e.target.value)}
+                      placeholder="11111111-2222-3333-4444-555555555555"
+                      className="font-mono"
+                    />
+                  </FormField>
+                  <FormField
+                    label="API token"
+                    htmlFor="conn-token"
+                    error={errors.apiToken}
+                    hint={
+                      hasSavedApiToken
+                        ? 'Leave blank to keep the saved token.'
+                        : hasDroppedSecret
+                          ? 'The database changed, so enter the token again.'
+                          : 'Create an API token with the D1 Edit permission.'
+                    }
+                  >
+                    <Input
+                      id="conn-token"
                       type="password"
-                      value={values.password}
-                      onChange={(e) => update('password', e.target.value)}
-                      placeholder="••••••••"
+                      value={values.apiToken}
+                      onChange={(e) => update('apiToken', e.target.value)}
+                      placeholder={hasSavedApiToken ? SAVED_SECRET_PLACEHOLDER : '••••••••'}
+                      autoComplete="off"
+                      className="font-mono"
                     />
                   </FormField>
-                </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-[1fr_120px] gap-3">
+                    <FormField label="Host" htmlFor="conn-host" error={errors.host}>
+                      <Input
+                        id="conn-host"
+                        value={values.host}
+                        onChange={(e) => update('host', e.target.value)}
+                        placeholder="localhost"
+                      />
+                    </FormField>
+                    <FormField label="Port" htmlFor="conn-port" error={errors.port}>
+                      <Input
+                        id="conn-port"
+                        type="number"
+                        value={values.port}
+                        onChange={(e) => update('port', Number(e.target.value))}
+                        min={1}
+                        max={65535}
+                      />
+                    </FormField>
+                  </div>
 
-                <label className="flex items-center justify-between gap-3 pt-1 text-xs text-text-muted">
-                  <span>Use SSL (insecure mode, ignores cert verification)</span>
-                  <Switch
-                    checked={values.ssl}
-                    onCheckedChange={(checked) => update('ssl', checked)}
-                  />
-                </label>
-              </>
-            )}
-
-            {testResult && (
-              <div
-                className={cn(
-                  'rounded-md border px-2.5 py-2',
-                  testResult.success
-                    ? 'border-success/20 bg-success/4'
-                    : 'border-danger/20 bg-danger/4'
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <Chip tone={testResult.success ? 'emerald' : 'rose'}>
-                    <span
-                      aria-hidden
-                      className={cn(
-                        'h-1.5 w-1.5 rounded-full',
-                        testResult.success
-                          ? 'bg-success shadow-[0_0_4px_0_rgba(110,231,183,0.6)]'
-                          : 'bg-danger shadow-[0_0_4px_0_rgba(253,164,175,0.6)]'
-                      )}
+                  <FormField
+                    label="Database"
+                    htmlFor="conn-db"
+                    error={errors.database}
+                    hint={
+                      values.engine === 'mysql'
+                        ? 'Optional - leave empty to browse all databases.'
+                        : undefined
+                    }
+                  >
+                    <Input
+                      id="conn-db"
+                      value={values.database}
+                      onChange={(e) => update('database', e.target.value)}
+                      placeholder={values.engine === 'mysql' ? '(optional)' : 'postgres'}
                     />
-                    {testResult.success ? 'Connected' : 'Failed'}
-                  </Chip>
-                  {testResult.serverVersion && (
-                    <span className="truncate rounded-sm bg-surface-elevated/60 px-1.5 py-0.5 font-mono text-xs text-text-muted ring-1 ring-inset ring-white/5">
-                      {shortServerVersion(testResult.serverVersion)}
-                    </span>
-                  )}
-                </div>
-                {!testResult.success && testResult.error && (
-                  <p className="mt-2 break-all font-mono text-xs text-danger">{testResult.error}</p>
-                )}
-              </div>
-            )}
+                  </FormField>
 
-            {formError && (
-              <p className="rounded-md border border-danger/20 bg-danger/5 p-2 font-mono text-xs text-danger">
-                {formError}
-              </p>
-            )}
-          </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField label="User" htmlFor="conn-user" error={errors.user}>
+                      <Input
+                        id="conn-user"
+                        value={values.user}
+                        onChange={(e) => update('user', e.target.value)}
+                        placeholder={DEFAULT_USERS[values.engine]}
+                      />
+                    </FormField>
+                    <FormField
+                      label="Password"
+                      htmlFor="conn-password"
+                      error={errors.password}
+                      hint={
+                        hasSavedPassword
+                          ? 'Leave blank to keep the saved one.'
+                          : hasDroppedSecret
+                            ? 'The server changed, so enter the password again.'
+                            : undefined
+                      }
+                    >
+                      <Input
+                        id="conn-password"
+                        type="password"
+                        value={values.password}
+                        onChange={(e) => update('password', e.target.value)}
+                        placeholder={hasSavedPassword ? SAVED_SECRET_PLACEHOLDER : '••••••••'}
+                        autoComplete="off"
+                      />
+                    </FormField>
+                  </div>
 
-          <div className="flex shrink-0 items-center gap-2 border-t border-border bg-surface-elevated/20 px-4 py-3">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="text-text-muted hover:bg-surface-elevated hover:text-text"
-              onClick={handleTest}
-              disabled={isTesting || isSubmitting}
-            >
-              {isTesting ? 'Testing…' : 'Test'}
-            </Button>
-            <div className="flex-1" />
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="text-text-muted hover:bg-surface-elevated hover:text-text"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <SubmitButton
-              size="sm"
-              onClick={handleSubmit}
-              isSubmitting={isSubmitting}
-              loadingText={initial ? 'Updating…' : 'Saving…'}
-            >
-              {initial ? 'Save changes' : 'Save connection'}
-            </SubmitButton>
-          </div>
-        </form>
-      }
-    />
+                  <ConnectionSslFields
+                    ssl={values.ssl}
+                    sslVerify={values.sslVerify ?? false}
+                    onChangeSsl={(ssl) => update('ssl', ssl)}
+                    onChangeSslVerify={(sslVerify) => update('sslVerify', sslVerify)}
+                  />
+                </>
+              )}
+
+              {testResult && <ConnectionTestResult result={testResult} />}
+
+              {formError && (
+                <p className="rounded-lg border border-danger/20 bg-danger/5 px-3 py-2 font-mono text-xs text-danger">
+                  {formError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 border-t border-border bg-surface px-4 py-3">
+              <Button
+                type="button"
+                variant="subtle"
+                onClick={handleTest}
+                disabled={isTesting || isSubmitting}
+              >
+                <IconPlugConnected size={14} />
+                {isTesting ? 'Testing…' : 'Test'}
+              </Button>
+              <div className="flex-1" />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={requestClose}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <SubmitButton
+                size="sm"
+                onClick={handleSubmit}
+                isSubmitting={isSubmitting}
+                loadingText={initial ? 'Updating…' : 'Saving…'}
+              >
+                {initial ? 'Save changes' : 'Save connection'}
+              </SubmitButton>
+            </div>
+          </form>
+        }
+      />
+      <ConfirmDialog
+        isOpen={isDiscardOpen}
+        onClose={() => setIsDiscardOpen(false)}
+        onConfirm={() => {
+          setIsDiscardOpen(false)
+          onClose()
+        }}
+        title="Discard unsaved changes?"
+        description="Your edits to this connection have not been saved."
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        variant="danger"
+      />
+    </>
   )
 }

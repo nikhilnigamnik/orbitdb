@@ -111,3 +111,45 @@ describe('the colour tag', () => {
     expect(container.querySelector('[class*="bg-tag-"]')).toBeNull()
   })
 })
+
+describe('the health dot', () => {
+  function renderHealth(health: 'ok' | 'fail', healthError?: string) {
+    const onRefreshHealth = vi.fn()
+    render(
+      <ConnectionCard
+        connection={connection}
+        isActive={false}
+        isConnecting={false}
+        health={health}
+        healthError={healthError}
+        onConnect={vi.fn()}
+        onDisconnect={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onRefreshHealth={onRefreshHealth}
+      />
+    )
+    return { onRefreshHealth }
+  }
+
+  it('is a 24px target around a 10px dot', () => {
+    renderHealth('ok')
+    const button = screen.getByRole('button', { name: 'Reachable' })
+    expect(button.className).toContain('size-6')
+    expect(button.querySelector('span')!.className).toContain('size-2.5')
+  })
+
+  it('names the error, which used to live only in a hover tooltip', () => {
+    const { onRefreshHealth } = renderHealth('fail', 'connect ECONNREFUSED')
+    const button = screen.getByRole('button', { name: /Unreachable: connect ECONNREFUSED/ })
+    fireEvent.click(button)
+    expect(onRefreshHealth).toHaveBeenCalled()
+  })
+})
+
+describe('the SSL lock', () => {
+  it('is announced as an image with a name', () => {
+    setup({ overrides: { ssl: true } })
+    expect(screen.getByRole('img', { name: 'SSL enabled' })).toBeTruthy()
+  })
+})

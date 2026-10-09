@@ -12,6 +12,7 @@ import { unwrap } from '@renderer/lib/ipc'
 import { errorMessage } from '@renderer/lib/errors'
 import { UNDO_PROMPT_MS } from '@renderer/config/site'
 import type { RowsResult, TableDetails } from '@renderer/types'
+import { isDialogInTheWay } from '../lib/dialog-guard'
 
 interface CellUndoOptions {
   connectionId: string
@@ -99,6 +100,7 @@ export function useCellUndo({ connectionId, details, setRows, prefetchCacheRef }
       const target = e.target as HTMLElement | null
       // Inside a field, cmd-Z is the browser's own text undo.
       if (target?.closest('input, textarea, [contenteditable="true"]')) return
+      if (isDialogInTheWay(e.target)) return
       e.preventDefault()
       void undoLastEdit()
     }

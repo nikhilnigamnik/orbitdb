@@ -18,6 +18,9 @@ export function useAsync<T>(
   const fnRef = useRef(fn)
   fnRef.current = fn
   const mountedRef = useRef(true)
+  // Only the latest request may write state: when the deps change mid-flight,
+  // a slow reply for the old key must not overwrite the new one.
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     mountedRef.current = true
@@ -27,13 +30,15 @@ export function useAsync<T>(
   }, [])
 
   const refresh = useCallback(async () => {
+    const requestId = ++requestIdRef.current
+    const isCurrent = () => mountedRef.current && requestId === requestIdRef.current
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
     try {
       const data = await fnRef.current()
-      if (!mountedRef.current) return
+      if (!isCurrent()) return
       setState({ data, error: null, isLoading: false })
     } catch (err) {
-      if (!mountedRef.current) return
+      if (!isCurrent()) return
       const message = err instanceof Error ? err.message : String(err)
       setState({ data: null, error: message, isLoading: false })
     }

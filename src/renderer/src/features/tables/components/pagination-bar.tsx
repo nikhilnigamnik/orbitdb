@@ -50,17 +50,17 @@ export function PaginationBar({
   const isExact = totalExact != null
 
   return (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-surface/40 px-5 py-2">
-      <div className="flex items-center gap-1.5 text-xs">
-        <span className="inline-flex items-center gap-1 rounded-md bg-surface-elevated/40 px-1.5 py-0.5 font-mono text-text ring-1 ring-white/5">
+    <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-t border-border bg-surface px-4 text-xs text-text-muted">
+      <div className="flex items-center gap-1">
+        <span className="inline-flex items-center gap-0.5 font-medium text-text tabular-nums">
           {formatNumber(start)}
           <span className="text-text-subtle">-</span>
           {formatNumber(end)}
         </span>
         {shownTotal != null && (
-          <span className="text-text-subtle">
+          <span>
             of{' '}
-            <span className="font-mono text-text-muted">
+            <span className="font-medium text-text tabular-nums">
               {isExact ? '' : '~'}
               {formatNumber(shownTotal)}
             </span>{' '}
@@ -70,7 +70,7 @@ export function PaginationBar({
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 text-xs text-text-subtle">
+        <div className="flex items-center gap-2">
           <span>Rows per page</span>
           <Popover
             openPopover={isPageSizeOpen}
@@ -92,14 +92,12 @@ export function PaginationBar({
                         setIsPageSizeOpen(false)
                       }}
                       className={cn(
-                        'flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs transition-colors',
-                        isSelected
-                          ? 'bg-surface-elevated text-text'
-                          : 'text-text-muted hover:bg-surface-elevated/60 hover:text-text'
+                        'flex h-8 cursor-pointer items-center justify-between gap-2 rounded-md px-2 text-xs text-text tabular-nums transition-colors hover:bg-surface-elevated',
+                        isSelected && 'font-medium'
                       )}
                     >
-                      <span className="font-mono">{size}</span>
-                      {isSelected && <IconCheck size={12} className="text-accent-text" />}
+                      <span>{size}</span>
+                      {isSelected && <IconCheck size={14} className="text-accent-text" />}
                     </button>
                   )
                 })}
@@ -109,32 +107,32 @@ export function PaginationBar({
             <button
               type="button"
               aria-label="Rows per page"
-              className="flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-surface-elevated/30 px-2 text-xs text-text transition-colors hover:bg-surface-elevated hover:text-text"
+              className="flex h-7 cursor-pointer items-center gap-1 rounded-lg bg-surface pr-1.5 pl-2 text-xs font-medium text-text shadow-control transition-colors hover:bg-surface-elevated aria-expanded:bg-surface-elevated"
             >
-              <span className="font-mono">{pageSize}</span>
-              <IconSelector size={12} className="text-text-subtle" />
+              <span className="tabular-nums">{pageSize}</span>
+              <IconSelector size={14} className="text-text-subtle" />
             </button>
           </Popover>
         </div>
 
-        <div className="flex items-center gap-0.5 rounded-md border border-border bg-surface-elevated/30 p-0.5">
+        <div className="flex items-center gap-0.5">
           <PagerButton label="First page" disabled={!hasPrev} onClick={() => onChangePage(0)}>
-            <IconChevronsLeft size={13} />
+            <IconChevronsLeft size={14} />
           </PagerButton>
           <PagerButton
             label="Previous page"
             disabled={!hasPrev}
             onClick={() => onChangePage(Math.max(0, offset - pageSize))}
           >
-            <IconChevronLeft size={13} />
+            <IconChevronLeft size={14} />
           </PagerButton>
 
-          <div className="flex select-none items-center gap-1 px-2 text-xs tabular-nums text-text-subtle">
-            <span className="font-mono text-text">{currentPage}</span>
+          <div className="flex select-none items-center gap-1 px-1.5 tabular-nums">
+            <span className="font-medium text-text">{currentPage}</span>
             {totalPages != null && (
               <>
-                <span className="text-text-subtle/60">/</span>
-                <span className="font-mono text-text-muted">{formatNumber(totalPages)}</span>
+                <span className="text-text-subtle">of</span>
+                <span className="font-medium text-text">{formatNumber(totalPages)}</span>
               </>
             )}
           </div>
@@ -144,7 +142,7 @@ export function PaginationBar({
             disabled={!hasNext}
             onClick={() => onChangePage(offset + pageSize)}
           >
-            <IconChevronRight size={13} />
+            <IconChevronRight size={14} />
           </PagerButton>
           {lastOffset != null && (
             <PagerButton
@@ -152,7 +150,7 @@ export function PaginationBar({
               disabled={!hasNext}
               onClick={() => onChangePage(lastOffset)}
             >
-              <IconChevronsRight size={13} />
+              <IconChevronsRight size={14} />
             </PagerButton>
           )}
         </div>
@@ -181,9 +179,9 @@ function PagerButton({
           disabled={disabled}
           aria-label={label}
           className={cn(
-            'flex h-6 w-6 cursor-pointer items-center justify-center rounded transition-colors',
+            'flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors',
             disabled
-              ? 'cursor-not-allowed text-text-subtle/40'
+              ? 'cursor-not-allowed text-text-subtle/50'
               : 'text-text-muted hover:bg-surface-elevated hover:text-text'
           )}
         >

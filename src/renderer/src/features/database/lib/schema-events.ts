@@ -18,3 +18,23 @@ export function onSchemaTablesChanged(listener: SchemaTablesListener): () => voi
     listeners.delete(listener)
   }
 }
+
+/**
+ * The sidebar's search button opens the find-a-value dialog, which the database
+ * page owns. Same reasoning as above: one listener, no callback threaded from
+ * the shell down through the router.
+ */
+type ValueSearchListener = () => void
+
+const valueSearchListeners = new Set<ValueSearchListener>()
+
+export function requestValueSearch(): void {
+  for (const listener of valueSearchListeners) listener()
+}
+
+export function onValueSearchRequested(listener: ValueSearchListener): () => void {
+  valueSearchListeners.add(listener)
+  return () => {
+    valueSearchListeners.delete(listener)
+  }
+}

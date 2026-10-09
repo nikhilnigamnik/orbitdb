@@ -16,7 +16,7 @@ function providerView(overrides: Partial<AiProviderView> & Pick<AiProviderView, 
     hasKey: false,
     keyHint: null,
     isKeyUnreadable: false,
-    model: 'claude-sonnet-5',
+    model: 'claude-sonnet-5-5',
     ...overrides
   } as AiProviderView
 }
@@ -28,9 +28,9 @@ function view(
 ): AiSettingsView {
   const base = [
     providerView({ id: 'anthropic' }),
-    providerView({ id: 'openai', model: 'gpt-5.2' }),
-    providerView({ id: 'google', model: 'gemini-3.6-flash' }),
-    providerView({ id: 'cloudflare', model: 'anthropic/claude-sonnet-5' })
+    providerView({ id: 'openai', model: 'gpt-6-luna' }),
+    providerView({ id: 'google', model: 'gemini-3.8-flash' }),
+    providerView({ id: 'cloudflare', model: 'anthropic/claude-sonnet-5-5' })
   ]
   return {
     active: 'anthropic',
@@ -52,7 +52,7 @@ function setup(initial: AiSettingsView = DEFAULT, overrides: Record<string, unkn
     setAiProvider: vi.fn(() => ok('openai')),
     setAiKey: vi.fn(() => ok(undefined)),
     clearAiKey: vi.fn(() => ok(undefined)),
-    setAiModel: vi.fn(() => ok('claude-opus-5')),
+    setAiModel: vi.fn(() => ok('claude-opus-5-5')),
     testAi: vi.fn(() => ok(undefined)),
     setGateway: vi.fn(() => ok(undefined)),
     clearGatewayToken: vi.fn(() => ok(undefined)),
@@ -103,8 +103,8 @@ describe('the layout', () => {
 
     // Scoped to the open list: every closed trigger also renders its own name.
     const list = await screen.findByRole('listbox')
-    expect(within(list).getByText('Gemini 2.5 Flash')).toBeTruthy()
-    expect(within(list).queryByText('Sonnet 5'), 'an Anthropic model must not appear').toBeNull()
+    expect(within(list).getByText('Gemini 3.5 Flash-Lite')).toBeTruthy()
+    expect(within(list).queryByText('Sonnet 5.5'), 'an Anthropic model must not appear').toBeNull()
   })
 })
 
@@ -165,7 +165,9 @@ describe('a key', () => {
   })
 
   it('is removed from the card it belongs to', async () => {
-    const { api } = setup(view({ id: 'openai', model: 'gpt-5.2', hasKey: true, keyHint: '…9999' }))
+    const { api } = setup(
+      view({ id: 'openai', model: 'gpt-6-luna', hasKey: true, keyHint: '…9999' })
+    )
 
     await openCard('OpenAI')
 
@@ -178,7 +180,9 @@ describe('a key', () => {
 describe('testing a key', () => {
   it('tests the provider whose button was pressed, not the active one', async () => {
     // Each card has its own button, so a key can be checked before switching.
-    const { api } = setup(view({ id: 'openai', model: 'gpt-5.2', hasKey: true, keyHint: '…9999' }))
+    const { api } = setup(
+      view({ id: 'openai', model: 'gpt-6-luna', hasKey: true, keyHint: '…9999' })
+    )
 
     fireEvent.click(within(await openCard('OpenAI')).getByText('Test key'))
 
@@ -210,7 +214,7 @@ describe('testing a key', () => {
 
 describe('a key sealed under another keychain', () => {
   it('says so on the card it belongs to, and only there', async () => {
-    setup(view({ id: 'openai', model: 'gpt-5.2', hasKey: true, isKeyUnreadable: true }))
+    setup(view({ id: 'openai', model: 'gpt-6-luna', hasKey: true, isKeyUnreadable: true }))
 
     expect(
       within(await card('OpenAI')).getByText(/can.t be decrypted on this machine/i),
@@ -249,7 +253,7 @@ describe('folding', () => {
 
   it('opens a card whose stored key needs re-entering', async () => {
     // Folded, the warning would be invisible and the key would stay broken.
-    setup(view({ id: 'google', model: 'gemini-3.6-flash', hasKey: true, isKeyUnreadable: true }))
+    setup(view({ id: 'google', model: 'gemini-3.8-flash', hasKey: true, isKeyUnreadable: true }))
 
     expect(within(await card('Google')).getByText(/can.t be decrypted/i)).toBeTruthy()
   })
@@ -271,7 +275,7 @@ describe('the Cloudflare provider card', () => {
 
   function withGateway(gateway: Partial<AiGatewayIds> = {}) {
     return {
-      ...view({ id: 'cloudflare', model: 'anthropic/claude-sonnet-5' }),
+      ...view({ id: 'cloudflare', model: 'anthropic/claude-sonnet-5-5' }),
       gateway: { accountId: '', gatewayId: '', ...gateway }
     }
   }
@@ -338,7 +342,7 @@ describe('the Cloudflare provider card', () => {
     fireEvent.click(within(await card(CLOUDFLARE)).getByLabelText(`${CLOUDFLARE} model`))
 
     const list = await screen.findByRole('listbox')
-    expect(within(list).getByText('Gemini 3.6 Flash')).toBeTruthy()
+    expect(within(list).getByText('Gemini 3.8 Flash')).toBeTruthy()
     expect(within(list).getByText('Google - balanced')).toBeTruthy()
   })
 })
@@ -350,5 +354,21 @@ describe('the other providers', () => {
 
     expect(within(anthropic).getByText('API key')).toBeTruthy()
     expect(within(anthropic).queryByText('Account ID')).toBeNull()
+  })
+})
+
+describe('a read that fails', () => {
+  it('says so and offers a retry, rather than rendering an empty section', async () => {
+    const getAi = vi
+      .fn()
+      .mockResolvedValueOnce({ success: false, error: 'settings.json is unreadable' })
+      .mockImplementation(() => ok(DEFAULT))
+    setup(DEFAULT, { getAi })
+
+    expect(await screen.findByText('Could not read AI settings')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(screen.queryByText('Could not read AI settings')).toBeNull())
+    expect(getAi).toHaveBeenCalledTimes(2)
   })
 })

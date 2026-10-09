@@ -1,5 +1,3 @@
-'use client'
-
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { cn } from '@renderer/lib/utils'
 import { PropsWithChildren, ReactNode, WheelEventHandler } from 'react'
@@ -43,7 +41,7 @@ export function Popover({
           align={align}
           side={side}
           className={cn(
-            'animate-slide-up-fade z-50 items-center overflow-hidden rounded-lg border border-border-strong bg-surface shadow-2xl shadow-black/70',
+            'animate-slide-up-fade z-50 items-center overflow-hidden rounded-xl bg-surface text-text shadow-pop',
             popoverContentClassName
           )}
           sticky={sticky}

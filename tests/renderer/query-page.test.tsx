@@ -315,14 +315,63 @@ describe('the query library', () => {
     expect(button.disabled).toBe(true)
   })
 
-  it('clears the history for this connection alone', async () => {
+  it('clears the history for this connection alone, once confirmed', async () => {
     listQueries.mockResolvedValue({ success: true, data: [savedQuery()] })
     await setup()
     await openLibrary()
 
     fireEvent.click(await screen.findByLabelText('Clear history'))
+    expect(await screen.findByText('Clear query history?')).toBeTruthy()
+    expect(clearHistory, 'nothing is cleared before the confirm').not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /^clear history$/i }))
 
     await waitFor(() => expect(clearHistory).toHaveBeenCalledWith('c1'))
+  })
+
+  it('asks before deleting a saved query', async () => {
+    listQueries.mockResolvedValue({
+      success: true,
+      data: [savedQuery({ id: 'a', isStarred: true, name: 'Daily count' })]
+    })
+    await setup()
+    await openLibrary()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete query' }))
+    expect(await screen.findByText('Delete this saved query?')).toBeTruthy()
+    expect(deleteQuery).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    await waitFor(() => expect(deleteQuery).toHaveBeenCalledWith('a'))
+  })
+
+  it('deletes a history entry at once, since a re-run recreates it', async () => {
+    listQueries.mockResolvedValue({ success: true, data: [savedQuery({ id: 'b' })] })
+    await setup()
+    await openLibrary()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete query' }))
+    await waitFor(() => expect(deleteQuery).toHaveBeenCalledWith('b'))
+  })
+
+  it('keeps the name field out of the button that loads the query', async () => {
+    listQueries.mockResolvedValue({
+      success: true,
+      data: [savedQuery({ id: 'a', sql: 'select kept', isStarred: true })]
+    })
+    await setup()
+    await openLibrary()
+
+    const nameField = await screen.findByLabelText('Query name')
+    expect(nameField.closest('button')).toBeNull()
+    fireEvent.click(nameField)
+    expect(editorText()).not.toBe('select kept')
+  })
+
+  it('says so when the saved queries cannot be read', async () => {
+    listQueries.mockResolvedValue({ success: false, error: 'queries.json is unreadable' })
+    await setup()
+    expect(await screen.findByText('Could not load saved queries')).toBeTruthy()
   })
 })
 

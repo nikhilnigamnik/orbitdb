@@ -1,9 +1,12 @@
 import * as React from 'react'
-import { IconClock, IconStar, IconStarFilled, IconTrash, IconX } from '@tabler/icons-react'
+import { IconClock, IconStar, IconStarFilled, IconTrash } from '@tabler/icons-react'
 import { formatDistanceToNow } from 'date-fns'
+
 import { Button } from '@renderer/components/ui/button'
+import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { cn } from '@renderer/lib/utils'
 import type { SavedQuery } from '@renderer/types'
+
 import { collapseSql, groupQueries } from '../lib/query-library'
 
 interface QueryLibrarySheetProps {
@@ -24,40 +27,51 @@ export function QueryLibrarySheet({
   onClearHistory
 }: QueryLibrarySheetProps) {
   const { saved, recent } = React.useMemo(() => groupQueries(queries), [queries])
+  const [pendingDelete, setPendingDelete] = React.useState<SavedQuery | null>(null)
+  const [isConfirmingClear, setIsConfirmingClear] = React.useState(false)
+
+  // A history entry is disposable - the next run of the same SQL recreates it -
+  // so it goes at once. A saved query is the one thing the user chose to keep,
+  // and there is no way back from deleting it.
+  function requestDelete(query: SavedQuery) {
+    if (query.isStarred) {
+      setPendingDelete(query)
+      return
+    }
+    onDelete(query)
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2 pr-12">
-        <div className="flex items-center gap-1.5">
-          <IconClock size={12} className="text-text-subtle" />
-          <span className="text-xs font-semibold tracking-wide text-text-muted uppercase">
-            Queries
-          </span>
+      <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-4 pr-12">
+        <div className="flex items-center gap-2">
+          <IconClock size={16} className="text-text-subtle" />
+          <span className="text-sm font-semibold text-text">Queries</span>
           {queries.length > 0 && (
-            <span className="rounded bg-surface-elevated px-1 py-0 font-mono text-xs text-text-subtle">
-              {queries.length}
-            </span>
+            <span className="text-[12px] text-text-subtle tabular-nums">{queries.length}</span>
           )}
         </div>
         <Button
-          size="icon-xs"
-          variant="ghost"
-          className="text-text-subtle hover:bg-surface-elevated hover:text-danger"
-          onClick={onClearHistory}
+          size="icon-sm"
+          variant="subtle"
+          className="hover:text-danger"
+          onClick={() => setIsConfirmingClear(true)}
           disabled={recent.length === 0}
           title="Clear history - starred queries are kept"
           aria-label="Clear history"
         >
-          <IconTrash size={12} />
+          <IconTrash size={16} />
         </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
         {queries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-            <IconClock size={18} className="text-text-subtle/60" />
-            <p className="text-xs text-text-subtle">No queries yet</p>
-            <p className="max-w-[15rem] text-xs text-text-subtle/70">
+          <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+            <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-surface-elevated">
+              <IconClock size={20} className="text-text-subtle" />
+            </div>
+            <p className="text-sm font-medium text-text">No queries yet</p>
+            <p className="mt-1 max-w-[15rem] text-xs text-text-muted">
               Everything you run lands here. Star one to keep it.
             </p>
           </div>
@@ -72,7 +86,7 @@ export function QueryLibrarySheet({
                     onPick={onPick}
                     onToggleStar={onToggleStar}
                     onRename={onRename}
-                    onDelete={onDelete}
+                    onDelete={requestDelete}
                   />
                 ))}
               </Section>
@@ -86,7 +100,7 @@ export function QueryLibrarySheet({
                     onPick={onPick}
                     onToggleStar={onToggleStar}
                     onRename={onRename}
-                    onDelete={onDelete}
+                    onDelete={requestDelete}
                   />
                 ))}
               </Section>
@@ -94,6 +108,36 @@ export function QueryLibrarySheet({
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={pendingDelete != null}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const query = pendingDelete
+          setPendingDelete(null)
+          if (query) onDelete(query)
+        }}
+        title="Delete this saved query?"
+        description={
+          pendingDelete
+            ? `"${pendingDelete.name?.trim() || collapseSql(pendingDelete.sql)}" will be removed. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        variant="danger"
+      />
+      <ConfirmDialog
+        isOpen={isConfirmingClear}
+        onClose={() => setIsConfirmingClear(false)}
+        onConfirm={() => {
+          setIsConfirmingClear(false)
+          onClearHistory()
+        }}
+        title="Clear query history?"
+        description={`${recent.length} recent ${recent.length === 1 ? 'query' : 'queries'} for this connection will be removed. Saved queries are kept.`}
+        confirmLabel="Clear history"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -109,11 +153,9 @@ function Section({
 }) {
   return (
     <div>
-      <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b border-border bg-surface px-3 py-1.5">
-        <span className="text-[10px] font-semibold tracking-wide text-text-subtle uppercase">
-          {label}
-        </span>
-        <span className="font-mono text-[10px] text-text-subtle/70">{count}</span>
+      <div className="sticky top-0 z-10 flex h-8 items-center gap-1.5 border-b border-border bg-surface px-4">
+        <span className="text-[12px] font-medium text-text-subtle">{label}</span>
+        <span className="text-[12px] text-text-subtle/70 tabular-nums">{count}</span>
       </div>
       {children}
     </div>
@@ -143,14 +185,11 @@ function QueryRow({ query, onPick, onToggleStar, onRename, onDelete }: QueryRowP
   }
 
   return (
-    <div className="group/entry relative border-b border-border/60 transition-colors hover:bg-surface-elevated/50">
-      <button
-        type="button"
-        onClick={() => onPick(query.sql)}
-        className="block w-full cursor-pointer px-3 py-2 pr-16 text-left"
-        title={collapseSql(query.sql)}
-      >
-        {query.isStarred && (
+    <div className="group/entry relative border-b border-border transition-colors hover:bg-surface-elevated/60">
+      {/* A sibling of the preview button, not a child: an input inside a button
+          is invalid markup, and a click on it would load the query. */}
+      {query.isStarred && (
+        <div className="px-4 pt-2.5 pr-16">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -165,13 +204,21 @@ function QueryRow({ query, onPick, onToggleStar, onRename, onDelete }: QueryRowP
                 e.currentTarget.blur()
               }
             }}
-            // Inside the button, so a click has to be stopped from loading the query.
-            onClick={(e) => e.stopPropagation()}
             placeholder="Name this query"
             aria-label="Query name"
-            className="mb-1 w-full cursor-text rounded-sm bg-transparent text-xs font-medium text-text outline-none placeholder:font-normal placeholder:text-text-subtle/70 hover:bg-surface-elevated focus:bg-surface-elevated focus:ring-1 focus:ring-accent/40"
+            className="-ml-1 w-[calc(100%+0.25rem)] cursor-text rounded-md bg-transparent px-1 text-sm font-medium text-text outline-none placeholder:font-normal placeholder:text-text-subtle hover:bg-surface-elevated focus:bg-surface focus:shadow-control"
           />
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => onPick(query.sql)}
+        className={cn(
+          'block w-full cursor-pointer px-4 pb-2.5 pr-16 text-left',
+          query.isStarred ? 'pt-1' : 'pt-2.5'
         )}
+        title={collapseSql(query.sql)}
+      >
         <p
           className={cn(
             'line-clamp-2 font-mono text-xs leading-snug',
@@ -181,36 +228,35 @@ function QueryRow({ query, onPick, onToggleStar, onRename, onDelete }: QueryRowP
         >
           {query.sql}
         </p>
-        <div className="mt-1 flex items-center gap-2 text-xs text-text-subtle">
-          <span className="font-mono">{query.durationMs} ms</span>
+        <div className="mt-1 flex items-center gap-2 text-[12px] text-text-subtle">
+          <span className="tabular-nums">{query.durationMs} ms</span>
           <span className="text-text-subtle/60">·</span>
           <span>{formatDistanceToNow(new Date(query.ranAt), { addSuffix: true })}</span>
         </div>
       </button>
 
-      <div className="absolute top-1.5 right-2 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/entry:opacity-100">
+      <div className="absolute top-2 right-3 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/entry:opacity-100">
         <Button
           size="icon-xs"
-          variant="ghost"
+          variant="subtle"
           className={cn(
-            'hover:bg-surface-elevated',
-            query.isStarred ? 'text-warning' : 'text-text-subtle hover:text-text'
+            query.isStarred ? 'text-warning hover:text-warning' : 'text-text-subtle hover:text-text'
           )}
           onClick={() => onToggleStar(query)}
           title={query.isStarred ? 'Remove from saved' : 'Save this query'}
           aria-label={query.isStarred ? 'Remove from saved' : 'Save this query'}
         >
-          {query.isStarred ? <IconStarFilled size={12} /> : <IconStar size={12} />}
+          {query.isStarred ? <IconStarFilled size={14} /> : <IconStar size={14} />}
         </Button>
         <Button
           size="icon-xs"
-          variant="ghost"
-          className="text-text-subtle hover:bg-surface-elevated hover:text-danger"
+          variant="subtle"
+          className="text-text-subtle hover:text-danger"
           onClick={() => onDelete(query)}
           title="Delete"
           aria-label="Delete query"
         >
-          <IconX size={12} />
+          <IconTrash size={14} />
         </Button>
       </div>
     </div>

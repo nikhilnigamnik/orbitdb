@@ -1,8 +1,39 @@
 import * as React from 'react'
 import { cn } from '@renderer/lib/utils'
 
+/**
+ * The hovered index lives outside React state, and each item subscribes to
+ * whether it alone is active. Hovering then re-renders the two items whose
+ * answer changed rather than every row in the list - the sidebar's table tree
+ * can hold hundreds.
+ */
+interface ActiveIndexStore {
+  get: () => number | null
+  set: (index: number | null) => void
+  subscribe: (listener: () => void) => () => void
+}
+
+function createActiveIndexStore(): ActiveIndexStore {
+  let activeIndex: number | null = null
+  const listeners = new Set<() => void>()
+  return {
+    get: () => activeIndex,
+    set: (index) => {
+      if (index === activeIndex) return
+      activeIndex = index
+      for (const listener of listeners) listener()
+    },
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    }
+  }
+}
+
 interface SlidingHoverContextValue {
-  activeIndex: number | null
+  store: ActiveIndexStore
   activate: (el: HTMLElement, index: number) => void
 }
 
@@ -35,28 +66,33 @@ export function SlidingHoverList({
     height: number
     opacity: number
   }>({ top: 0, height: 0, opacity: 0 })
-  const [activeIndex, setActiveIndex] = React.useState<number | null>(null)
+  const [store] = React.useState(createActiveIndexStore)
 
-  const activate = React.useCallback((el: HTMLElement, index: number) => {
-    const container = listRef.current
-    if (!container) return
-    const containerRect = container.getBoundingClientRect()
-    const itemRect = el.getBoundingClientRect()
-    setHoverStyle({
-      top: itemRect.top - containerRect.top,
-      height: itemRect.height,
-      opacity: 1
-    })
-    setActiveIndex(index)
-  }, [])
+  const activate = React.useCallback(
+    (el: HTMLElement, index: number) => {
+      const container = listRef.current
+      if (!container) return
+      const containerRect = container.getBoundingClientRect()
+      const itemRect = el.getBoundingClientRect()
+      setHoverStyle({
+        top: itemRect.top - containerRect.top,
+        height: itemRect.height,
+        opacity: 1
+      })
+      store.set(index)
+    },
+    [store]
+  )
+
+  const contextValue = React.useMemo(() => ({ store, activate }), [store, activate])
 
   function handleMouseLeave() {
     setHoverStyle((prev) => ({ ...prev, opacity: 0 }))
-    setActiveIndex(null)
+    store.set(null)
   }
 
   return (
-    <SlidingHoverContext.Provider value={{ activeIndex, activate }}>
+    <SlidingHoverContext.Provider value={contextValue}>
       <As
         ref={listRef as React.Ref<HTMLUListElement & HTMLDivElement>}
         onMouseLeave={handleMouseLeave}
@@ -65,7 +101,7 @@ export function SlidingHoverList({
         <div
           aria-hidden
           className={cn(
-            'pointer-events-none absolute left-0 right-0 rounded-md bg-surface-elevated/80',
+            'pointer-events-none absolute left-0 right-0 rounded-md bg-surface-elevated',
             highlightClassName
           )}
           style={{
@@ -96,8 +132,8 @@ function SlidingHoverListItem({
   style,
   as: As = 'li'
 }: SlidingHoverListItemProps) {
-  const { activeIndex, activate } = useSlidingHoverContext()
-  const isActive = activeIndex === index
+  const { store, activate } = useSlidingHoverContext()
+  const isActive = React.useSyncExternalStore(store.subscribe, () => store.get() === index)
   return (
     <As
       onMouseEnter={(e: React.MouseEvent<HTMLElement>) => activate(e.currentTarget, index)}

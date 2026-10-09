@@ -49,8 +49,20 @@ export function useFilterParams({ onAdopt }: FilterParamsOptions) {
   // and the other has not.
   const lastWrittenParamsRef = React.useRef(readFilterParamsKey(searchParams))
 
+  // setSearchParams resolves against the location this hook last rendered
+  // with. Called after the view has gone - a late AI filter, an "Undo filters"
+  // toast outliving its table - it navigated straight back to the old table.
+  const isMountedRef = React.useRef(true)
+  React.useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
   const writeFilterParams = React.useCallback(
     (next: RowFilter[], join: FilterJoin) => {
+      if (!isMountedRef.current) return
       lastWrittenParamsRef.current = filterParamsKey(next, join)
       setSearchParams(
         (prev) => {

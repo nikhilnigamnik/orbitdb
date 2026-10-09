@@ -1,4 +1,3 @@
-import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   IconDots,
   IconPin,
@@ -17,7 +16,7 @@ import {
 } from '@renderer/components/ui/dropdown-menu'
 import { cn } from '@renderer/lib/utils'
 import { useTableDestructiveActions } from '@renderer/features/database/lib/use-table-destructive-actions'
-import { ROUTES, tableRoute, tableStructureRoute } from '@renderer/config/routes'
+import { tableRoute, tableStructureRoute } from '@renderer/config/routes'
 import type { TableInfo } from '@renderer/types'
 
 interface TableActionsMenuProps {
@@ -26,6 +25,13 @@ interface TableActionsMenuProps {
   table: TableInfo
   isPinned: boolean
   onTogglePin: () => void
+  /**
+   * Router access comes in as stable callbacks rather than hooks here: one menu
+   * per sidebar row, and useNavigate/useSearchParams would re-render every one
+   * of them on every navigation.
+   */
+  onNavigate: (to: string) => void
+  onDropped: (schema: string, table: string) => void
 }
 
 export function TableActionsMenu({
@@ -33,21 +39,17 @@ export function TableActionsMenu({
   schema,
   table,
   isPinned,
-  onTogglePin
+  onTogglePin,
+  onNavigate,
+  onDropped
 }: TableActionsMenuProps) {
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const isTable = table.type === 'table'
 
   const { requestTruncate, requestDrop, confirmDialog } = useTableDestructiveActions({
     connectionId,
     schema,
     table: table.name,
-    onDropped: () => {
-      if (searchParams.get('schema') === schema && searchParams.get('table') === table.name) {
-        navigate(ROUTES.database, { replace: true })
-      }
-    }
+    onDropped: () => onDropped(schema, table.name)
   })
 
   return (
@@ -69,16 +71,16 @@ export function TableActionsMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem onSelect={() => onTogglePin()}>
-            {isPinned ? <IconPinFilled size={13} /> : <IconPin size={13} />}
+            {isPinned ? <IconPinFilled size={16} /> : <IconPin size={16} />}
             {isPinned ? 'Unpin' : 'Pin'}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => navigate(tableRoute(schema, table.name))}>
-            <IconTable size={13} />
+          <DropdownMenuItem onSelect={() => onNavigate(tableRoute(schema, table.name))}>
+            <IconTable size={16} />
             Browse data
           </DropdownMenuItem>
           {isTable && (
-            <DropdownMenuItem onSelect={() => navigate(tableStructureRoute(schema, table.name))}>
-              <IconPencil size={13} />
+            <DropdownMenuItem onSelect={() => onNavigate(tableStructureRoute(schema, table.name))}>
+              <IconPencil size={16} />
               Alter table
             </DropdownMenuItem>
           )}
@@ -86,11 +88,11 @@ export function TableActionsMenu({
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="danger" onSelect={requestTruncate}>
-                <IconEraser size={13} />
+                <IconEraser size={16} />
                 Truncate
               </DropdownMenuItem>
               <DropdownMenuItem variant="danger" onSelect={requestDrop}>
-                <IconTrash size={13} />
+                <IconTrash size={16} />
                 Drop
               </DropdownMenuItem>
             </>

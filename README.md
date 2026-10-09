@@ -8,9 +8,9 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 
 **Browsing and editing**
 
-- **Multi-engine connections** - saved profiles per engine, credentials encrypted at rest via the OS keychain, testable before you connect.
-- **Schema browser** - schemas, tables, views, columns, indexes and foreign keys in a sidebar tree, with pinned tables and per-table actions.
-- **Data grid** - paginated rows with sorting, resizable columns, multi-row selection and foreign-key jumps. Row counts are exact rather than estimated wherever counting is affordable.
+- **Multi-engine connections** - saved profiles per engine, credentials encrypted at rest via the OS keychain and never handed to the UI, optional TLS certificate verification, testable before you connect.
+- **Schema browser** - schemas, tables, views, columns, indexes and foreign keys, with your tables listed in the sidebar, pinned ones under Favorites, and per-table actions.
+- **Data grid** - paginated rows with sorting, resizable columns, multi-row selection and foreign-key jumps, fully usable from the keyboard. Row counts are exact rather than estimated wherever counting is affordable.
 - **Relationships both ways** - follow a foreign key out to its parent from any cell, and see from the row editor which rows in other tables reference the one you are editing, counted, with cascading deletes flagged.
 - **Connection overview** - connecting lands on the shape of the database: table and view counts, size, the largest tables, and your recent queries.
 - **Record view** - one row read top to bottom, with long values wrapped rather than truncated, links out along foreign keys, and the rows that reference it.
@@ -26,7 +26,7 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 
 **SQL**
 
-- **Query editor** - CodeMirror with SQL highlighting, line numbers and completion for your own tables and columns. Resizable results pane, a draft that survives navigating away, and destructive statements ask before running.
+- **Query editor** - CodeMirror with SQL highlighting, line numbers and completion for your own tables and columns. Resizable results pane, a draft that survives navigating away, and destructive statements ask before running. The editor keeps its own database session, so a transaction you open carries across runs without touching the grid.
 - **Query library** - every run is kept per connection; star one to name it and keep it out of the history cap. Stored alongside your connections rather than in browser storage.
 - **Check references** - from the connection overview, sweep for rows pointing at parents that no longer exist. Covers declared foreign keys _and_ columns like `user_id` that never had one, and flags a declared constraint with orphans behind it as not actually enforced (SQLite, and therefore D1, ships with foreign keys off).
 - **Find a value anywhere** - `Mod+Shift+F` sweeps every searchable column of every table for a value and shows where it appears, with counts. Click a result to open that table already filtered. Useful for undeclared foreign keys and tracking down stray data.
@@ -40,12 +40,12 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 
 Bring your own API key - **Anthropic**, **OpenAI**, **Google** or a **Cloudflare AI Gateway** - paste it in **Settings → AI**, and pick a model:
 
-| Provider   | Models                                               |
-| ---------- | ---------------------------------------------------- |
-| Anthropic  | Sonnet 5 · Haiku 4.5 · Opus 5                        |
-| OpenAI     | GPT-5.2 · GPT-5 mini · GPT-5.2 Pro                   |
-| Google     | Gemini 3.6 Flash · Gemini 2.5 Flash · Gemini 3.1 Pro |
-| Cloudflare | Any of the above, through your own gateway           |
+| Provider   | Models                                                    |
+| ---------- | --------------------------------------------------------- |
+| Anthropic  | Sonnet 5.5 · Haiku 5.5 · Opus 5.5 · Fable 5.1             |
+| OpenAI     | GPT-6.1 Sol · GPT-6 Luna · GPT-6 Astra                    |
+| Google     | Gemini 3.8 Flash · Gemini 3.5 Flash-Lite · Gemini 3.1 Pro |
+| Cloudflare | Any of the above, through your own gateway                |
 
 **Usage** - Settings shows tokens by provider, model and feature for today, the last 30 days, and all time. Counted from what the API reports, kept on your machine for 90 days, and clearable.
 

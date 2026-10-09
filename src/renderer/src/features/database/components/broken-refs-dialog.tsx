@@ -1,9 +1,15 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconAlertTriangle, IconArrowRight, IconCheck, IconUnlink } from '@tabler/icons-react'
+import {
+  IconAlertTriangle,
+  IconArrowRight,
+  IconCheck,
+  IconTable,
+  IconUnlink
+} from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Chip } from '@renderer/components/ui/chip'
-import { Dialog } from '@renderer/components/ui/dialog'
+import { Dialog, DialogDescription, DialogTitle } from '@renderer/components/ui/dialog'
 import { Skeleton } from '@renderer/components/ui/skeleton'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { unwrap } from '@renderer/lib/ipc'
@@ -60,86 +66,92 @@ export function BrokenRefsDialog({ isOpen, onClose, connectionId, schema }: Brok
     void window.api.db.cancelSearch(sweepId.current)
   }
 
+  function close() {
+    cancel()
+    onClose()
+  }
+
   return (
     <Dialog
       open={isOpen}
       setOpen={(next) => {
-        if (!next) {
-          cancel()
-          onClose()
-        }
+        if (!next) close()
       }}
+      title="Broken references"
       content={
         <div className="flex max-h-[70vh] flex-col">
-          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
-            <IconUnlink size={14} className="shrink-0 text-text-subtle" />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-xs font-medium text-text">Broken references</span>
-              <span className="truncate font-mono text-[11px] text-text-subtle">{schema}</span>
+          <div className="flex shrink-0 flex-col gap-1 px-5 pt-5 pb-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <DialogTitle asChild>
+                <h2 className="text-[15px] font-semibold text-text">Broken references</h2>
+              </DialogTitle>
+              {schema && <Chip className="font-mono">{schema}</Chip>}
             </div>
-            {isRunning ? (
-              <Button size="sm" variant="ghost" onClick={cancel}>
-                Stop
-              </Button>
-            ) : (
-              <Button size="sm" onClick={() => void run()} disabled={!schema}>
-                {result ? 'Check again' : 'Check'}
-              </Button>
-            )}
+            <DialogDescription asChild>
+              <p className="text-xs text-text-muted">
+                Finds rows whose reference points at a parent that no longer exists.
+              </p>
+            </DialogDescription>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div className="min-h-0 flex-1 overflow-auto px-5">
             {!isRunning && !result && !error && (
-              <div className="flex flex-col gap-1.5 px-3 py-6 text-center">
-                <p className="text-xs text-text-muted">
-                  Finds rows whose reference points at a parent that no longer exists.
-                </p>
-                <p className="text-[11px] text-text-subtle">
-                  Covers declared foreign keys and columns like <code>user_id</code> that never had
-                  one. Each pair is a join across two whole tables, so this can be slow.
-                </p>
-              </div>
+              <p className="pb-1 text-xs text-text-subtle">
+                Covers declared foreign keys and columns like{' '}
+                <code className="rounded bg-surface-sunken px-1 font-mono text-[12px] text-text-muted">
+                  user_id
+                </code>{' '}
+                that never had one. Each pair is a join across two whole tables, so this can be
+                slow.
+              </p>
             )}
 
             {isRunning && (
-              <>
-                <div className="flex items-center gap-2 px-3 py-2 text-xs text-text-muted">
+              <div className="overflow-hidden rounded-xl border border-border">
+                <div className="flex h-9 items-center gap-2 border-b border-border px-3 text-xs text-text-muted">
                   <Spinner size={12} />
                   Joining each reference against its parent
                 </div>
-                <ul className="divide-y divide-border/60" aria-hidden>
+                <ul className="divide-y divide-border" aria-hidden>
                   {[0.76, 0.58, 0.68, 0.46].map((width, i) => (
-                    <li key={i} className="flex items-center gap-3 px-3 py-2.5">
+                    <li key={i} className="flex h-12 items-center gap-3 px-3">
                       <Skeleton className="h-3" style={{ width: `${width * 100}%` }} />
                       <Skeleton className="ml-auto h-3 w-8 shrink-0" />
                     </li>
                   ))}
                 </ul>
-              </>
+              </div>
             )}
 
             {!isRunning && error && (
-              <div className="flex items-start gap-2 px-3 py-4 text-xs text-danger">
-                <IconAlertTriangle size={13} className="mt-px shrink-0" />
+              <div className="flex items-start gap-2 rounded-lg border border-danger/20 bg-danger/5 px-3 py-2.5 text-xs text-danger">
+                <IconAlertTriangle size={14} className="mt-px shrink-0" />
                 {error}
               </div>
             )}
 
             {!isRunning && result && result.broken.length === 0 && result.pairsChecked > 0 && (
-              <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-text-muted">
-                <IconCheck size={13} className="text-success" />
-                Every reference resolves.
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-surface-elevated text-success">
+                  <IconCheck size={20} />
+                </span>
+                <p className="text-sm font-medium text-text">Every reference resolves.</p>
               </div>
             )}
 
             {!isRunning && result && result.pairsChecked === 0 && result.pairsFound === 0 && (
-              <p className="px-3 py-6 text-center text-xs text-text-subtle">
-                No references to check - nothing here names a column after another table.
-              </p>
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-surface-elevated text-text-subtle">
+                  <IconUnlink size={20} />
+                </span>
+                <p className="max-w-sm text-xs text-text-muted">
+                  No references to check - nothing here names a column after another table.
+                </p>
+              </div>
             )}
 
             {!isRunning && result && result.broken.length > 0 && (
-              <ul className="divide-y divide-border/60">
+              <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
                 {result.broken.map((ref) => (
                   <li key={`${ref.table}.${ref.column}`}>
                     <button
@@ -148,28 +160,32 @@ export function BrokenRefsDialog({ isOpen, onClose, connectionId, schema }: Brok
                         navigate(tableRoute(ref.schema, ref.table))
                         onClose()
                       }}
-                      className="group flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-surface-elevated/50"
+                      className="group flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-elevated/60"
                     >
+                      <IconTable
+                        size={16}
+                        className="shrink-0 self-start text-text-subtle mt-0.5"
+                      />
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="flex items-center gap-2">
-                          <span className="truncate font-mono text-xs text-text">
-                            {ref.table}
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-sm">
+                            <span className="font-medium text-text">{ref.table}</span>
                             <span className="text-text-subtle">.{ref.column}</span>
                           </span>
                           {/* A declared constraint with orphans behind it means
                               the database is not enforcing what it claims to. */}
                           {ref.isDeclared && <Chip tone="rose">Not enforced</Chip>}
                         </span>
-                        <span className="truncate font-mono text-[10px] text-text-subtle">
+                        <span className="truncate text-[12px] text-text-subtle">
                           → {ref.referencedTable}.{ref.referencedColumn}
                         </span>
                       </span>
-                      <span className="shrink-0 font-mono text-xs tabular-nums text-danger">
+                      <span className="shrink-0 text-sm font-medium text-danger tabular-nums">
                         {formatNumber(ref.count)}
                       </span>
                       <IconArrowRight
-                        size={12}
-                        className="shrink-0 text-accent-text opacity-0 transition-opacity group-hover:opacity-100"
+                        size={14}
+                        className="shrink-0 text-text-subtle opacity-0 transition-opacity group-hover:opacity-100"
                       />
                     </button>
                   </li>
@@ -178,18 +194,33 @@ export function BrokenRefsDialog({ isOpen, onClose, connectionId, schema }: Brok
             )}
           </div>
 
-          {result && (
-            <div className="shrink-0 border-t border-border px-3 py-2">
-              <p className="text-[11px] text-text-subtle">
-                {formatNumber(result.pairsChecked)} of {formatNumber(result.pairsFound)} references
-                checked
-                {result.wasCancelled && ' · stopped early, so this is partial'}
-                {result.pairsSkipped > 0 && ` · ${formatNumber(result.pairsSkipped)} past the cap`}
-                {result.failures.length > 0 &&
-                  ` · ${result.failures.length} could not be read (${result.failures[0].table})`}
-              </p>
-            </div>
-          )}
+          <div className="flex shrink-0 items-center gap-3 px-5 py-4">
+            <p className="min-w-0 flex-1 text-[12px] text-text-subtle">
+              {result && (
+                <>
+                  {formatNumber(result.pairsChecked)} of {formatNumber(result.pairsFound)}{' '}
+                  references checked
+                  {result.wasCancelled && ' · stopped early, so this is partial'}
+                  {result.pairsSkipped > 0 &&
+                    ` · ${formatNumber(result.pairsSkipped)} past the cap`}
+                  {result.failures.length > 0 &&
+                    ` · ${result.failures.length} could not be read (${result.failures[0].table})`}
+                </>
+              )}
+            </p>
+            <Button variant="outline" onClick={close}>
+              Close
+            </Button>
+            {isRunning ? (
+              <Button variant="outline" onClick={cancel}>
+                Stop
+              </Button>
+            ) : (
+              <Button onClick={() => void run()} disabled={!schema}>
+                {result ? 'Check again' : 'Check'}
+              </Button>
+            )}
+          </div>
         </div>
       }
     />

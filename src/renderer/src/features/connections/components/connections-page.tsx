@@ -1,15 +1,19 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  IconArrowsSort,
+  IconCheck,
   IconChevronRight,
   IconPlug,
+  IconPlugConnected,
+  IconPlus,
   IconRefresh,
-  IconArrowsSort,
   IconSettings
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Popover } from '@renderer/components/ui/popover'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
+import { PageHeader, PageToolbar } from '@renderer/components/layout/page-header'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
@@ -29,16 +33,16 @@ import { ConnectionCard } from './connection-card'
 import { ConnectionFormSheet } from './connection-form-sheet'
 import { ROUTES } from '@renderer/config/routes'
 import {
-  APP_NAME,
   DEFAULT_ENVIRONMENT,
   ENVIRONMENT_LABEL,
   UNGROUPED_FOLDER_LABEL
 } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
-import orbitdbLogo from '@renderer/assets/orbitdb-mark.svg'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 
 type SortMode = 'name-asc' | 'name-desc' | 'recent'
+
+const DEFAULT_SORT: SortMode = 'name-asc'
 
 const SORT_LABEL: Record<SortMode, string> = {
   'name-asc': 'Name (A-Z)',
@@ -69,7 +73,8 @@ export function ConnectionsPage() {
     connect,
     disconnect,
     isConnecting,
-    connectError
+    connectError,
+    disconnectError
   } = useConnection()
 
   const { health, errors: healthErrors, refresh: refreshHealth } = useConnectionHealth(connections)
@@ -82,7 +87,7 @@ export function ConnectionsPage() {
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState<TabKey>('all')
-  const [sort, setSort] = React.useState<SortMode>('name-asc')
+  const [sort, setSort] = React.useState<SortMode>(DEFAULT_SORT)
   const [sortOpen, setSortOpen] = React.useState(false)
   const [collapsedFolders, setCollapsedFolders] = React.useState<string[]>(loadCollapsedFolders)
 
@@ -186,156 +191,165 @@ export function ConnectionsPage() {
     )
   }
 
+  const isSorted = sort !== DEFAULT_SORT
+
   return (
-    <div className="flex min-h-full flex-col items-center p-1 bg-bg">
-      <div className="rounded-lg bg-surface flex-1 flex-col w-full">
-        <div className="mx-auto w-full max-w-2xl flex-col px-6 py-10">
-          <div className="mt-8 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <img src={orbitdbLogo} alt={APP_NAME} className="h-7 w-7 object-contain" />
-                <span className="truncate text-xs font-semibold text-text">{APP_NAME}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={refresh}
-                disabled={isLoading}
-                title="Refresh"
-              >
-                {isLoading ? <Spinner size={14} /> : <IconRefresh size={14} />}
-                Refresh
-              </Button>
-              {/* The sidebar's settings entry isn't here - this page renders
-                  before a connection exists, so this is the only way in. */}
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                onClick={() => navigate(ROUTES.settings)}
-                aria-label="Settings"
-                title="Settings"
-              >
-                <IconSettings size={14} />
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-12 flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-bold leading-none tracking-tight text-text">
-              Connections
-            </h2>
-            <Button onClick={openCreate}>Add new</Button>
-          </div>
-
-          <div className="mt-5 flex items-center justify-between gap-4">
-            <SlidingTabs
-              tabs={TABS.map((tab) => ({
-                id: tab.key,
-                label: tab.label,
-                count: counts[tab.key]
-              }))}
-              value={activeTab}
-              onChange={setActiveTab}
-            />
-
-            <Popover
-              openPopover={sortOpen}
-              setOpenPopover={setSortOpen}
-              align="end"
-              popoverContentClassName="w-48 overflow-hidden"
-              content={
-                <div className="flex flex-col p-1">
-                  {(Object.keys(SORT_LABEL) as SortMode[]).map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        setSort(key)
-                        setSortOpen(false)
-                      }}
-                      className={cn(
-                        'flex w-full cursor-pointer rounded-md items-center px-1.5 py-1.5 text-left text-xs hover:bg-surface-elevated',
-                        sort === key ? 'text-text' : 'text-text-muted'
-                      )}
-                    >
-                      {SORT_LABEL[key]}
-                    </button>
-                  ))}
-                </div>
-              }
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
+      <PageHeader
+        breadcrumbs={[{ label: 'Connections', icon: <IconPlugConnected /> }]}
+        actions={
+          <>
+            {/* Settings is in the sidebar too, but this is where a first run
+                lands with nothing to connect to yet - and the AI key lives in
+                Settings - so it stays one click away from here. */}
+            <Button
+              size="icon-sm"
+              variant="outline"
+              onClick={() => navigate(ROUTES.settings)}
+              aria-label="Settings"
+              title="Settings"
             >
-              <Button type="button" variant={'ghost'} className="text-xs">
-                <IconArrowsSort size={10} />
-                {SORT_LABEL[sort]}
-              </Button>
-            </Popover>
-          </div>
+              <IconSettings size={16} />
+            </Button>
+            <Button variant="outline" onClick={refresh} disabled={isLoading} title="Refresh">
+              {isLoading ? <Spinner size={14} /> : <IconRefresh size={14} />}
+              Refresh
+            </Button>
+            <Button onClick={openCreate}>
+              <IconPlus size={14} data-icon="inline-start" />
+              Add new
+            </Button>
+          </>
+        }
+      />
 
-          <div className="mt-4 flex flex-1 flex-col gap-3">
+      <PageToolbar>
+        <SlidingTabs
+          tabs={TABS.map((tab) => ({
+            id: tab.key,
+            label: tab.label,
+            count: counts[tab.key]
+          }))}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
+        <div className="flex-1" />
+        <Popover
+          openPopover={sortOpen}
+          setOpenPopover={setSortOpen}
+          align="end"
+          popoverContentClassName="w-48 overflow-hidden"
+          content={
+            <div className="flex flex-col p-1">
+              {(Object.keys(SORT_LABEL) as SortMode[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setSort(key)
+                    setSortOpen(false)
+                  }}
+                  // Every option in ink, as in Attio's menus - the check alone marks
+                  // the current one.
+                  className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-text hover:bg-surface-elevated"
+                >
+                  <span className="flex-1 truncate">{SORT_LABEL[key]}</span>
+                  {sort === key && <IconCheck size={16} className="shrink-0 text-accent" />}
+                </button>
+              ))}
+            </div>
+          }
+        >
+          {/* Attio's Sort trigger: a dashed chip while the list is in its default
+              order, a solid white one once the user has chosen another. */}
+          <button
+            type="button"
+            className={cn(
+              'flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors',
+              isSorted
+                ? 'bg-surface text-text shadow-control hover:bg-surface-elevated'
+                : 'border border-dashed border-border-strong text-text-muted hover:bg-surface-elevated hover:text-text'
+            )}
+          >
+            <IconArrowsSort size={14} className="shrink-0" />
+            {SORT_LABEL[sort]}
+          </button>
+        </Popover>
+      </PageToolbar>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+        {(connectError || disconnectError || error) && (
+          <div className="flex flex-col gap-3 px-4 pt-4">
             {connectError && <ErrorState title="Failed to connect" message={connectError} />}
+            {disconnectError && (
+              <ErrorState title="Failed to disconnect" message={disconnectError} />
+            )}
             {error && (
               <ErrorState title="Failed to load connections" message={error} onRetry={refresh} />
             )}
-
-            {isLoading ? (
-              <LoadingState className="py-16" />
-            ) : sorted.length === 0 ? (
-              <EmptyState
-                icon={<IconPlug size={20} />}
-                title={
-                  activeTab === 'all'
-                    ? 'No connections yet'
-                    : `No ${ENVIRONMENT_LABEL[activeTab]} connections`
-                }
-                description={
-                  activeTab === 'all'
-                    ? 'Add a Postgres, MySQL, or D1 connection to start exploring.'
-                    : `Tag a connection as ${ENVIRONMENT_LABEL[activeTab]} to see it here.`
-                }
-                action={
-                  <Button size="sm" className="rounded-lg px-3.5" onClick={openCreate}>
-                    Add new
-                  </Button>
-                }
-              />
-            ) : hasFolders ? (
-              // Headings only once something has actually been filed. A lone
-              // "Ungrouped" header over every card names a distinction the user
-              // has not made yet.
-              groups.map((group) => {
-                const isCollapsed = collapsedFolders.includes(group.folder)
-                return (
-                  <div key={group.folder || UNGROUPED_KEY} className="flex flex-col gap-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleFolder(group.folder)}
-                      aria-expanded={!isCollapsed}
-                      className="group/folder flex w-full cursor-pointer items-center gap-1.5 pt-1 text-left"
-                    >
-                      <IconChevronRight
-                        size={12}
-                        className={cn(
-                          'shrink-0 text-text-subtle transition-transform',
-                          !isCollapsed && 'rotate-90'
-                        )}
-                      />
-                      <span className="truncate text-xs font-semibold text-text-muted transition-colors group-hover/folder:text-text">
-                        {group.folder || UNGROUPED_FOLDER_LABEL}
-                      </span>
-                      <span className="text-xs text-text-subtle">{group.connections.length}</span>
-                      <span className="ml-1 h-px flex-1 bg-border" aria-hidden />
-                    </button>
-                    {!isCollapsed && group.connections.map(renderCard)}
-                  </div>
-                )
-              })
-            ) : (
-              sorted.map(renderCard)
-            )}
           </div>
-        </div>
+        )}
+
+        {isLoading ? (
+          <LoadingState className="py-16" />
+        ) : sorted.length === 0 ? (
+          <div className="flex flex-1 p-4">
+            <EmptyState
+              className="border-0 bg-transparent"
+              icon={<IconPlug size={20} />}
+              title={
+                activeTab === 'all'
+                  ? 'No connections yet'
+                  : `No ${ENVIRONMENT_LABEL[activeTab]} connections`
+              }
+              description={
+                activeTab === 'all'
+                  ? 'Add a Postgres, MySQL, or D1 connection to start exploring.'
+                  : `Tag a connection as ${ENVIRONMENT_LABEL[activeTab]} to see it here.`
+              }
+              action={
+                <Button variant="outline" onClick={openCreate}>
+                  <IconPlus size={14} data-icon="inline-start" />
+                  Add new
+                </Button>
+              }
+            />
+          </div>
+        ) : hasFolders ? (
+          // Headings only once something has actually been filed. A lone
+          // "Ungrouped" header over every row names a distinction the user
+          // has not made yet.
+          groups.map((group) => {
+            const isCollapsed = collapsedFolders.includes(group.folder)
+            return (
+              <section key={group.folder || UNGROUPED_KEY} className="flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => toggleFolder(group.folder)}
+                  aria-expanded={!isCollapsed}
+                  className="group/folder sticky top-0 z-10 flex h-9 w-full shrink-0 cursor-pointer items-center gap-1.5 border-b border-border bg-bg px-4 text-left"
+                >
+                  <IconChevronRight
+                    size={14}
+                    className={cn(
+                      'shrink-0 text-text-subtle transition-transform',
+                      !isCollapsed && 'rotate-90'
+                    )}
+                  />
+                  <span className="truncate text-[12px] font-medium text-text-muted transition-colors group-hover/folder:text-text">
+                    {group.folder || UNGROUPED_FOLDER_LABEL}
+                  </span>
+                  <span className="text-[12px] text-text-subtle tabular-nums">
+                    {group.connections.length}
+                  </span>
+                </button>
+                {!isCollapsed && group.connections.map(renderCard)}
+              </section>
+            )
+          })
+        ) : (
+          sorted.map(renderCard)
+        )}
       </div>
 
       <ConnectionFormSheet
@@ -362,7 +376,7 @@ export function ConnectionsPage() {
         isLoading={isDeleting}
       />
       {deleteError && (
-        <div className="fixed bottom-4 right-4">
+        <div className="fixed right-4 bottom-4 z-50 max-w-md rounded-lg bg-surface shadow-pop">
           <ErrorState title="Delete failed" message={deleteError} />
         </div>
       )}

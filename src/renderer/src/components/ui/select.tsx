@@ -1,9 +1,9 @@
-'use client'
-
 import * as React from 'react'
 import { IconCheck, IconChevronDown } from '@tabler/icons-react'
 import { Select as SelectPrimitive } from 'radix-ui'
 import { cn } from '@renderer/lib/utils'
+
+import { FIELD_FOCUS } from './focus-ring'
 
 export interface SelectOption<T extends string = string> {
   value: T
@@ -49,11 +49,11 @@ export function Select<T extends string = string>({
         data-size={size}
         aria-label={ariaLabel}
         className={cn(
-          'flex w-fit cursor-pointer items-center justify-between gap-1.5 rounded-md border border-border-strong bg-input px-2 text-text outline-none transition-colors',
-          'hover:bg-surface-elevated/40 hover:text-text',
-          'focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40',
+          'flex w-fit cursor-pointer items-center justify-between gap-1.5 rounded-lg border border-border-strong bg-input px-2.5 text-text shadow-[0_1px_2px_0_rgba(0,0,0,0.03)] outline-none transition-[border-color,box-shadow,background-color]',
+          'hover:border-text-subtle/45',
+          FIELD_FOCUS,
           'disabled:cursor-not-allowed disabled:opacity-50',
-          'data-[state=open]:border-[var(--color-border-strong)] data-[state=open]:bg-surface-elevated',
+          'data-[state=open]:border-accent data-[state=open]:ring-[3px] data-[state=open]:ring-accent/15',
           'data-placeholder:text-text-subtle',
           // h-7 to sit level with Input, which every form pairs it with.
           'data-[size=default]:h-7 data-[size=default]:text-xs',
@@ -77,7 +77,7 @@ export function Select<T extends string = string>({
           align={align}
           sideOffset={6}
           className={cn(
-            'animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-lg border border-border bg-surface text-text drop-shadow-xs',
+            'animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-xl bg-surface text-text shadow-pop',
             contentClassName
           )}
         >
@@ -88,15 +88,15 @@ export function Select<T extends string = string>({
                 value={option.value}
                 disabled={option.disabled}
                 className={cn(
-                  'relative flex cursor-pointer select-none items-center gap-2 rounded-md py-1.5 pl-2 pr-7 text-xs text-text-muted outline-none transition-colors',
-                  'focus:bg-surface-elevated focus:text-text',
+                  'relative flex h-8 cursor-pointer select-none items-center gap-2 rounded-md pl-2 pr-7 text-xs text-text outline-none transition-colors',
+                  'focus:bg-surface-elevated',
                   'data-[state=checked]:text-text',
                   'data-disabled:pointer-events-none data-disabled:opacity-50'
                 )}
               >
                 <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
                 <SelectPrimitive.ItemIndicator className="absolute right-2 flex items-center">
-                  <IconCheck size={12} className="text-text" />
+                  <IconCheck size={14} className="text-accent" />
                 </SelectPrimitive.ItemIndicator>
               </SelectPrimitive.Item>
             ))}

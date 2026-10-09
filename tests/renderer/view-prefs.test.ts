@@ -4,6 +4,7 @@ import {
   MAX_FROZEN_COLUMNS,
   defaultViewPrefs,
   loadViewPrefs,
+  moveViewPrefs,
   saveViewPrefs,
   toggleFrozenColumn,
   toggleHiddenColumn
@@ -135,5 +136,25 @@ describe('freezing a column', () => {
   it('still unpins when the cap is reached', () => {
     const full = Array.from({ length: MAX_FROZEN_COLUMNS }, (_, i) => `c${i}`)
     expect(toggleFrozenColumn(full, 'c0')).not.toContain('c0')
+  })
+})
+
+describe('renaming a table', () => {
+  it('carries the remembered view over to the new name', () => {
+    const prefs = { ...defaultViewPrefs(), orderBy: 'email', columnSizing: { email: 240 } }
+    saveViewPrefs('c1', 'public', 'users', prefs)
+
+    moveViewPrefs('c1', 'public', 'users', 'members')
+
+    expect(loadViewPrefs('c1', 'public', 'members')).toMatchObject({
+      orderBy: 'email',
+      columnSizing: { email: 240 }
+    })
+    expect(localStorage.getItem(KEY), 'the old entry is left behind').toBeNull()
+  })
+
+  it('does nothing when there was no remembered view', () => {
+    moveViewPrefs('c1', 'public', 'users', 'members')
+    expect(loadViewPrefs('c1', 'public', 'members')).toEqual(defaultViewPrefs())
   })
 })

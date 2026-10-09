@@ -13,6 +13,9 @@ function settingsApi() {
 interface UseAiSettings {
   settings: AiSettingsView | null
   isLoading: boolean
+  /** Why the first read failed, so the section can say so instead of rendering empty. */
+  loadError: string | null
+  reload: () => Promise<void>
   isSaving: boolean
   isTesting: boolean
   setProvider: (provider: AiProviderId) => Promise<void>
@@ -31,6 +34,7 @@ interface UseAiSettings {
 export function useAiSettings(): UseAiSettings {
   const [settings, setSettings] = React.useState<AiSettingsView | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
+  const [loadError, setLoadError] = React.useState<string | null>(null)
   const [isSaving, setIsSaving] = React.useState(false)
   const [isTesting, setIsTesting] = React.useState(false)
 
@@ -38,17 +42,21 @@ export function useAiSettings(): UseAiSettings {
     setSettings(await unwrap(settingsApi().getAi()))
   }, [])
 
-  React.useEffect(() => {
-    void (async () => {
-      try {
-        await refresh()
-      } catch (err) {
-        console.error('Failed to read AI settings', errorMessage(err))
-      } finally {
-        setIsLoading(false)
-      }
-    })()
+  const reload = React.useCallback(async () => {
+    setIsLoading(true)
+    setLoadError(null)
+    try {
+      await refresh()
+    } catch (err) {
+      setLoadError(errorMessage(err))
+    } finally {
+      setIsLoading(false)
+    }
   }, [refresh])
+
+  React.useEffect(() => {
+    void reload()
+  }, [reload])
 
   const mutate = React.useCallback(
     async (action: () => Promise<unknown>) => {
@@ -66,6 +74,8 @@ export function useAiSettings(): UseAiSettings {
   return {
     settings,
     isLoading,
+    loadError,
+    reload,
     isSaving,
     isTesting,
     setProvider: (provider) => mutate(() => unwrap(settingsApi().setAiProvider(provider))),

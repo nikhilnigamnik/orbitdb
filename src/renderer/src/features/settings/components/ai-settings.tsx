@@ -1,17 +1,29 @@
 import * as React from 'react'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { useToast } from '@renderer/components/ui/toast'
+import { ErrorState } from '@renderer/components/common/error-state'
 import { errorMessage } from '@renderer/lib/errors'
 import { useAiSettings } from '@renderer/features/settings/use-ai-settings'
 import { aiProvider } from '@renderer/config/site'
 import type { AiModelId, AiProviderId } from '@renderer/types'
+
 import { AiProviderCard } from './ai-provider-card'
 import { SettingRow, SettingsCard } from './settings-card'
 
 export function AiSettings() {
   const toast = useToast()
-  const { settings, isLoading, setProvider, saveKey, clearKey, setModel, testKey, setGateway } =
-    useAiSettings()
+  const {
+    settings,
+    isLoading,
+    loadError,
+    reload,
+    setProvider,
+    saveKey,
+    clearKey,
+    setModel,
+    testKey,
+    setGateway
+  } = useAiSettings()
   const [testing, setTesting] = React.useState<AiProviderId | null>(null)
   // Per provider, not global: saving one key should not freeze the other cards.
   const [busy, setBusy] = React.useState<AiProviderId | null>(null)
@@ -36,8 +48,8 @@ export function AiSettings() {
       <SettingsCard>
         <SettingRow
           title={
-            <span className="flex items-center gap-2 text-text-muted">
-              <Spinner size={13} className="text-text-subtle" />
+            <span className="flex items-center gap-2 font-normal text-text-muted">
+              <Spinner size={16} className="text-text-subtle" />
               Reading settings…
             </span>
           }
@@ -46,8 +58,20 @@ export function AiSettings() {
     )
   }
 
+  if (loadError) {
+    return (
+      <ErrorState
+        title="Could not read AI settings"
+        message={loadError}
+        onRetry={() => void reload()}
+      />
+    )
+  }
+
+  // One card, one expandable row per provider - the way Attio lists a set of
+  // integrations - rather than a stack of separate cards.
   return (
-    <div className="flex flex-col gap-3">
+    <SettingsCard>
       {settings?.providers.map((view) => (
         <AiProviderCard
           key={view.id}
@@ -102,6 +126,6 @@ export function AiSettings() {
           }
         />
       ))}
-    </div>
+    </SettingsCard>
   )
 }

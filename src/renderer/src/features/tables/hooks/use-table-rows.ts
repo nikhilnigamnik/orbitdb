@@ -40,6 +40,13 @@ interface TableRowsOptions {
   writeFilterParams: (filters: RowFilter[], join: FilterJoin) => void
   setRowSelection: (selection: Record<string, boolean>) => void
   onReady?: () => void
+  /**
+   * The table's unfiltered count, when the container already runs one for its
+   * header. Used in place of a second identical count while no filter is set -
+   * on D1 every count is billed by the rows it reads. Undefined means nobody
+   * else is counting, so this hook does.
+   */
+  unfilteredTotal?: number | null
 }
 
 export function useTableRows({
@@ -54,14 +61,17 @@ export function useTableRows({
   setFilterJoinState,
   writeFilterParams,
   setRowSelection,
-  onReady
+  onReady,
+  unfilteredTotal
 }: TableRowsOptions) {
   const toast = useToast()
   const [rows, setRows] = React.useState<Record<string, unknown>[]>([])
   const [columns, setColumns] = React.useState<ColumnInfo[]>(details.columns)
   const [totalEstimate, setTotalEstimate] = React.useState<number | null>(details.estimatedRows)
   /** Exact count for the current filters, once it lands. Null while unknown. */
-  const [totalExact, setTotalExact] = React.useState<number | null>(null)
+  const [filteredTotal, setFilteredTotal] = React.useState<number | null>(null)
+  const usesSharedCount = unfilteredTotal !== undefined && filters.length === 0
+  const totalExact = usesSharedCount ? unfilteredTotal : filteredTotal
   const [isLoading, setIsLoading] = React.useState(true)
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -87,6 +97,7 @@ export function useTableRows({
 
   const load = React.useCallback(async () => {
     const requestId = ++requestIdRef.current
+    const isPastTheEnd = (result: RowsResult): boolean => result.rows.length === 0 && offset > 0
     const queryKey = JSON.stringify({
       connectionId,
       schema: details.schema,
@@ -101,7 +112,7 @@ export function useTableRows({
 
     let data: RowsResult
     const cached = prefetchCacheRef.current
-    if (cached?.key === queryKey) {
+    if (cached?.key === queryKey && !isPastTheEnd(cached.data)) {
       data = cached.data
       prefetchCacheRef.current = null
       setRows(data.rows)
@@ -114,6 +125,7 @@ export function useTableRows({
       lastGoodQueryRef.current = { filters, filterJoin }
     } else {
       prefetchCacheRef.current = null
+      let isSteppingBack = false
       setIsLoading(true)
       setError(null)
       try {
@@ -131,6 +143,15 @@ export function useTableRows({
           })
         )
         if (requestId !== requestIdRef.current) return
+        if (isPastTheEnd(data)) {
+          // Deleting the last rows of the last page reloads a page that no
+          // longer exists, which read as "This table is empty". Step back one
+          // instead; the offset change runs the next load. Leaving the loading
+          // state on avoids a flash of the deleted rows in between.
+          isSteppingBack = true
+          setOffset(Math.max(0, offset - pageSize))
+          return
+        }
         setRows(data.rows)
         setColumns(data.columns)
         setTotalEstimate(data.totalEstimate)
@@ -156,7 +177,7 @@ export function useTableRows({
         }
         return
       } finally {
-        if (requestId === requestIdRef.current) setIsLoading(false)
+        if (requestId === requestIdRef.current && !isSteppingBack) setIsLoading(false)
       }
     }
 
@@ -209,6 +230,7 @@ export function useTableRows({
     filters,
     filterJoin,
     setRowSelection,
+    setOffset,
     toast
   ])
 
@@ -262,8 +284,9 @@ export function useTableRows({
   // The count runs alongside the page rather than gating it: the rows appear
   // immediately and the total sharpens from estimate to exact when it arrives.
   React.useEffect(() => {
+    if (usesSharedCount) return
     let cancelled = false
-    setTotalExact(null)
+    setFilteredTotal(null)
     void unwrap(
       window.api.db.countRows({
         connectionId,
@@ -274,7 +297,7 @@ export function useTableRows({
       })
     )
       .then((total) => {
-        if (!cancelled) setTotalExact(total)
+        if (!cancelled) setFilteredTotal(total)
       })
       .catch(() => {
         // A count is an enhancement - falling back to the estimate is fine.
@@ -282,7 +305,7 @@ export function useTableRows({
     return () => {
       cancelled = true
     }
-  }, [connectionId, details.schema, details.name, filters, filterJoin])
+  }, [connectionId, details.schema, details.name, filters, filterJoin, usesSharedCount])
 
   // Signal the container once the first page lands, so it can reveal the header
   // and grid together - a single loader instead of loader-then-loader.

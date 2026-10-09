@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { IconSettings, IconSparkles } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { ROUTES } from '@renderer/config/routes'
-import { MISSING_AI_KEY_MESSAGE } from '@renderer/config/site'
+import { isAiSetupMessage } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 
 /**
@@ -11,7 +11,9 @@ import { cn } from '@renderer/lib/utils'
  * used to be, tells the user something is broken when nothing is.
  */
 export function isMissingAiKeyError(message: string | null | undefined): boolean {
-  return message === MISSING_AI_KEY_MESSAGE
+  // A half-configured Cloudflare gateway is the same kind of state - set-up
+  // that Settings finishes - so it gets the same prompt, not a red error.
+  return isAiSetupMessage(message)
 }
 
 interface AiKeyRequiredProps {
@@ -24,25 +26,25 @@ export function AiKeyRequired({ onNavigate, className }: AiKeyRequiredProps) {
   const navigate = useNavigate()
 
   return (
-    <div className={cn('flex flex-col items-center gap-3 px-6 py-8 text-center', className)}>
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/10 text-accent-text ring-1 ring-inset ring-accent/20">
-        <IconSparkles size={16} />
+    <div className={cn('flex flex-col items-center px-6 py-8 text-center', className)}>
+      <span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-accent/10 text-accent-text">
+        <IconSparkles size={20} />
       </span>
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium text-text">Add an Anthropic API key</p>
-        <p className="max-w-[34ch] text-xs leading-relaxed text-text-subtle">
-          The AI features need your own key. It stays encrypted on this machine.
-        </p>
-      </div>
+      <p className="text-sm font-medium text-text">Set up an AI provider</p>
+      <p className="mt-1 max-w-[34ch] text-xs text-text-muted">
+        Add a key for Anthropic, OpenAI, Google or a Cloudflare gateway in Settings. It stays
+        encrypted on this machine.
+      </p>
       <Button
         size="sm"
-        variant="secondary"
+        variant="outline"
+        className="mt-4"
         onClick={() => {
           onNavigate?.()
           navigate(ROUTES.settings)
         }}
       >
-        <IconSettings size={12} />
+        <IconSettings size={14} />
         Open settings
       </Button>
     </div>

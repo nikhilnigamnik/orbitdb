@@ -1,8 +1,7 @@
 import * as React from 'react'
 import {
+  IconAdjustmentsHorizontal,
   IconArrowLeft,
-  IconDatabase,
-  IconFilter2,
   IconPlus,
   IconSearch,
   IconX
@@ -24,6 +23,7 @@ import { formatCellValue } from '@renderer/lib/format'
 import type { ColumnInfo, FilterJoin, RowFilter } from '@renderer/types'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
+import { ColumnTypeIcon } from './column-type-icon'
 
 interface FiltersBarProps {
   connectionId: string
@@ -180,32 +180,41 @@ export function FiltersBar({
                 type="button"
                 onClick={() => onChangeJoin(join === 'and' ? 'or' : 'and')}
                 title="Switch between matching all filters and any of them"
-                className="cursor-pointer rounded px-1 font-mono text-xs uppercase text-text-subtle transition-colors hover:bg-surface-elevated hover:text-text"
+                className="h-7 cursor-pointer rounded-lg bg-surface px-2 text-xs font-medium text-text-muted capitalize shadow-control transition-colors hover:bg-surface-elevated hover:text-text"
               >
                 {join}
               </button>
             )
           // h-7 stands the chip level with the trigger beside it and the fields
           // above it; the segments stretch to fill rather than set their own height.
+          // White with the hairline halo, as Attio draws an applied filter.
+          const column = columns.find((c) => c.name === f.column)
+          const summary = unary
+            ? `${f.column} ${f.operator}`
+            : `${f.column} ${f.operator} ${String(f.value ?? '')}`
           return (
             <React.Fragment key={i}>
               {connector}
-              <div className="inline-flex h-7 items-stretch overflow-hidden rounded-md border border-border bg-surface-elevated/60 text-xs text-text">
+              <div className="inline-flex h-7 items-stretch overflow-hidden rounded-lg bg-surface text-xs text-text shadow-control">
                 <button
                   type="button"
                   onClick={() => editFilter(i)}
-                  aria-label={`Edit filter on ${f.column}`}
+                  aria-label={`Edit filter: ${summary}`}
                   className="group/edit flex cursor-pointer items-stretch transition-colors hover:bg-surface-elevated"
                 >
-                  <span className="flex items-center gap-1.5 px-2">
-                    <IconDatabase size={11} className="text-text-subtle" />
+                  <span className="flex items-center gap-1.5 pr-1.5 pl-2 font-medium">
+                    {column ? (
+                      <ColumnTypeIcon column={column} />
+                    ) : (
+                      <IconAdjustmentsHorizontal size={14} className="text-text-subtle" />
+                    )}
                     {f.column}
                   </span>
-                  <span className="flex items-center border-l border-border px-2 font-mono text-text-muted group-hover/edit:text-text">
+                  <span className="flex items-center px-1.5 text-text-muted group-hover/edit:text-text">
                     {f.operator}
                   </span>
                   {!unary && (
-                    <span className="flex max-w-40 items-center truncate border-l border-border px-2 font-mono">
+                    <span className="flex max-w-40 items-center truncate pr-2 pl-1.5 font-mono text-accent-text">
                       {String(f.value ?? '')}
                     </span>
                   )}
@@ -213,10 +222,10 @@ export function FiltersBar({
                 <button
                   type="button"
                   onClick={() => removeFilter(i)}
-                  aria-label="Remove filter"
-                  className="flex cursor-pointer items-center border-l border-border px-2 text-danger transition-colors hover:bg-danger/10"
+                  aria-label={`Remove filter on ${f.column}`}
+                  className="flex cursor-pointer items-center border-l border-border px-1.5 text-text-subtle transition-colors hover:bg-surface-elevated hover:text-danger"
                 >
-                  <IconX size={11} />
+                  <IconX size={14} />
                 </button>
               </div>
             </React.Fragment>
@@ -244,37 +253,37 @@ export function FiltersBar({
               <div ref={panelRef}>
                 {editingColumn ? (
                   <div className="flex flex-col">
-                    <div className="flex items-center gap-2 border-b border-border px-2 py-1">
+                    <div className="flex h-10 items-center gap-2 border-b border-border px-2">
                       <button
                         type="button"
                         onClick={resetEditor}
                         aria-label="Back to columns"
                         className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-text-subtle hover:bg-surface-elevated hover:text-text"
                       >
-                        <IconArrowLeft size={14} />
+                        <IconArrowLeft size={16} />
                       </button>
                       <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                        <IconDatabase size={12} className="text-text-subtle" />
-                        <span className="truncate text-xs font-medium text-text">
+                        <ColumnTypeIcon column={editingColumn} size={16} />
+                        <span className="truncate text-sm font-medium text-text">
                           {editingColumn.name}
                         </span>
-                        <span className="font-mono text-xs text-text-subtle">
+                        <span className="text-[12px] text-text-subtle">
                           {editingColumn.udtName || editingColumn.dataType}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-1 border-b border-border px-2 py-2">
+                    <div className="flex flex-wrap gap-1.5 border-b border-border p-2">
                       {OPERATORS.map((op) => (
                         <button
                           key={op.value}
                           type="button"
                           onClick={() => setOperator(op.value)}
                           className={cn(
-                            'cursor-pointer rounded-md border px-2 py-0.5 font-mono text-xs',
+                            'h-7 min-w-7 cursor-pointer rounded-lg px-2 text-xs font-medium transition-colors',
                             op.value === operator
-                              ? 'border-border-strong bg-surface-elevated text-text'
-                              : 'border-border bg-surface-elevated/30 text-text-muted hover:bg-surface-elevated hover:text-text'
+                              ? 'bg-surface text-text shadow-control'
+                              : 'text-text-muted hover:bg-surface-elevated hover:text-text'
                           )}
                         >
                           {op.label}
@@ -284,14 +293,10 @@ export function FiltersBar({
 
                     {isUnary ? (
                       <div className="p-2">
-                        <button
-                          type="button"
-                          onClick={() => commitFilter('')}
-                          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-accent px-2 py-2 text-xs font-medium text-white transition-colors hover:bg-accent/90"
-                        >
+                        <Button type="button" className="w-full" onClick={() => commitFilter('')}>
                           {editingIndex == null ? 'Apply' : 'Update'} &ldquo;{operatorMeta?.label}
                           &rdquo;
-                        </button>
+                        </Button>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-2 p-2">
@@ -317,7 +322,7 @@ export function FiltersBar({
                         </div>
 
                         {isPattern && (
-                          <p className="text-xs text-text-subtle">
+                          <p className="text-[12px] text-text-subtle">
                             <span className="font-mono text-text-muted">%</span> matches any run of
                             characters - a bare term matches only an exact value.
                           </p>
@@ -330,8 +335,8 @@ export function FiltersBar({
                         ) : valuesError ? (
                           <p className="text-xs text-danger">{valuesError}</p>
                         ) : values.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-medium uppercase tracking-wider text-text-subtle">
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-[12px] font-medium text-text-subtle">
                               Suggestions
                             </span>
                             <div className="flex flex-wrap gap-1">
@@ -343,7 +348,7 @@ export function FiltersBar({
                                     type="button"
                                     onClick={() => commitFilter(value)}
                                     className={cn(
-                                      'max-w-full cursor-pointer truncate rounded-md border border-border bg-surface-elevated/40 px-2 py-0.5 font-mono text-xs transition-colors hover:border-border-strong hover:bg-surface-elevated',
+                                      'h-6 max-w-full cursor-pointer truncate rounded-md bg-surface px-2 font-mono text-xs shadow-control transition-colors hover:bg-surface-elevated',
                                       value === null
                                         ? 'italic text-text-subtle'
                                         : 'text-text-muted hover:text-text'
@@ -364,8 +369,8 @@ export function FiltersBar({
                     <div className="border-b border-border px-2 py-1">
                       <div className="relative">
                         <IconSearch
-                          size={12}
-                          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
+                          size={14}
+                          className="absolute top-1/2 left-2 -translate-y-1/2 text-text-subtle"
                         />
                         <input
                           autoFocus
@@ -389,13 +394,13 @@ export function FiltersBar({
                               <button
                                 type="button"
                                 onClick={() => openColumn(col)}
-                                className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left"
+                                className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left"
                               >
-                                <IconDatabase size={14} className="shrink-0 text-text-subtle" />
+                                <ColumnTypeIcon column={col} size={16} />
                                 <span className="flex-1 truncate text-xs text-text">
                                   {col.name}
                                 </span>
-                                <span className="font-mono text-xs text-text-subtle">
+                                <span className="text-[12px] text-text-subtle">
                                   {col.udtName || col.dataType}
                                 </span>
                               </button>
@@ -410,13 +415,24 @@ export function FiltersBar({
             </div>
           }
         >
+          {/* Attio's dashed chip: an outline that only promises a control until
+              something is applied, at which point the applied filters carry the
+              weight and this shrinks to a plus. */}
           <Button
             type="button"
             variant="subtle"
-            size="icon-sm"
+            size={hasFilters ? 'icon-sm' : 'sm'}
             aria-label={hasFilters ? 'Add filter' : 'Open filters'}
+            className="rounded-lg border-dashed border-border-strong px-2 aria-expanded:border-border-strong"
           >
-            {hasFilters ? <IconPlus stroke={2} size={14} /> : <IconFilter2 stroke={2} size={14} />}
+            {hasFilters ? (
+              <IconPlus size={14} />
+            ) : (
+              <>
+                <IconAdjustmentsHorizontal size={14} />
+                Filter
+              </>
+            )}
           </Button>
         </Popover>
 
@@ -428,7 +444,7 @@ export function FiltersBar({
             onClick={clearFilters}
             aria-label="Clear all filters"
           >
-            <IconX size={12} />
+            <IconX size={14} />
             Clear all
           </Button>
         )}

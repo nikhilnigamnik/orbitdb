@@ -45,7 +45,8 @@ import { estimateNodeHeight, layoutNodes, type LayoutDirection } from '../lib/au
 import { TableNode, type TableNodeData } from './table-node'
 
 const nodeTypes: NodeTypes = { table: TableNode }
-const ACCENT = 'var(--color-accent-text, #5c8af5)'
+const ACCENT = 'var(--color-accent)'
+const EDGE = 'var(--color-border-strong)'
 
 interface SchemaGraphCanvasProps {
   graph: SchemaGraph
@@ -144,8 +145,8 @@ function buildGraph(
     data: {
       rel: `${e.from.table}.${e.from.columns.join('+')} → ${e.to.table}.${e.to.columns.join('+')}`
     } satisfies EdgeData,
-    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: ACCENT },
-    style: { stroke: ACCENT, strokeWidth: 1.25 }
+    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: EDGE },
+    style: { stroke: EDGE, strokeWidth: 1.5 }
   }))
 
   return { nodes: layoutNodes(nodes, edges, direction), edges }
@@ -164,7 +165,8 @@ function ToolButton({ title, onClick, children }: ToolButtonProps) {
         <button
           type="button"
           onClick={onClick}
-          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
+          aria-label={title}
+          className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
         >
           {children}
         </button>
@@ -260,18 +262,29 @@ function Flow({ graph, schema, connectionId = '' }: SchemaGraphCanvasProps) {
       edges.map((e) => {
         const isConnected = focusId ? e.source === focusId || e.target === focusId : false
         const isHovered = hoveredEdge === e.id
+        // Grey at rest; the accent marks an edge that is selected, hovered or
+        // belongs to the focused table, so it only ever means "this one".
+        const isLit = isConnected || isHovered || Boolean(e.selected)
+        const stroke = isLit ? ACCENT : EDGE
         return {
           ...e,
           animated: isConnected,
           label: isHovered ? (e.data as EdgeData | undefined)?.rel : undefined,
-          labelStyle: { fill: 'var(--color-text)', fontSize: 10, fontFamily: 'monospace' },
-          labelBgStyle: { fill: 'var(--color-surface)', fillOpacity: 0.92 },
-          labelBgPadding: [4, 2] as [number, number],
-          labelBgBorderRadius: 4,
+          labelStyle: {
+            fill: 'var(--color-text)',
+            fontSize: 12,
+            fontWeight: 500,
+            fontFamily: 'var(--font-mono, monospace)'
+          },
+          labelBgStyle: { fill: 'var(--color-surface)', stroke: EDGE, strokeWidth: 1 },
+          labelBgPadding: [6, 3] as [number, number],
+          labelBgBorderRadius: 6,
+          markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: stroke },
           style: {
             ...e.style,
-            strokeWidth: isConnected ? 2 : 1.25,
-            opacity: focusId && !isConnected ? 0.1 : 1
+            stroke,
+            strokeWidth: isConnected ? 2 : 1.5,
+            opacity: focusId && !isConnected ? 0.15 : 1
           }
         }
       }),
@@ -330,8 +343,13 @@ function Flow({ graph, schema, connectionId = '' }: SchemaGraphCanvasProps) {
       )
       const viewport = getViewportForBounds(bounds, imageWidth, imageHeight, 0.1, 4, padding)
 
+      // The image is cut from the live DOM, so it takes the canvas colour from
+      // the theme rather than a hardcoded one that can drift from it.
+      const canvas = viewportEl.closest('.orbit-flow') ?? viewportEl
+      const backgroundColor =
+        getComputedStyle(canvas).getPropertyValue('--color-surface').trim() || 'white'
       const options = {
-        backgroundColor: '#131519',
+        backgroundColor,
         width: imageWidth,
         height: imageHeight,
         style: {
@@ -370,36 +388,40 @@ function Flow({ graph, schema, connectionId = '' }: SchemaGraphCanvasProps) {
       maxZoom={2}
       proOptions={{ hideAttribution: true }}
     >
-      <Background gap={20} size={1} color="rgba(255,255,255,0.06)" />
-      <Controls showInteractive={false} />
-      <MiniMap pannable zoomable />
+      <Background gap={20} size={1.25} color="var(--color-border-strong)" />
+      <Controls showInteractive={false} className="overflow-hidden rounded-lg" />
+      <MiniMap pannable zoomable className="overflow-hidden rounded-lg shadow-pop" />
       <Panel position="top-right">
-        <div className="flex items-center gap-0.5 rounded-md border border-border bg-surface/90 p-1 shadow-lg shadow-black/40 backdrop-blur">
+        <div
+          role="toolbar"
+          aria-label="Diagram"
+          className="flex items-center gap-0.5 rounded-lg bg-surface p-1 shadow-pop"
+        >
           <ToolButton title="Fit view" onClick={() => fitView({ padding: 0.2, duration: 300 })}>
-            <IconArrowsMaximize size={15} />
+            <IconArrowsMaximize size={16} />
           </ToolButton>
           <ToolButton title="Re-run auto layout" onClick={() => relayout(direction)}>
-            <IconHierarchy2 size={15} />
+            <IconHierarchy2 size={16} />
           </ToolButton>
           <ToolButton title="Forget the saved arrangement" onClick={resetLayout}>
-            <IconRestore size={15} />
+            <IconRestore size={16} />
           </ToolButton>
           <ToolButton
             title={`Layout: ${direction === 'LR' ? 'horizontal' : 'vertical'} - click to flip`}
             onClick={toggleDirection}
           >
             {direction === 'LR' ? (
-              <IconArrowsHorizontal size={15} />
+              <IconArrowsHorizontal size={16} />
             ) : (
-              <IconArrowsVertical size={15} />
+              <IconArrowsVertical size={16} />
             )}
           </ToolButton>
-          <div className="mx-0.5 h-4 w-px bg-border" />
+          <div aria-hidden className="mx-0.5 h-4 w-px bg-border-strong" />
           <ToolButton title="Export as PNG" onClick={() => exportImage('png')}>
-            <IconPhoto size={15} />
+            <IconPhoto size={16} />
           </ToolButton>
           <ToolButton title="Export as SVG" onClick={() => exportImage('svg')}>
-            <span className="text-xs font-semibold tracking-tight">SVG</span>
+            <span className="text-[12px] font-medium">SVG</span>
           </ToolButton>
         </div>
       </Panel>
@@ -409,7 +431,7 @@ function Flow({ graph, schema, connectionId = '' }: SchemaGraphCanvasProps) {
 
 export function SchemaGraphCanvas({ graph, schema, connectionId }: SchemaGraphCanvasProps) {
   return (
-    <div className="orbit-flow h-full w-full">
+    <div className="orbit-flow h-full w-full bg-bg">
       <ReactFlowProvider>
         <Flow graph={graph} schema={schema} connectionId={connectionId} />
       </ReactFlowProvider>

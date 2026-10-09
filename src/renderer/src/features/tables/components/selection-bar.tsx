@@ -39,23 +39,16 @@ export function SelectionBar({
 }: SelectionBarProps) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
-      <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-lg border border-border-strong/70 bg-surface/95 py-1.5 pl-2 pr-1.5 shadow-2xl shadow-black/60 backdrop-blur-xl">
-        <span className="flex items-center gap-2 pl-1 pr-1.5 text-xs">
-          <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-md bg-surface-elevated px-1.5 font-mono text-xs font-medium text-text ring-1 ring-inset ring-white/10">
-            {count}
-          </span>
-          <span className="text-text-subtle">row{count === 1 ? '' : 's'} selected</span>
+      <div className="animate-slide-up-fade pointer-events-auto flex items-center gap-1 rounded-xl bg-surface p-1.5 pl-3 shadow-pop">
+        <span className="flex items-center gap-1.5 pr-1 text-xs text-text-muted">
+          <span className="font-medium text-text tabular-nums">{count}</span>
+          row{count === 1 ? '' : 's'} selected
         </span>
 
-        <span className="mx-1 h-4 w-px bg-white/10" />
+        <span aria-hidden className="mx-1 h-4 w-px bg-border-strong" />
 
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1 rounded-md px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
-          onClick={onClear}
-        >
-          <IconX size={12} />
+        <Button size="sm" variant="subtle" onClick={onClear}>
+          <IconX size={14} />
           Clear
         </Button>
         <ExportMenu
@@ -68,27 +61,16 @@ export function SelectionBar({
           onCopied={onCopied}
           onCopyFailed={onCopyFailed}
         >
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 gap-1 rounded-md px-2.5 text-text-muted hover:bg-surface-elevated hover:text-text"
-          >
-            <IconDownload size={12} />
+          <Button size="sm" variant="outline">
+            <IconDownload size={14} className="text-text-subtle" />
             Export {count}
           </Button>
         </ExportMenu>
         {canMutate && (
-          <>
-            <span className="mx-1 h-4 w-px bg-white/10" />
-            <Button
-              size="sm"
-              className="h-7 gap-1 rounded-md bg-danger-fill px-3 text-white shadow-[inset_0_-2px_0_0_var(--color-danger-shade),0_1px_3px_0_rgba(0,0,0,0.4)] ring-1 ring-inset ring-white/15 hover:bg-danger hover:shadow-none active:shadow-none focus-visible:border-white/60 focus-visible:ring-2 focus-visible:ring-white/30"
-              onClick={onDelete}
-            >
-              <IconTrash size={12} />
-              Delete {count}
-            </Button>
-          </>
+          <Button size="sm" variant="destructive" onClick={onDelete}>
+            <IconTrash size={14} />
+            Delete {count}
+          </Button>
         )}
       </div>
     </div>

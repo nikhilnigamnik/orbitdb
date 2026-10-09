@@ -2,15 +2,15 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@renderer/lib/utils'
 
-// Sized to sit inside an h-7 control with room to breathe: h-4, 2px radius,
-// px-1, 10px mono, hairline border over a barely-there fill.
+// Attio's key hint: a small sans keycap on a soft grey fill with a 0.5px edge,
+// sized to sit inside an h-7 control.
 const kbdVariants = cva(
-  'inline-flex h-4 min-w-4 items-center justify-center gap-0.5 rounded-[3px] border px-1 font-mono text-[10px] leading-none',
+  'inline-flex h-[18px] min-w-[18px] items-center justify-center gap-0.5 rounded-[5px] px-1 font-sans text-[11px] font-medium leading-none',
   {
     variants: {
       tone: {
-        default: 'border-text-muted/15 bg-text-muted/8 text-text-muted',
-        accent: 'border-white/20 bg-white/10 text-white'
+        default: 'bg-surface-sunken text-text-subtle shadow-[inset_0_0_0_0.5px_rgba(0,0,0,0.1)]',
+        accent: 'bg-white/20 text-white shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.25)]'
       }
     },
     defaultVariants: { tone: 'default' }

@@ -1,6 +1,3 @@
-/** Hard cap on rows pulled for a full-table export, to avoid runaway fetches. */
-export const EXPORT_ROW_LIMIT = 100_000
-
 export type ExportFormat = 'json' | 'csv' | 'xlsx'
 
 function isoTimestamp(): string {
@@ -48,7 +45,7 @@ function headerFor(rows: Row[], columns?: string[]): string[] {
 }
 
 /** Normalize a cell to a spreadsheet-friendly primitive (objects → JSON text). */
-function normalizeCell(value: unknown): string | number | boolean | null {
+export function normalizeCell(value: unknown): string | number | boolean | null {
   if (value === null || value === undefined) return null
   if (typeof value === 'bigint') return value.toString()
   if (value instanceof Date) return value.toISOString()
@@ -59,23 +56,41 @@ function normalizeCell(value: unknown): string | number | boolean | null {
   return String(value)
 }
 
-function escapeCsvField(value: string | number | boolean | null): string {
+// A spreadsheet reads a field starting with one of these as a formula, so a
+// stored `=HYPERLINK(...)` would run when the export is opened. Tab and CR are
+// on OWASP's list because some importers strip them and expose what follows.
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/
+// pg hands numeric and bigint columns over as strings, so "-12.50" arrives as
+// text. It is a number, not a formula, and prefixing it would corrupt it.
+const PLAIN_NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/
+
+export const CSV_BOM = '\uFEFF'
+
+/**
+ * One CSV field. Text that a spreadsheet would run as a formula gets a leading
+ * `'`, which spreadsheets read as "this is text".
+ */
+export function escapeCsvField(value: string | number | boolean | null): string {
   if (value === null) return ''
-  const str = String(value)
+  const raw = String(value)
+  const isFormula = FORMULA_TRIGGER.test(raw) && !PLAIN_NUMBER.test(raw)
+  const str = typeof value === 'string' && isFormula ? `'${raw}` : raw
   return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
 }
 
-export function downloadCsv(filename: string, rows: Row[], columns?: string[]): void {
+/** The CSV text itself, BOM included, so it can be tested without a download. */
+export function toCsv(rows: Row[], columns?: string[]): string {
   const header = headerFor(rows, columns)
   const lines = [header.map(escapeCsvField).join(',')]
   for (const row of rows) {
     lines.push(header.map((col) => escapeCsvField(normalizeCell(row[col]))).join(','))
   }
-  // Prepend a BOM so Excel reads UTF-8 correctly.
-  triggerDownload(
-    new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }),
-    filename
-  )
+  // The BOM is what makes Excel read the file as UTF-8 rather than ANSI.
+  return `${CSV_BOM}${lines.join('\r\n')}`
+}
+
+export function downloadCsv(filename: string, rows: Row[], columns?: string[]): void {
+  triggerDownload(new Blob([toCsv(rows, columns)], { type: 'text/csv;charset=utf-8' }), filename)
 }
 
 export async function downloadXlsx(
@@ -100,4 +115,17 @@ export async function downloadXlsx(
     }),
     filename
   )
+}
+
+/** Writes `rows` to a file in `format`, named from `filenameParts` (e.g. schema, table). */
+export async function exportToFile(
+  format: ExportFormat,
+  filenameParts: string[],
+  rows: Row[],
+  columns?: string[]
+): Promise<void> {
+  const filename = buildExportFilename(filenameParts, format)
+  if (format === 'json') return downloadJson(filename, rows)
+  if (format === 'csv') return downloadCsv(filename, rows, columns)
+  await downloadXlsx(filename, rows, columns)
 }

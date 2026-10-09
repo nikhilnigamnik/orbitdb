@@ -4,15 +4,12 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem
+  DropdownMenuItem,
+  DropdownMenuSeparator
 } from '@renderer/components/ui/dropdown-menu'
-import {
-  buildExportFilename,
-  downloadCsv,
-  downloadJson,
-  downloadXlsx,
-  type ExportFormat
-} from '@renderer/lib/export'
+import { useToast } from '@renderer/components/ui/toast'
+import { exportToFile, type ExportFormat } from '@renderer/lib/export'
+import { errorMessage } from '@renderer/lib/errors'
 import { toInsertSql, toJsonText, toTsv, type InsertTarget } from '../lib/clipboard-format'
 
 interface ExportMenuProps {
@@ -46,6 +43,8 @@ export function ExportMenu({
   onCopied,
   onCopyFailed
 }: ExportMenuProps) {
+  const toast = useToast()
+
   async function copy(label: string, text: string) {
     if (rows.length === 0) return
     try {
@@ -58,14 +57,10 @@ export function ExportMenu({
 
   async function run(format: ExportFormat) {
     if (rows.length === 0) return
-    const filename = buildExportFilename(filenameParts, format)
     try {
-      if (format === 'json') downloadJson(filename, rows)
-      else if (format === 'csv') downloadCsv(filename, rows, columns)
-      else await downloadXlsx(filename, rows, columns)
+      await exportToFile(format, filenameParts, rows, columns)
     } catch (err) {
-      // No toast surface yet - log so the export failure isn't fully silent.
-      console.error(`Failed to export as ${format}:`, err)
+      toast.error('Export failed', { description: errorMessage(err) })
     }
   }
 
@@ -73,35 +68,35 @@ export function ExportMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align={align} side={side}>
-        <DropdownMenuItem onSelect={() => run('json')}>
-          <IconJson size={13} />
+        <DropdownMenuItem onSelect={() => void run('json')}>
+          <IconJson size={16} />
           JSON (.json)
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => run('csv')}>
-          <IconFileTypeCsv size={13} />
+        <DropdownMenuItem onSelect={() => void run('csv')}>
+          <IconFileTypeCsv size={16} />
           CSV (.csv)
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => run('xlsx')}>
-          <IconFileTypeXls size={13} />
+        <DropdownMenuItem onSelect={() => void run('xlsx')}>
+          <IconFileTypeXls size={16} />
           Excel (.xlsx)
         </DropdownMenuItem>
         {insertTarget && (
           <>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="border-t border-border"
               onSelect={() => void copy('text', toTsv(rows, columns, { withHeader: true }))}
             >
-              <IconClipboard size={13} />
+              <IconClipboard size={16} />
               Copy as text
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void copy('JSON', toJsonText(rows, columns))}>
-              <IconClipboard size={13} />
+              <IconClipboard size={16} />
               Copy as JSON
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => void copy('SQL', toInsertSql(rows, columns, insertTarget))}
             >
-              <IconClipboard size={13} />
+              <IconClipboard size={16} />
               Copy as INSERT
             </DropdownMenuItem>
           </>

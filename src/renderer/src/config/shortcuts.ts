@@ -22,6 +22,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { keys: 'Mod+K', description: 'Search tables, connections and actions' },
       { keys: 'Mod+Shift+F', description: 'Find a value in every table' },
+      { keys: '/', description: 'Find a value in every table, when nothing has focus' },
       { keys: '?', description: 'Show this list' }
     ]
   },
@@ -33,9 +34,16 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: 'Mod+↑ / Mod+↓', description: 'Jump to the first or last row' },
       { keys: 'Home / End', description: 'Jump to the start or end of the row' },
       { keys: 'Enter', description: 'Edit the cell under the cursor' },
+      { keys: 'Shift+Enter', description: 'Open the record under the cursor' },
+      { keys: 'Space', description: 'Select or deselect the row under the cursor' },
+      {
+        keys: 'Delete / Backspace',
+        description: 'Delete the row under the cursor, after confirming'
+      },
       { keys: 'Escape', description: 'Clear the cursor, or cancel an edit' },
       { keys: 'Mod+C', description: 'Copy the selection as text' },
       { keys: 'Mod+Shift+C', description: 'Copy the selection as JSON' },
+      { keys: 'Mod+Z', description: 'Undo the last cell edit' },
       { keys: 'Double-click', description: 'Edit a cell' },
       { keys: 'Shift+click', description: 'Extend the selection to a cell' }
     ]

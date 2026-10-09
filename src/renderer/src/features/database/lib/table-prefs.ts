@@ -67,3 +67,21 @@ export function pushRecent(connectionId: string, ref: TableRef): TableRef[] {
   writeJson(recentKey(connectionId), next)
   return next
 }
+
+/**
+ * Follows a rename into the favourites and recents, which are stored by name
+ * and would otherwise keep pointing at a table that no longer exists.
+ */
+export function renameTableRef(connectionId: string, from: TableRef, to: TableRef): void {
+  const rename = (refs: TableRef[]): TableRef[] =>
+    refs.map((ref) => (sameRef(ref, from) ? to : ref))
+  savePinned(connectionId, rename(loadPinned(connectionId)))
+  writeJson(recentKey(connectionId), rename(loadRecent(connectionId)))
+}
+
+/** Drops a table that is gone from the favourites and recents. */
+export function forgetTableRef(connectionId: string, ref: TableRef): void {
+  const without = (refs: TableRef[]): TableRef[] => refs.filter((r) => !sameRef(r, ref))
+  savePinned(connectionId, without(loadPinned(connectionId)))
+  writeJson(recentKey(connectionId), without(loadRecent(connectionId)))
+}

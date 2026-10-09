@@ -48,8 +48,8 @@ export function ConnectionAppearanceFields({
       >
         <div className="relative">
           <IconFolder
-            size={13}
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
+            size={14}
+            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-subtle"
           />
           <Input
             id="conn-folder"
@@ -57,7 +57,7 @@ export function ConnectionAppearanceFields({
             onChange={(e) => onChangeFolder(e.target.value)}
             maxLength={MAX_FOLDER_NAME_LENGTH}
             placeholder="Ungrouped"
-            className={cn('pl-8', suggestions.length > 0 && 'pr-16')}
+            className={cn('pl-8', suggestions.length > 0 && 'pr-20')}
           />
           {suggestions.length > 0 && (
             <div className="absolute right-1 top-1/2 -translate-y-1/2">
@@ -76,9 +76,9 @@ export function ConnectionAppearanceFields({
                           onChangeFolder(name)
                           setPickerOpen(false)
                         }}
-                        className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-text-muted hover:bg-surface-elevated hover:text-text"
+                        className="flex h-8 w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-sm text-text hover:bg-surface-elevated"
                       >
-                        <IconFolder size={12} className="shrink-0" />
+                        <IconFolder size={16} className="shrink-0 text-text-subtle" />
                         <span className="truncate">{name}</span>
                       </button>
                     ))}
@@ -87,7 +87,7 @@ export function ConnectionAppearanceFields({
               >
                 <button
                   type="button"
-                  className="cursor-pointer rounded px-1.5 py-0.5 text-xs text-text-subtle transition-colors hover:text-text"
+                  className="flex h-6 cursor-pointer items-center rounded-md px-1.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-surface-elevated hover:text-text aria-expanded:bg-surface-elevated aria-expanded:text-text"
                 >
                   Existing
                 </button>
@@ -98,7 +98,7 @@ export function ConnectionAppearanceFields({
       </FormField>
 
       <FormField label="Colour">
-        <div className="flex h-7 flex-wrap items-center gap-2">
+        <div className="flex h-7 flex-wrap items-center gap-2.5 px-0.5">
           {CONNECTION_COLORS.map((swatch) => {
             const isSelected = color === swatch
             return (
@@ -110,9 +110,9 @@ export function ConnectionAppearanceFields({
                 aria-label={CONNECTION_COLOR_LABEL[swatch]}
                 title={CONNECTION_COLOR_LABEL[swatch]}
                 className={cn(
-                  'h-5 w-5 shrink-0 cursor-pointer rounded-full transition-transform hover:scale-110',
+                  'size-5 shrink-0 cursor-pointer rounded-full transition-transform hover:scale-110',
                   CONNECTION_COLOR_CLASS[swatch],
-                  isSelected && 'ring-2 ring-text ring-offset-2 ring-offset-surface'
+                  isSelected && 'ring-2 ring-accent ring-offset-2 ring-offset-surface'
                 )}
               />
             )
@@ -126,9 +126,9 @@ export function ConnectionAppearanceFields({
             disabled={!color}
             aria-label="No colour"
             title="No colour"
-            className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border-strong text-text-subtle transition-colors hover:border-text-subtle hover:text-text disabled:cursor-default disabled:opacity-30 disabled:hover:border-border-strong disabled:hover:text-text-subtle"
+            className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-border-strong text-text-subtle transition-colors hover:border-text-subtle hover:text-text disabled:cursor-default disabled:opacity-40 disabled:hover:border-border-strong disabled:hover:text-text-subtle"
           >
-            <IconX size={10} />
+            <IconX size={12} />
           </button>
         </div>
       </FormField>

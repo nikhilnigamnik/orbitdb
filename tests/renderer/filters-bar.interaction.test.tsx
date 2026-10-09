@@ -110,13 +110,14 @@ describe('the value box', () => {
 })
 
 describe('the suggestions heading', () => {
-  it('sits at the smaller chip size, not body size', async () => {
+  it('sits at the meta size in sentence case, not body size or a shouted label', async () => {
     setup()
     await openEditorOn('status')
 
     const heading = await screen.findByText('Suggestions')
-    expect(heading.className).toContain('text-[10px]')
+    expect(heading.className).toContain('text-[12px]')
     expect(heading.className).not.toMatch(/\btext-xs\b/)
+    expect(heading.className).not.toMatch(/\buppercase\b/)
   })
 })
 
@@ -140,7 +141,7 @@ describe('editing an applied filter', () => {
       { column: 'name', operator: 'like', value: '%bo%' }
     ])
 
-    fireEvent.click(screen.getByLabelText('Edit filter on status'))
+    fireEvent.click(screen.getByLabelText('Edit filter: status = active'))
 
     // Loaded with what was applied, not reset to a blank editor.
     const box = await screen.findByDisplayValue('active')

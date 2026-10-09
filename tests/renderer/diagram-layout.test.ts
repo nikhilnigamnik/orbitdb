@@ -5,7 +5,8 @@ import {
   clearLayout,
   loadLayout,
   positionsOf,
-  saveLayout
+  saveLayout,
+  LAYOUT_VERSION
 } from '../../src/renderer/src/features/diagram/lib/diagram-layout'
 
 const KEY = 'orbitdb:diagram-layout:c1:public'
@@ -47,6 +48,13 @@ describe('a round trip', () => {
 })
 
 describe('reading a file that has drifted', () => {
+  it('drops an arrangement saved by an older auto-layout', () => {
+    // A drag saves every position, so an old arrangement would pin the old
+    // algorithm's single tall column for good.
+    localStorage.setItem(KEY, JSON.stringify({ positions: { a: { x: 1, y: 1 } }, direction: 'LR' }))
+    expect(loadLayout('c1', 'public')).toBeNull()
+  })
+
   it('ignores unparseable JSON', () => {
     localStorage.setItem(KEY, 'not json')
     expect(loadLayout('c1', 'public')).toBeNull()
@@ -56,6 +64,7 @@ describe('reading a file that has drifted', () => {
     localStorage.setItem(
       KEY,
       JSON.stringify({
+        version: LAYOUT_VERSION,
         positions: { good: { x: 1, y: 2 }, bad: { x: 'left', y: 2 }, worse: null },
         direction: 'LR'
       })
@@ -66,20 +75,29 @@ describe('reading a file that has drifted', () => {
 
   it('treats a file with no usable positions as no layout', () => {
     // Restoring an empty arrangement would stack every table on the origin.
-    localStorage.setItem(KEY, JSON.stringify({ positions: {}, direction: 'LR' }))
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({ version: LAYOUT_VERSION, positions: {}, direction: 'LR' })
+    )
 
     expect(loadLayout('c1', 'public')).toBeNull()
   })
 
   it('falls back to horizontal for an unknown direction', () => {
-    localStorage.setItem(KEY, JSON.stringify({ positions: { a: { x: 0, y: 0 } }, direction: 'up' }))
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({ version: LAYOUT_VERSION, positions: { a: { x: 0, y: 0 } }, direction: 'up' })
+    )
 
     expect(loadLayout('c1', 'public')?.direction).toBe('LR')
   })
 
   it('refuses a non-finite coordinate', () => {
     // JSON.stringify turns Infinity into null, so this arrives as a broken node.
-    localStorage.setItem(KEY, JSON.stringify({ positions: { a: { x: Infinity, y: 0 } } }))
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({ version: LAYOUT_VERSION, positions: { a: { x: Infinity, y: 0 } } })
+    )
 
     expect(loadLayout('c1', 'public')).toBeNull()
   })

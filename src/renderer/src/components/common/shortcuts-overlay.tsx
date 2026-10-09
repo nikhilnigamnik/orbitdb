@@ -1,28 +1,11 @@
 import * as React from 'react'
 import { IconKeyboard } from '@tabler/icons-react'
-import { Dialog } from '@renderer/components/ui/dialog'
+import { Dialog, DialogDescription, DialogTitle } from '@renderer/components/ui/dialog'
 import { Kbd } from '@renderer/components/ui/kbd'
 import { SHORTCUT_GROUPS, shortcutParts } from '@renderer/config/shortcuts'
+import { isTyping } from '@renderer/lib/keyboard'
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
-
-/** True when a keystroke belongs to whatever the user is typing into. */
-function isTyping(target: EventTarget | null): boolean {
-  // An instanceof check rather than a cast: a keydown can be dispatched at the
-  // document, which has neither `tagName` nor `closest`.
-  if (!(target instanceof HTMLElement)) return false
-  const element = target
-  const tag = element.tagName
-  return (
-    tag === 'INPUT' ||
-    tag === 'TEXTAREA' ||
-    tag === 'SELECT' ||
-    element.isContentEditable ||
-    // The SQL editor is a contenteditable inside this class rather than a
-    // textarea, and `?` is a character someone may well be typing.
-    element.closest('.cm-editor') != null
-  )
-}
 
 /**
  * Every shortcut in one list, on `?`.
@@ -52,27 +35,31 @@ export function ShortcutsOverlay() {
       className="top-[10vh] w-[min(720px,calc(100vw-2rem))]"
       content={
         <div className="flex max-h-[76vh] flex-col">
-          <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
-            <IconKeyboard size={14} className="text-text-subtle" />
-            <h2 className="text-xs font-semibold text-text">Keyboard shortcuts</h2>
-            <span className="ml-auto text-xs text-text-subtle">
-              Press <Kbd>?</Kbd> any time
+          <div className="flex shrink-0 items-start gap-3 px-5 pt-5 pb-3">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-elevated text-text-muted">
+              <IconKeyboard size={16} />
             </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-1 pt-px">
+              <DialogTitle className="text-[15px] leading-tight font-semibold text-text">
+                Keyboard shortcuts
+              </DialogTitle>
+              <DialogDescription className="flex items-center gap-1.5 text-xs text-text-muted">
+                Press <Kbd>?</Kbd> any time
+              </DialogDescription>
+            </div>
           </div>
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-x-6 overflow-auto p-4 sm:grid-cols-2">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-x-6 gap-y-4 overflow-auto px-5 pt-1 pb-5 sm:grid-cols-2">
             {SHORTCUT_GROUPS.map((group) => (
-              <section key={group.title} className="mb-4 break-inside-avoid">
-                <h3 className="mb-1.5 text-[10px] font-semibold tracking-wide text-text-subtle uppercase">
-                  {group.title}
-                </h3>
+              <section key={group.title} className="break-inside-avoid">
+                <h3 className="mb-1 text-[12px] font-medium text-text-subtle">{group.title}</h3>
                 <dl className="flex flex-col">
                   {group.shortcuts.map((shortcut) => (
                     <div
                       key={shortcut.keys}
-                      className="flex items-center justify-between gap-3 border-b border-border/40 py-1.5 last:border-b-0"
+                      className="flex h-8 items-center justify-between gap-3 border-b border-border last:border-b-0"
                     >
-                      <dt className="min-w-0 flex-1 truncate text-xs text-text-muted">
+                      <dt className="min-w-0 flex-1 truncate text-xs text-text">
                         {shortcut.description}
                       </dt>
                       <dd className="flex shrink-0 items-center gap-0.5">

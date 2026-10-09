@@ -3,25 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <title>OrbitDB</title>
+    <!-- connect-src is widened for the Vite dev server only, by a transform in
+         electron.vite.config.ts; the renderer itself makes no network calls. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' ws: https:"
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self'"
     />
     <style>
       html,
       body {
         margin: 0;
         padding: 0;
-        background: #0e1013;
-        color: #e6e8ec;
+        background: #ffffff;
+        color: #242629;
         font-family:
-          Inter,
+          'Inter Variable',
           -apple-system,
           BlinkMacSystemFont,
           'Segoe UI',
@@ -36,7 +32,7 @@
         align-items: center;
         justify-content: center;
         gap: 14px;
-        background: #0e1013;
+        background: #ffffff;
       }
       #splash .logo {
         width: 64px;
@@ -56,7 +52,7 @@
         font-size: 17px;
         font-weight: 600;
         letter-spacing: -0.01em;
-        color: #9aa1ac;
+        color: #6e7074;
       }
     </style>
   </head>
@@ -72,8 +68,8 @@
         >
           <defs>
             <linearGradient id="splash-silver" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#f5f5f5" />
-              <stop offset="1" stop-color="#9a9a9a" />
+              <stop offset="0" stop-color="#6b6e74" />
+              <stop offset="1" stop-color="#242629" />
             </linearGradient>
           </defs>
           <g fill="url(#splash-silver)">

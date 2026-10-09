@@ -97,6 +97,27 @@ export function saveViewPrefs(
 }
 
 /**
+ * Carries a table's remembered view across a rename. Entries are keyed by name,
+ * so without this a renamed table opened with default widths and sort.
+ */
+export function moveViewPrefs(
+  connectionId: string,
+  schema: string,
+  from: string,
+  to: string
+): void {
+  if (!connectionId || from === to) return
+  try {
+    const raw = localStorage.getItem(key(connectionId, schema, from))
+    if (raw === null) return
+    localStorage.setItem(key(connectionId, schema, to), raw)
+    localStorage.removeItem(key(connectionId, schema, from))
+  } catch {
+    // quota / private mode - the renamed table just opens with defaults
+  }
+}
+
+/**
  * Hiding every column leaves a grid with nothing in it and no control to bring
  * anything back, so the last visible one cannot be hidden.
  */

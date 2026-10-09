@@ -4,6 +4,7 @@ import { Button } from '@renderer/components/ui/button'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { Dialog } from '@renderer/components/ui/dialog'
 import { Kbd } from '@renderer/components/ui/kbd'
+import { Chip } from '@renderer/components/ui/chip'
 
 interface AiPromptProps {
   open: boolean
@@ -50,9 +51,11 @@ export function AiPrompt({
     <Dialog
       open={open}
       setOpen={onOpenChange}
+      title="Ask AI to write SQL"
+      description="Describe the query in plain words. The SQL lands in the editor for review."
       content={
         <>
-          <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-3">
+          <div className="flex h-12 items-center gap-2.5 border-b border-border px-4">
             {isGenerating ? (
               <Spinner size={16} className="text-accent-text" />
             ) : (
@@ -70,24 +73,22 @@ export function AiPrompt({
                 }
               }}
               placeholder={isGenerating ? 'Generating…' : placeholder}
-              className="min-w-0 flex-1 bg-transparent text-xs text-text placeholder:text-text-subtle focus:outline-none disabled:opacity-60"
+              className="min-w-0 flex-1 bg-transparent text-sm text-text placeholder:text-text-subtle focus:outline-none disabled:opacity-60"
             />
-            <span className="shrink-0 rounded bg-surface-elevated px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-text-subtle">
-              Beta
-            </span>
+            <Chip tone="accent">Beta</Chip>
             <Button
               size="icon-xs"
-              variant="ghost"
-              className="shrink-0 text-text-subtle hover:bg-surface-elevated hover:text-text"
+              variant="subtle"
+              className="shrink-0"
               onClick={close}
               aria-label="Close AI prompt"
             >
-              <IconX size={13} />
+              <IconX size={14} />
             </Button>
           </div>
 
-          <div className="flex flex-col gap-1 p-2">
-            <p className="px-1.5 pb-1 text-xs font-semibold uppercase tracking-wider text-text-subtle">
+          <div className="flex flex-col p-1.5">
+            <p className="flex h-7 items-center px-2 text-[12px] font-medium text-text-subtle">
               Try
             </p>
             {suggestions.map((s) => (
@@ -95,23 +96,23 @@ export function AiPrompt({
                 key={s}
                 type="button"
                 onClick={() => submit(s)}
-                className="group/sug flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
+                className="group/sug flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm text-text transition-colors hover:bg-surface-elevated"
               >
                 <IconSparkles
-                  size={12}
+                  size={16}
                   className="shrink-0 text-text-subtle transition-colors group-hover/sug:text-accent-text"
                 />
                 <span className="truncate">{s}</span>
                 <IconArrowUpRight
-                  size={13}
+                  size={14}
                   className="ml-auto shrink-0 text-text-subtle opacity-0 transition-opacity group-hover/sug:opacity-100"
                 />
               </button>
             ))}
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-border bg-surface-elevated/30 px-3.5 py-2">
-            <span className="flex items-center gap-1.5 text-xs text-text-subtle">
+          <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
+            <span className="flex items-center gap-1.5 text-[12px] text-text-subtle">
               <Kbd>↵</Kbd>
               <span>Generate</span>
               <span className="text-text-subtle/40">·</span>
@@ -120,9 +121,9 @@ export function AiPrompt({
             </span>
             <Button size="sm" onClick={() => submit()} disabled={!prompt.trim() || isGenerating}>
               {isGenerating ? (
-                <Spinner size={12} className="text-current" />
+                <Spinner size={14} className="text-current" />
               ) : (
-                <IconArrowRight size={12} />
+                <IconArrowRight size={14} />
               )}
               {isGenerating ? 'Generating…' : 'Generate'}
             </Button>

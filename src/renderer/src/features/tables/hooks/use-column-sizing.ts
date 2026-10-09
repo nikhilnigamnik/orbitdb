@@ -4,12 +4,18 @@
  * A sticky column needs an explicit `left`, which is the summed width of
  * everything pinned before it - so a frozen column is always explicitly sized,
  * or the offsets drift as auto-sized columns re-measure.
+ *
+ * The widths themselves travel as CSS variables on the table, and each cell's
+ * style only names the variable. Dragging a column edge then rewrites one style
+ * attribute instead of re-rendering every row on every frame.
  */
 
 import * as React from 'react'
 import { frozenOffsets, frozenWidth } from '../lib/frozen-columns'
 
 interface ColumnSizingOptions {
+  /** Data column ids in display order. */
+  columnIds: string[]
   /** Restored widths, keyed by column name. */
   savedColumnSizing?: Record<string, number>
   frozenColumns: string[]
@@ -17,7 +23,19 @@ interface ColumnSizingOptions {
   onColumnSizingCommit?: (sizing: Record<string, number>) => void
 }
 
+const MIN_WIDTH = 64
+const MAX_WIDTH = 1200
+
+function widthVar(index: number): string {
+  return `--grid-w-${index}`
+}
+
+function leftVar(index: number): string {
+  return `--grid-l-${index}`
+}
+
 export function useColumnSizing({
+  columnIds,
   savedColumnSizing,
   frozenColumns,
   onColumnSizingCommit
@@ -31,37 +49,61 @@ export function useColumnSizing({
     setColumnSizing(savedColumnSizing ?? {})
   }, [savedColumnSizing])
 
-  // Read back through a ref rather than the render closure: onMove outlives the
-  // render it was created in, and would otherwise commit the widths that existed
-  // when the drag started.
+  // Read back through a ref rather than the render closure: onUp outlives the
+  // render it was created in, and would otherwise commit the widths that
+  // existed when the drag started.
   const sizingRef = React.useRef(columnSizing)
   sizingRef.current = columnSizing
-
-  // Columns stay auto-sized until the user drags a header edge; only then is
-  // an explicit width pinned. Double-clicking the handle clears it back to auto.
-  // The drag is driven manually (not header.getResizeHandler()) because TanStack
-  // starts from its 150px default size, which makes auto-sized columns jump.
-  const resizedWidth = React.useCallback(
-    (columnId: string): number | undefined => columnSizing[columnId],
-    [columnSizing]
-  )
 
   const stickyOffsets = React.useMemo(
     () => frozenOffsets(frozenColumns, columnSizing),
     [frozenColumns, columnSizing]
   )
   const isAnyFrozen = frozenColumns.length > 0
-  /** A frozen column is always explicitly sized - the offsets depend on it. */
-  const stickyStyle = React.useCallback(
-    (columnId: string): React.CSSProperties | undefined => {
-      const left = stickyOffsets.get(columnId)
-      if (left === undefined) return undefined
-      const width = frozenWidth(columnId, columnSizing)
-      return { left, width, minWidth: width, maxWidth: width }
-    },
-    [stickyOffsets, columnSizing]
-  )
+
+  /** The values, on the table element. Changes on every frame of a drag. */
+  const widthVars = React.useMemo(() => {
+    const vars: Record<string, string> = {}
+    columnIds.forEach((id, index) => {
+      const left = stickyOffsets.get(id)
+      if (left !== undefined) {
+        vars[widthVar(index)] = `${frozenWidth(id, columnSizing)}px`
+        vars[leftVar(index)] = `${left}px`
+      } else if (columnSizing[id] !== undefined) {
+        vars[widthVar(index)] = `${columnSizing[id]}px`
+      }
+    })
+    return vars as React.CSSProperties
+  }, [columnIds, columnSizing, stickyOffsets])
+
+  // Which columns carry an explicit width at all. A drag changes the width but
+  // not this, so the per-cell styles built from it hold still for the drag.
+  const sizedKey = columnIds
+    .map((id) => (stickyOffsets.has(id) ? 'f' : columnSizing[id] !== undefined ? 's' : '-'))
+    .join('')
+
+  /**
+   * Per data column, the style its cells take: absent while auto-sized, the
+   * width variables once dragged, plus `left` when frozen.
+   */
+  const cellStyles = React.useMemo(() => {
+    const styles = new Map<string, React.CSSProperties>()
+    columnIds.forEach((id, index) => {
+      const kind = sizedKey[index]
+      if (kind === '-') return
+      const width = `var(${widthVar(index)})`
+      const style: React.CSSProperties = { width, minWidth: width, maxWidth: width }
+      if (kind === 'f') style.left = `var(${leftVar(index)})`
+      styles.set(id, style)
+    })
+    return styles
+  }, [columnIds, sizedKey])
+
   const [resizingColumn, setResizingColumn] = React.useState<string | null>(null)
+  // Columns stay auto-sized until the user drags a header edge; only then is
+  // an explicit width pinned. Double-clicking the handle clears it back to auto.
+  // The drag is driven manually (not header.getResizeHandler()) because TanStack
+  // starts from its 150px default size, which makes auto-sized columns jump.
   const startResize = React.useCallback(
     (e: React.MouseEvent<HTMLDivElement>, columnId: string) => {
       e.preventDefault()
@@ -70,23 +112,35 @@ export function useColumnSizing({
       const startWidth = th.getBoundingClientRect().width
       const startX = e.clientX
       setResizingColumn(columnId)
-      // The committed value is read off the table rather than tracked here:
-      // onMove runs on a stale closure over whatever sizing existed at mousedown.
-      let latest: Record<string, number> = sizingRef.current
+
+      let pendingWidth: number | null = null
+      let frame = 0
+      const apply = (width: number): void =>
+        setColumnSizing((prev) =>
+          prev[columnId] === width ? prev : { ...prev, [columnId]: width }
+        )
+      // At most one state update per frame: mousemove fires faster than the
+      // screen redraws, and each update re-renders the grid component.
       const onMove = (ev: MouseEvent): void => {
-        const width = Math.min(1200, Math.max(64, startWidth + ev.clientX - startX))
-        setColumnSizing((prev) => {
-          latest = { ...prev, [columnId]: width }
-          return latest
+        pendingWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + ev.clientX - startX))
+        if (frame) return
+        frame = requestAnimationFrame(() => {
+          frame = 0
+          if (pendingWidth !== null) apply(pendingWidth)
         })
       }
       const onUp = (): void => {
         window.removeEventListener('mousemove', onMove)
         window.removeEventListener('mouseup', onUp)
+        if (frame) cancelAnimationFrame(frame)
         setResizingColumn(null)
+        // A click on the handle with no drag changes nothing worth saving.
+        if (pendingWidth === null) return
+        const committed = { ...sizingRef.current, [columnId]: pendingWidth }
+        setColumnSizing(committed)
         // Once, at the end. Committing per frame would write to storage on
         // every mousemove of the drag.
-        onColumnSizingCommit?.(latest)
+        onColumnSizingCommit?.(committed)
       }
       window.addEventListener('mousemove', onMove)
       window.addEventListener('mouseup', onUp)
@@ -95,12 +149,10 @@ export function useColumnSizing({
   )
   const resetColumnSize = React.useCallback(
     (columnId: string) => {
-      setColumnSizing((prev) => {
-        const next = { ...prev }
-        delete next[columnId]
-        onColumnSizingCommit?.(next)
-        return next
-      })
+      const next = { ...sizingRef.current }
+      delete next[columnId]
+      setColumnSizing(next)
+      onColumnSizingCommit?.(next)
     },
     [onColumnSizingCommit]
   )
@@ -108,10 +160,9 @@ export function useColumnSizing({
   return {
     columnSizing,
     setColumnSizing,
-    resizedWidth,
-    stickyOffsets,
     isAnyFrozen,
-    stickyStyle,
+    widthVars,
+    cellStyles,
     resizingColumn,
     startResize,
     resetColumnSize

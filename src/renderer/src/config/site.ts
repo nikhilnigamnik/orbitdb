@@ -2,7 +2,7 @@ import type { ConnectionColor, ConnectionEnvironment, DatabaseEngine } from '@re
 
 // Same rule as the AI re-exports above: a value crossing the shared boundary
 // comes through config/ rather than a relative path from a component.
-export { normalizeFolder, CONNECTION_COLORS } from '../../../shared/types'
+export { normalizeFolder, CONNECTION_COLORS, canReuseStoredSecrets } from '../../../shared/types'
 
 // Re-exported so components follow the usual "constants come from config/" rule
 // rather than reaching across the shared boundary by relative path.
@@ -12,6 +12,7 @@ export {
   DEFAULT_AI_PROVIDER,
   MISSING_AI_KEY_MESSAGE,
   aiFeatureLabel,
+  isAiSetupMessage,
   aiModelLabel,
   aiProvider,
   needsGatewayIds
@@ -21,7 +22,6 @@ export { formatCost, isPricedModel, rateFor } from '../../../shared/ai-pricing'
 
 export const APP_NAME = 'OrbitDB'
 export const APP_TAGLINE = 'Postgres + MySQL, made friendly'
-export const APP_VERSION = '0.1.0'
 
 export const GITHUB_REPO_URL = 'https://github.com/nikhilnigamnik/orbitdb'
 
@@ -106,6 +106,22 @@ export const CONNECTION_COLOR_CLASS: Record<ConnectionColor, string> = {
   amber: 'bg-tag-amber',
   orange: 'bg-tag-orange',
   rose: 'bg-tag-rose'
+}
+
+/**
+ * A tag filled behind a letter (the sidebar's connection tile). Ink follows
+ * the fill so the initial holds 4.5:1: dark on the light tags, white on the
+ * dark ones, and green and rose - which carry neither - on deeper fills.
+ */
+export const CONNECTION_TILE_CLASS: Record<ConnectionColor, string> = {
+  slate: 'bg-tag-slate text-text',
+  blue: 'bg-tag-blue text-white',
+  violet: 'bg-tag-violet text-white',
+  cyan: 'bg-tag-cyan text-text',
+  green: 'bg-tag-green-deep text-white',
+  amber: 'bg-tag-amber text-text',
+  orange: 'bg-tag-orange text-text',
+  rose: 'bg-tag-rose-deep text-white'
 }
 
 export const CONNECTION_COLOR_LABEL: Record<ConnectionColor, string> = {

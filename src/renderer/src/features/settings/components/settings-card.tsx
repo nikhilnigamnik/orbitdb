@@ -2,13 +2,24 @@ import * as React from 'react'
 import { cn } from '@renderer/lib/utils'
 
 /**
- * The shape every settings group takes: one bordered card, rows divided by a
- * hairline. Grouping is what tells you which controls belong together, so it is
- * a component rather than a class string copied per section.
+ * The shape every settings group takes: one white card with a hairline edge,
+ * rows divided by a hairline. Grouping is what tells you which controls belong
+ * together, so it is a component rather than a class string copied per section.
  */
-export function SettingsCard({ children }: { children: React.ReactNode }) {
+export function SettingsCard({
+  children,
+  className
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
   return (
-    <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface-elevated/20">
+    <div
+      className={cn(
+        'divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface shadow-card',
+        className
+      )}
+    >
       {children}
     </div>
   )
@@ -27,13 +38,13 @@ export function SettingRow({ title, description, children, isStacked }: SettingR
   return (
     <div
       className={cn(
-        'flex gap-3 p-4',
-        isStacked ? 'flex-col' : 'flex-row items-center justify-between'
+        'flex min-h-14 gap-3 px-4 py-3',
+        isStacked ? 'flex-col' : 'flex-row items-center justify-between gap-6'
       )}
     >
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-xs font-medium text-text">{title}</span>
-        {description && <span className="text-xs text-text-subtle">{description}</span>}
+        <span className="text-sm font-medium text-text">{title}</span>
+        {description && <span className="text-xs text-text-muted">{description}</span>}
       </div>
       {children && <div className={cn(!isStacked && 'shrink-0')}>{children}</div>}
     </div>
@@ -43,7 +54,7 @@ export function SettingRow({ title, description, children, isStacked }: SettingR
 /** A quieter strip under the rows, for a note plus the group's one action. */
 export function SettingFooter({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 bg-surface-elevated/20 px-4 py-2.5">
+    <div className="flex min-h-12 items-center justify-between gap-3 bg-bg px-4 py-2.5">
       {children}
     </div>
   )

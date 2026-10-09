@@ -111,3 +111,43 @@ describe('after a cell edit', () => {
     expect(markedRow(), 'and the row marker with it').toBeNull()
   })
 })
+
+describe('Cmd+Z', () => {
+  function mountView() {
+    render(
+      <MemoryRouter>
+        <ToastProvider>
+          <TableDataView connectionId="c1" details={details} />
+        </ToastProvider>
+      </MemoryRouter>
+    )
+  }
+
+  it('undoes the last cell edit from the grid', async () => {
+    const updateRow = vi.fn(() => ok({ id: 'a1', related_type: 'Customer' }))
+    Object.assign(window.api.db, { updateRow })
+    mountView()
+    await editRelatedType()
+    await waitFor(() => expect(updateRow).toHaveBeenCalledTimes(1))
+
+    fireEvent.keyDown(document.body, { key: 'z', metaKey: true })
+    await waitFor(() => expect(updateRow).toHaveBeenCalledTimes(2))
+  })
+
+  it('stands down while a sheet is open over the grid', async () => {
+    const updateRow = vi.fn(() => ok({ id: 'a1', related_type: 'Customer' }))
+    Object.assign(window.api.db, { updateRow })
+    mountView()
+    await editRelatedType()
+    await waitFor(() => expect(updateRow).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByLabelText('Edit row'))
+    await screen.findByText('Save changes')
+    fireEvent.keyDown(document.body, { key: 'z', metaKey: true })
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    expect(updateRow, 'an edit the user cannot see is not undone').toHaveBeenCalledTimes(1)
+  })
+})
