@@ -9,9 +9,9 @@ export const AI_PROVIDERS = [
     label: 'Anthropic',
     keyPlaceholder: 'sk-ant-…',
     models: [
-      { id: 'claude-sonnet-5', label: 'Sonnet 5', hint: 'Balanced - the default' },
-      { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', hint: 'Fastest and cheapest' },
-      { id: 'claude-opus-5', label: 'Opus 5', hint: 'Strongest on complex SQL' },
+      { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5', hint: 'Balanced - the default' },
+      { id: 'claude-haiku-5-5', label: 'Haiku 5.5', hint: 'Fastest and cheapest' },
+      { id: 'claude-opus-5-5', label: 'Opus 5.5', hint: 'Strongest on complex SQL' },
       { id: 'claude-fable-5-1', label: 'Fable 5.1', hint: 'Most capable - priciest' }
     ]
   },
@@ -20,14 +20,9 @@ export const AI_PROVIDERS = [
     label: 'OpenAI',
     keyPlaceholder: 'sk-…',
     models: [
-      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', hint: 'Balanced - the default' },
-      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', hint: 'Fastest and cheapest' },
-      { id: 'gpt-6-astra', label: 'GPT-6 Astra', hint: 'Most capable - priciest' },
-      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', hint: 'Strong on complex SQL' },
-      { id: 'gpt-5.5', label: 'GPT-5.5', hint: 'Older flagship' },
-      { id: 'gpt-5.2', label: 'GPT-5.2', hint: 'Older, still capable' },
-      { id: 'gpt-5.2-pro', label: 'GPT-5.2 Pro', hint: 'Older reasoning tier - costly' },
-      { id: 'gpt-5-mini', label: 'GPT-5 mini', hint: 'Older, very cheap' }
+      { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', hint: 'Balanced - the default' },
+      { id: 'gpt-6-luna', label: 'GPT-6 Luna', hint: 'Fastest and cheapest' },
+      { id: 'gpt-6-astra', label: 'GPT-6 Astra', hint: 'Most capable - priciest' }
     ]
   },
   {
@@ -35,14 +30,9 @@ export const AI_PROVIDERS = [
     label: 'Google',
     keyPlaceholder: 'AIza…',
     models: [
-      { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', hint: 'Balanced - the default' },
+      { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', hint: 'Balanced - the default' },
       { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', hint: 'Fast and cheap' },
-      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', hint: 'Strongest - preview model' },
-      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', hint: 'Previous Flash' },
-      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', hint: 'Older, cheaper still' },
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', hint: 'Older reasoning tier' },
-      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Older, widely available' },
-      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite', hint: 'Cheapest offered' }
+      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', hint: 'Strongest - preview model' }
     ]
   },
   {
@@ -65,28 +55,17 @@ export const AI_PROVIDERS = [
      * which made both Gemini rows here unusable.
      */
     models: [
-      { id: 'anthropic/claude-sonnet-5', label: 'Sonnet 5', hint: 'Anthropic - the default' },
-      {
-        id: 'anthropic/claude-haiku-4-5-20251001',
-        label: 'Haiku 4.5',
-        hint: 'Anthropic - fast and cheap'
-      },
-      { id: 'anthropic/claude-opus-5', label: 'Opus 5', hint: 'Anthropic - strongest' },
+      { id: 'anthropic/claude-sonnet-5-5', label: 'Sonnet 5.5', hint: 'Anthropic - the default' },
+      { id: 'anthropic/claude-haiku-5-5', label: 'Haiku 5.5', hint: 'Anthropic - fast and cheap' },
+      { id: 'anthropic/claude-opus-5-5', label: 'Opus 5.5', hint: 'Anthropic - strongest' },
       { id: 'anthropic/claude-fable-5-1', label: 'Fable 5.1', hint: 'Anthropic - most capable' },
-      { id: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra', hint: 'OpenAI - balanced' },
-      { id: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna', hint: 'OpenAI - fast and cheap' },
+      { id: 'openai/gpt-6.1-sol', label: 'GPT-6.1 Sol', hint: 'OpenAI - balanced' },
+      { id: 'openai/gpt-6-luna', label: 'GPT-6 Luna', hint: 'OpenAI - fast and cheap' },
       { id: 'openai/gpt-6-astra', label: 'GPT-6 Astra', hint: 'OpenAI - most capable' },
-      { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol', hint: 'OpenAI - strong' },
-      { id: 'openai/gpt-5.5', label: 'GPT-5.5', hint: 'OpenAI - previous flagship' },
       {
-        id: 'google-ai-studio/gemini-3.6-flash',
-        label: 'Gemini 3.6 Flash',
+        id: 'google-ai-studio/gemini-3.8-flash',
+        label: 'Gemini 3.8 Flash',
         hint: 'Google - balanced'
-      },
-      {
-        id: 'google-ai-studio/gemini-3.5-flash',
-        label: 'Gemini 3.5 Flash',
-        hint: 'Google - previous Flash'
       },
       {
         id: 'google-ai-studio/gemini-3.5-flash-lite',
@@ -97,8 +76,7 @@ export const AI_PROVIDERS = [
         id: 'google-ai-studio/gemini-3.1-pro-preview',
         label: 'Gemini 3.1 Pro',
         hint: 'Google - strongest, preview'
-      },
-      { id: 'google-ai-studio/gemini-2.5-flash', label: 'Gemini 2.5 Flash', hint: 'Google - cheap' }
+      }
     ]
   }
 ] as const
@@ -144,6 +122,15 @@ export const MISSING_AI_KEY_MESSAGE =
 /** Matched the same way as `MISSING_AI_KEY_MESSAGE`, for a half-filled gateway. */
 export const INCOMPLETE_GATEWAY_MESSAGE =
   'The Cloudflare AI Gateway needs an account id and a gateway id. Add them in Settings.'
+
+/**
+ * True for the errors that mean "finish setting up AI in Settings" rather than
+ * "something broke". The one place both messages are matched, so a third cannot
+ * be added to main without the renderer learning about it here.
+ */
+export function isAiSetupMessage(message: string | null | undefined): boolean {
+  return message === MISSING_AI_KEY_MESSAGE || message === INCOMPLETE_GATEWAY_MESSAGE
+}
 
 export function aiProvider(id: AiProviderId): (typeof AI_PROVIDERS)[number] {
   const found = AI_PROVIDERS.find((provider) => provider.id === id)

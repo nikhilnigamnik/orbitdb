@@ -5,7 +5,7 @@ import { currentAiModelId } from './ai-models'
  * tokens. Lives in `shared/` because main prices the usage rollup and the
  * renderer labels the result.
  *
- * Sourced from each vendor's own pricing page (checked 2026-09-06) - deliberately
+ * Sourced from each vendor's own pricing page (checked 2026-10-08) - deliberately
  * not from a third-party aggregator, several of which disagree with the vendor by
  * a factor of two. **These are hardcoded and will drift.** Nothing in the app can
  * detect that, so the figures are always presented as an estimate.
@@ -37,16 +37,49 @@ interface ModelPricing extends TokenRate {
 const PRICING: Record<string, ModelPricing> = {
   // Anthropic - platform.claude.com/docs/en/about-claude/models/overview
   'claude-fable-5-1': { input: 10, output: 50 },
-  'claude-opus-5': { input: 5, output: 25 },
-  // $2/$10 was announced as introductory pricing through 2026-08-31. Anthropic
-  // has since made it the standard rate and cancelled the increase to $3/$15,
-  // so this is flat rather than a promo - and every day of history prices the
-  // same, which is why removing the promo does not rewrite what was recorded.
-  'claude-sonnet-5': { input: 2, output: 10 },
-  'claude-haiku-4-5-20251001': { input: 1, output: 5 },
+  'claude-opus-5-5': { input: 4, output: 20 },
+  'claude-sonnet-5-5': { input: 2, output: 10 },
+  // $0.50/$2.50 above 100K input tokens; schema prompts stay well under that.
+  'claude-haiku-5-5': { input: 0.1, output: 0.5 },
 
   // OpenAI - developers.openai.com/api/docs/pricing
   'gpt-6-astra': { input: 10, output: 50 },
+  'gpt-6.1-sol': { input: 2, output: 10 },
+  'gpt-6-luna': { input: 0.1, output: 0.5 },
+
+  // Google - ai.google.dev/gemini-api/docs/pricing
+  'gemini-3.8-flash': {
+    input: 1.5,
+    output: 7.5,
+    promo: { input: 0.75, output: 3.75, through: '2026-12-31' }
+  },
+  'gemini-3.5-flash-lite': { input: 0.3, output: 2.5 },
+  'gemini-3.1-pro-preview': { input: 2, output: 12 },
+
+  // Cloudflare AI Gateway - developers.cloudflare.com/ai-gateway/features/unified-billing
+  // Inference is passed through at each vendor's own rate with no markup, so
+  // these mirror the rows above. The 5% fee is charged when credits are bought,
+  // not per call, so it cannot be priced per token here.
+  'anthropic/claude-fable-5-1': { input: 10, output: 50 },
+  'anthropic/claude-opus-5-5': { input: 4, output: 20 },
+  'anthropic/claude-sonnet-5-5': { input: 2, output: 10 },
+  'anthropic/claude-haiku-5-5': { input: 0.1, output: 0.5 },
+  'openai/gpt-6-astra': { input: 10, output: 50 },
+  'openai/gpt-6.1-sol': { input: 2, output: 10 },
+  'openai/gpt-6-luna': { input: 0.1, output: 0.5 },
+  'google-ai-studio/gemini-3.8-flash': {
+    input: 1.5,
+    output: 7.5,
+    promo: { input: 0.75, output: 3.75, through: '2026-12-31' }
+  },
+  'google-ai-studio/gemini-3.5-flash-lite': { input: 0.3, output: 2.5 },
+  'google-ai-studio/gemini-3.1-pro-preview': { input: 2, output: 12 },
+
+  // Retired from the picker but kept, so usage already recorded under them still
+  // prices instead of dropping into `unpricedCalls`. Rates as they were when retired.
+  'claude-opus-5': { input: 5, output: 25 },
+  'claude-sonnet-5': { input: 2, output: 10 },
+  'claude-haiku-4-5-20251001': { input: 1, output: 5 },
   'gpt-5.6-sol': {
     input: 5,
     output: 30,
@@ -58,26 +91,15 @@ const PRICING: Record<string, ModelPricing> = {
   'gpt-5.2': { input: 1.75, output: 14 },
   'gpt-5.2-pro': { input: 21, output: 168 },
   'gpt-5-mini': { input: 0.25, output: 2 },
-
-  // Google - ai.google.dev/gemini-api/docs/pricing
   'gemini-3.6-flash': { input: 1.5, output: 7.5 },
   'gemini-3.5-flash': { input: 1.5, output: 9 },
-  'gemini-3.5-flash-lite': { input: 0.3, output: 2.5 },
-  'gemini-3.1-pro-preview': { input: 2, output: 12 },
   'gemini-3.1-flash-lite': { input: 0.25, output: 1.5 },
   'gemini-2.5-pro': { input: 1.25, output: 10 },
   'gemini-2.5-flash': { input: 0.3, output: 2.5 },
   'gemini-2.5-flash-lite': { input: 0.1, output: 0.4 },
-
-  // Cloudflare AI Gateway - developers.cloudflare.com/ai-gateway/features/unified-billing
-  // Inference is passed through at each vendor's own rate with no markup, so
-  // these mirror the rows above. The 5% fee is charged when credits are bought,
-  // not per call, so it cannot be priced per token here.
-  'anthropic/claude-fable-5-1': { input: 10, output: 50 },
   'anthropic/claude-opus-5': { input: 5, output: 25 },
   'anthropic/claude-sonnet-5': { input: 2, output: 10 },
   'anthropic/claude-haiku-4-5-20251001': { input: 1, output: 5 },
-  'openai/gpt-6-astra': { input: 10, output: 50 },
   'openai/gpt-5.6-terra': { input: 2, output: 12 },
   'openai/gpt-5.6-luna': { input: 0.2, output: 1.2 },
   'openai/gpt-5.6-sol': {
@@ -88,8 +110,6 @@ const PRICING: Record<string, ModelPricing> = {
   'openai/gpt-5.5': { input: 5, output: 30 },
   'google-ai-studio/gemini-3.6-flash': { input: 1.5, output: 7.5 },
   'google-ai-studio/gemini-3.5-flash': { input: 1.5, output: 9 },
-  'google-ai-studio/gemini-3.5-flash-lite': { input: 0.3, output: 2.5 },
-  'google-ai-studio/gemini-3.1-pro-preview': { input: 2, output: 12 },
   'google-ai-studio/gemini-2.5-flash': { input: 0.3, output: 2.5 }
 }
 
