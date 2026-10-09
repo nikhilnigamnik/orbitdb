@@ -34,7 +34,9 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 
 **AI (optional)**
 
-- **Natural language → SQL**, grounded in your schema. The result lands in the editor for review rather than executing itself.
+- **Natural language → SQL**, grounded in your schema - or describe a change ("only last week", "group by city") and it edits the query already in the editor. The result lands in the editor for review rather than executing itself.
+- **Fix with AI** - when a query fails, one click sends the SQL and the database's error and puts a corrected query in the editor, with a sentence on what was wrong.
+- **Explain query** - a plain-English walk-through of what the SQL in the editor does, flagging things like voided rows being counted or a join that multiplies rows.
 - **Natural language → filters** on the current table.
 - **Explain a table**, **suggest indexes**, and **generate seed data** - the model returns values, and the inserts are built in code with engine-correct quoting.
 

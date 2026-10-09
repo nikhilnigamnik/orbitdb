@@ -5,15 +5,29 @@ import { Spinner } from '@renderer/components/ui/spinner'
 import { Dialog } from '@renderer/components/ui/dialog'
 import { Kbd } from '@renderer/components/ui/kbd'
 import { Chip } from '@renderer/components/ui/chip'
+import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 
 interface AiPromptProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (prompt: string) => void
+  /** `isRevision` is true when the request should edit the existing query. */
+  onSubmit: (prompt: string, isRevision: boolean) => void
   isGenerating?: boolean
   placeholder?: string
   suggestions?: string[]
+  /**
+   * Offers to edit an existing query rather than write a new one - the SQL
+   * editor passes this when it holds one. Editing is the default then, since a
+   * follow-up ("only last week") is the commoner request once a query exists.
+   */
+  canRevise?: boolean
 }
+
+const REVISION_SUGGESTIONS = [
+  'Only include rows from the last 30 days',
+  'Sort the newest first',
+  'Also show the total count'
+]
 
 const DEFAULT_SUGGESTIONS = [
   'Top 10 customers by revenue this month',
@@ -32,9 +46,17 @@ export function AiPrompt({
   onSubmit,
   isGenerating = false,
   placeholder = 'Describe the query you want…',
-  suggestions = DEFAULT_SUGGESTIONS
+  suggestions = DEFAULT_SUGGESTIONS,
+  canRevise = false
 }: AiPromptProps) {
   const [prompt, setPrompt] = React.useState('')
+  const [wantsNewQuery, setWantsNewQuery] = React.useState(false)
+  const isRevision = canRevise && !wantsNewQuery
+
+  // Each opening starts from the default for what the editor holds now.
+  React.useEffect(() => {
+    if (open) setWantsNewQuery(false)
+  }, [open])
 
   function close() {
     onOpenChange(false)
@@ -43,7 +65,7 @@ export function AiPrompt({
   function submit(value: string = prompt) {
     const trimmed = value.trim()
     if (!trimmed || isGenerating) return
-    onSubmit(trimmed)
+    onSubmit(trimmed, isRevision)
     setPrompt('')
   }
 
@@ -51,8 +73,12 @@ export function AiPrompt({
     <Dialog
       open={open}
       setOpen={onOpenChange}
-      title="Ask AI to write SQL"
-      description="Describe the query in plain words. The SQL lands in the editor for review."
+      title={isRevision ? 'Ask AI to edit the query' : 'Ask AI to write SQL'}
+      description={
+        isRevision
+          ? 'Describe the change in plain words. The revised query replaces the one in the editor, for review.'
+          : 'Describe the query in plain words. The SQL lands in the editor for review.'
+      }
       content={
         <>
           <div className="flex h-12 items-center gap-2.5 border-b border-border px-4">
@@ -72,7 +98,13 @@ export function AiPrompt({
                   submit()
                 }
               }}
-              placeholder={isGenerating ? 'Generating…' : placeholder}
+              placeholder={
+                isGenerating
+                  ? 'Generating…'
+                  : isRevision
+                    ? 'Describe the change to make…'
+                    : placeholder
+              }
               className="min-w-0 flex-1 bg-transparent text-sm text-text placeholder:text-text-subtle focus:outline-none disabled:opacity-60"
             />
             <Chip tone="accent">Beta</Chip>
@@ -87,11 +119,24 @@ export function AiPrompt({
             </Button>
           </div>
 
+          {canRevise && (
+            <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+              <SlidingTabs
+                value={isRevision ? 'edit' : 'new'}
+                onChange={(value) => setWantsNewQuery(value === 'new')}
+                tabs={[
+                  { id: 'edit', label: 'Edit current query' },
+                  { id: 'new', label: 'New query' }
+                ]}
+              />
+            </div>
+          )}
+
           <div className="flex flex-col p-1.5">
             <p className="flex h-7 items-center px-2 text-[12px] font-medium text-text-subtle">
               Try
             </p>
-            {suggestions.map((s) => (
+            {(isRevision ? REVISION_SUGGESTIONS : suggestions).map((s) => (
               <button
                 key={s}
                 type="button"
@@ -125,7 +170,7 @@ export function AiPrompt({
               ) : (
                 <IconArrowRight size={14} />
               )}
-              {isGenerating ? 'Generating…' : 'Generate'}
+              {isGenerating ? 'Generating…' : isRevision ? 'Update query' : 'Generate'}
             </Button>
           </div>
         </>

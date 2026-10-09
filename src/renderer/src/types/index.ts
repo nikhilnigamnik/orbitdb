@@ -10,6 +10,8 @@ export type {
   CascadeDeleteResult,
   CascadeDeleteStep,
   CascadeDetachStep,
+  ExplainSqlResult,
+  FixSqlResult,
   ColumnInfo,
   ConnectionColor,
   ConnectionEnvironment,

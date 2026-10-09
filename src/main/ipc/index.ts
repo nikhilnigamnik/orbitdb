@@ -11,6 +11,8 @@ import type {
   DdlRequest,
   DistinctValuesOptions,
   ExplainTableOptions,
+  ExplainSqlOptions,
+  FixSqlOptions,
   FilterTableOptions,
   GenerateSeedOptions,
   GenerateSqlOptions,
@@ -26,6 +28,8 @@ import type {
   CheckReferencesOptions
 } from '../../shared/types'
 import { generateSql } from '../ai/generate-sql'
+import { fixSql } from '../ai/fix-sql'
+import { explainSql } from '../ai/explain-sql'
 import { explainTable } from '../ai/explain-table'
 import { filterTable } from '../ai/filter-table'
 import { suggestIndexes } from '../ai/suggest-indexes'
@@ -256,6 +260,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'ai:generate-sql',
     wrap(async (opts: GenerateSqlOptions) => generateSql(opts))
+  )
+  ipcMain.handle(
+    'ai:fix-sql',
+    wrap(async (opts: FixSqlOptions) => fixSql(opts))
+  )
+  ipcMain.handle(
+    'ai:explain-sql',
+    wrap(async (opts: ExplainSqlOptions) => explainSql(opts))
   )
   ipcMain.handle(
     'ai:filter-table',

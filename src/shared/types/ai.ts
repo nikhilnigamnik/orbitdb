@@ -10,6 +10,8 @@ export type { AiFeature, AiModelId, AiProviderId }
 export interface GenerateSqlOptions {
   connectionId: string
   prompt: string
+  /** The editor's query, to be revised rather than replaced. Absent writes a new one. */
+  currentSql?: string
 }
 
 export interface GenerateSqlResult {
@@ -33,6 +35,31 @@ export interface FilterTableResult {
    * request would return a wider result set that looks like an answer.
    */
   notes?: string[]
+}
+
+export interface FixSqlOptions {
+  connectionId: string
+  sql: string
+  /** The database's own error message from running `sql`. */
+  error: string
+}
+
+export interface FixSqlResult {
+  sql: string
+  /** One or two sentences naming the cause and the change. */
+  explanation: string
+  /** False when the model judged the error not to be the query's fault. */
+  isChanged: boolean
+}
+
+export interface ExplainSqlOptions {
+  connectionId: string
+  sql: string
+}
+
+export interface ExplainSqlResult {
+  /** Markdown. */
+  explanation: string
 }
 
 export interface ExplainTableOptions {

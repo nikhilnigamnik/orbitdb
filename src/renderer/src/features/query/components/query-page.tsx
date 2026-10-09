@@ -7,7 +7,8 @@ import {
   IconPlug,
   IconTrash,
   IconSparkles,
-  IconTerminal2
+  IconTerminal2,
+  IconBulb
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { PageHeader } from '@renderer/components/layout/page-header'
@@ -28,7 +29,10 @@ import { SqlEditor } from './sql-editor'
 import { QueryResults } from './query-results'
 import { AiPrompt } from './ai-prompt'
 import { QueryLibrarySheet } from './query-library-sheet'
+import { ExplainQuerySheet } from './explain-query-sheet'
 import { useSqlSchema } from '../hooks/use-sql-schema'
+import { useQueryAi, type FailedRun } from '../hooks/use-query-ai'
+import { hasSqlBody } from '../lib/sql-text'
 
 const MIN_PANEL_PCT = 15
 const MAX_PANEL_PCT = 85
@@ -69,7 +73,18 @@ export function QueryPage() {
   const [pendingRun, setPendingRun] = React.useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [isAiOpen, setIsAiOpen] = React.useState(false)
-  const [isAiGenerating, setIsAiGenerating] = React.useState(false)
+  // Only a run the database rejected; an AI failure shown in the same pane is
+  // not something "Fix with AI" could act on.
+  const [failedRun, setFailedRun] = React.useState<FailedRun | null>(null)
+  const ai = useQueryAi({
+    connectionId,
+    sql,
+    setSql,
+    setResult: (next) => {
+      setFailedRun(null)
+      setResult(next)
+    }
+  })
   const [editorPct, setEditorPct] = React.useState(50)
   const [isDragging, setIsDragging] = React.useState(false)
   const splitRef = React.useRef<HTMLDivElement>(null)
@@ -151,11 +166,16 @@ export function QueryPage() {
         window.api.db.runQuery({ connectionId, sql: trimmed, queryId })
       )
       setResult(queryResult)
+      setFailedRun(
+        queryResult.success ? null : { sql: trimmed, error: queryResult.error ?? 'Query failed' }
+      )
       await recordRun(trimmed, queryResult.durationMs, queryResult.success)
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setFailedRun({ sql: trimmed, error: message })
       setResult({
         success: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: message,
         rows: [],
         fields: [],
         rowCount: null,
@@ -233,41 +253,11 @@ export function QueryPage() {
     }
   }
 
-  async function handleAiGenerate(prompt: string) {
-    if (!active || isAiGenerating) return
-    setIsAiGenerating(true)
-    try {
-      const { sql: generated } = await unwrap(
-        window.api.ai.generateSql({ connectionId: active.connectionId, prompt })
-      )
-      // Put it in the editor rather than running it. The model is told to
-      // prefer SELECT, but that is a preference in a prompt - a misread request
-      // used to reach the database with nothing in between.
-      const replaced = sql
-      setSql(generated)
-      setIsAiOpen(false)
-      // The draft is persisted on every keystroke, so overwriting it puts the
-      // old text beyond reach - history only holds queries that were run.
-      if (replaced.trim()) {
-        toast.info('Replaced the editor contents', {
-          action: { label: 'Undo', onClick: () => setSql(replaced) }
-        })
-      }
-    } catch (err) {
-      setIsAiOpen(false)
-      setResult({
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-        rows: [],
-        fields: [],
-        rowCount: null,
-        command: null,
-        durationMs: 0,
-        truncated: false
-      })
-    } finally {
-      setIsAiGenerating(false)
-    }
+  async function handleAiGenerate(prompt: string, isRevision: boolean) {
+    // Closed either way: on success the editor holds the answer, on failure the
+    // results pane holds the error.
+    await ai.generate(prompt, isRevision)
+    setIsAiOpen(false)
   }
 
   const connectionLabel = current?.name ?? active.currentDatabase
@@ -293,6 +283,16 @@ export function QueryPage() {
             >
               <IconSparkles size={14} className="text-accent-text" />
               Ask AI
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void ai.explain()}
+              disabled={!hasSqlBody(sql)}
+              title="Explain the query in the editor"
+            >
+              <IconBulb size={14} className="text-text-subtle" />
+              Explain
             </Button>
             <Sheet
               openSheet={historyOpen}
@@ -393,7 +393,12 @@ export function QueryPage() {
           />
 
           <div className="min-h-0 flex-1 overflow-hidden">
-            <QueryResults result={result} isRunning={isRunning} />
+            <QueryResults
+              result={result}
+              isRunning={isRunning}
+              onFixWithAi={failedRun ? () => void ai.fix(failedRun) : undefined}
+              isFixing={ai.isFixing}
+            />
           </div>
         </div>
       </div>
@@ -401,9 +406,12 @@ export function QueryPage() {
       <AiPrompt
         open={isAiOpen}
         onOpenChange={setIsAiOpen}
-        onSubmit={handleAiGenerate}
-        isGenerating={isAiGenerating}
+        onSubmit={(prompt, isRevision) => void handleAiGenerate(prompt, isRevision)}
+        isGenerating={ai.isGenerating}
+        canRevise={hasSqlBody(sql)}
       />
+
+      <ExplainQuerySheet explanation={ai.explanation} onClose={ai.closeExplanation} />
 
       <ConfirmDialog
         isOpen={pendingRun != null}

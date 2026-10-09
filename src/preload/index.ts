@@ -4,6 +4,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   ActiveConnectionMeta,
+  ExplainSqlOptions,
+  ExplainSqlResult,
+  FixSqlOptions,
+  FixSqlResult,
   AiModelId,
   AiProviderId,
   AiGatewayIds,
@@ -105,6 +109,8 @@ const api = {
   },
   ai: {
     generateSql: (opts: GenerateSqlOptions) => invoke<GenerateSqlResult>('ai:generate-sql', opts),
+    fixSql: (opts: FixSqlOptions) => invoke<FixSqlResult>('ai:fix-sql', opts),
+    explainSql: (opts: ExplainSqlOptions) => invoke<ExplainSqlResult>('ai:explain-sql', opts),
     filterTable: (opts: FilterTableOptions) => invoke<FilterTableResult>('ai:filter-table', opts),
     explainTable: (opts: ExplainTableOptions) =>
       invoke<ExplainTableResult>('ai:explain-table', opts),

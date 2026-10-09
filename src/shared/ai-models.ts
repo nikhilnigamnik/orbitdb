@@ -98,6 +98,8 @@ export const DEFAULT_AI_PROVIDER: AiProviderId = 'anthropic'
 /** What a model call was for. Recorded with its token usage. */
 export const AI_FEATURES = [
   { id: 'generate-sql', label: 'Generate SQL' },
+  { id: 'fix-sql', label: 'Fix SQL' },
+  { id: 'explain-sql', label: 'Explain query' },
   { id: 'filter-table', label: 'AI filter' },
   { id: 'explain-table', label: 'Explain table' },
   { id: 'suggest-indexes', label: 'Suggest indexes' },

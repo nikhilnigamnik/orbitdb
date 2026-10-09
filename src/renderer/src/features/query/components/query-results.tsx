@@ -9,11 +9,13 @@ import {
   IconHash,
   IconId,
   IconLetterCase,
+  IconSparkles,
   IconTable,
   IconToggleLeft
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Chip } from '@renderer/components/ui/chip'
+import { Spinner } from '@renderer/components/ui/spinner'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { formatCellValue, formatNumber } from '@renderer/lib/format'
 import { ExportMenu } from '@renderer/features/tables/components/export-menu'
@@ -25,6 +27,9 @@ import { AiKeyRequired, isMissingAiKeyError } from '@renderer/components/common/
 interface QueryResultsProps {
   result: QueryResult | null
   isRunning: boolean
+  /** Offered on an error the database returned, never on an AI failure shown here. */
+  onFixWithAi?: () => void
+  isFixing?: boolean
 }
 
 /** What a screen reader hears when a run finishes, since the strip itself is not focusable. */
@@ -51,20 +56,21 @@ function announcement(result: QueryResult | null, isRunning: boolean): string {
  * loading, error and result layouts - a region mounted already holding its text
  * is not reliably announced.
  */
-export function QueryResults({ result, isRunning }: QueryResultsProps) {
+export function QueryResults(props: QueryResultsProps) {
+  const { result, isRunning } = props
   return (
     <div className="flex h-full flex-col">
       <p role="status" className="sr-only">
         {announcement(result, isRunning)}
       </p>
       <div className="min-h-0 flex-1">
-        <QueryResultsBody result={result} isRunning={isRunning} />
+        <QueryResultsBody {...props} />
       </div>
     </div>
   )
 }
 
-function QueryResultsBody({ result, isRunning }: QueryResultsProps) {
+function QueryResultsBody({ result, isRunning, onFixWithAi, isFixing }: QueryResultsProps) {
   if (isRunning) {
     return <LoadingState />
   }
@@ -94,6 +100,23 @@ function QueryResultsBody({ result, isRunning }: QueryResultsProps) {
           <pre className="rounded-lg border border-danger/20 bg-danger/5 p-3 font-mono text-xs break-words whitespace-pre-wrap text-danger">
             {result.error}
           </pre>
+          {/* Beside the error it acts on, where the eye already is. */}
+          {onFixWithAi && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-3"
+              onClick={onFixWithAi}
+              disabled={isFixing}
+            >
+              {isFixing ? (
+                <Spinner size={14} className="text-current" />
+              ) : (
+                <IconSparkles size={14} className="text-accent-text" />
+              )}
+              {isFixing ? 'Fixing…' : 'Fix with AI'}
+            </Button>
+          )}
         </div>
         <ResultsFooter>
           <Chip tone="rose">
