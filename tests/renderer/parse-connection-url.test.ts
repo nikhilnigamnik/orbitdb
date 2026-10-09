@@ -42,6 +42,19 @@ describe('parseConnectionUrl', () => {
     expect(parseConnectionUrl('postgres://h/db')?.ssl).toBe(false)
   })
 
+  it('turns SSL on for hosts that refuse to connect without it', () => {
+    // A Neon URL copied without its query string: Neon rejects plain text with
+    // "connection is insecure", so off would save a connection that never opens.
+    expect(
+      parseConnectionUrl('postgresql://u:p@ep-x-pooler.c-4.us-east-2.aws.neon.tech/neondb')?.ssl
+    ).toBe(true)
+    expect(parseConnectionUrl('postgres://u:p@db.abc.supabase.co/postgres')?.ssl).toBe(true)
+    expect(parseConnectionUrl('mysql://u:p@aws.connect.psdb.cloud/app')?.ssl).toBe(true)
+    // An explicit mode still wins, and look-alike hosts are not matched.
+    expect(parseConnectionUrl('postgres://u:p@x.neon.tech/db?sslmode=disable')?.ssl).toBe(false)
+    expect(parseConnectionUrl('postgres://u:p@notneon.tech/db')?.ssl).toBe(false)
+  })
+
   it('unbrackets IPv6 hosts, which the drivers want bare', () => {
     expect(parseConnectionUrl('postgres://[::1]:5432/app')?.host).toBe('::1')
     expect(parseConnectionUrl('postgres://[2001:db8::1]/app')?.host).toBe('2001:db8::1')
