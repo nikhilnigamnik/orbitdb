@@ -202,20 +202,24 @@ export function FiltersBar({
                   aria-label={`Edit filter: ${summary}`}
                   className="group/edit flex cursor-pointer items-stretch transition-colors hover:bg-control-hover"
                 >
-                  <span className="flex items-center gap-1.5 pr-1.5 pl-2 font-medium">
+                  <span className="flex min-w-0 items-center gap-1.5 pr-1.5 pl-2 font-medium">
                     {column ? (
                       <ColumnTypeIcon column={column} />
                     ) : (
                       <IconAdjustmentsHorizontal size={14} className="text-text-subtle" />
                     )}
-                    {f.column}
+                    <span className="max-w-40 truncate">{f.column}</span>
                   </span>
                   <span className="flex items-center px-1.5 text-text-muted group-hover/edit:text-text">
                     {f.operator}
                   </span>
                   {!unary && (
-                    <span className="flex max-w-40 items-center truncate pr-2 pl-1.5 font-mono text-accent-text">
-                      {String(f.value ?? '')}
+                    // truncate on the text's own box: on a flex container the
+                    // ellipsis never applies and the value is cut mid-character.
+                    <span className="flex min-w-0 items-center pr-2 pl-1.5 font-mono text-accent-text">
+                      <span className="max-w-40 truncate" title={String(f.value ?? '')}>
+                        {String(f.value ?? '')}
+                      </span>
                     </span>
                   )}
                 </button>

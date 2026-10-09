@@ -168,3 +168,17 @@ describe('clear all', () => {
     expect(onApply).toHaveBeenCalled()
   })
 })
+
+describe('an applied filter with a long value', () => {
+  it('ends the value in an ellipsis and keeps the whole of it on hover', () => {
+    // truncate used to sit on a flex container, where text-overflow never
+    // applies - the value was cut off mid-character with nothing to show it.
+    const value = '-1xOd5w4daqOo9eaytGcLongEnoughToOverflow'
+    setup([{ column: 'id', operator: '!=', value }])
+
+    const text = screen.getByText(value)
+    expect(text.className).toContain('truncate')
+    expect(text.className).not.toMatch(/\bflex\b/)
+    expect(text.getAttribute('title')).toBe(value)
+  })
+})
