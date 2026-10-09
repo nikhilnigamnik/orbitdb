@@ -9,6 +9,7 @@ import { Pool, type ClientConfig, type PoolConfig } from 'pg'
 import { recordQuery } from '../../query-log'
 import { invalidateIntrospection } from '../../introspection-cache'
 import { pgTlsOptions } from '../../tls'
+import { describeError } from '../../describe-error'
 import {
   type ConnectionInput,
   type SavedConnection,
@@ -86,7 +87,7 @@ function instrumentPgPool(pool: Pool, connectionId: string): void {
         params,
         durationMs: Date.now() - t0,
         success: false,
-        error: err instanceof Error ? err.message : String(err)
+        error: describeError(err)
       })
       throw err
     }
@@ -115,7 +116,7 @@ export async function test(input: ConnectionInput): Promise<TestConnectionResult
     const res = await pool.query<{ version: string }>('select version() as version')
     return { success: true, serverVersion: res.rows[0]?.version }
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) }
+    return { success: false, error: describeError(err) }
   } finally {
     if (pool) await pool.end().catch(() => undefined)
   }

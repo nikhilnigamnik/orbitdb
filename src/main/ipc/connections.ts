@@ -14,6 +14,7 @@ import {
   updateConnection
 } from '../store/connections-store'
 import { disconnectPool, testConnection } from '../db/manager'
+import { describeError } from '../db/describe-error'
 
 // Older files and older renderers can carry a null where a field is now simply
 // absent; reading that as absent beats refusing a connection the user saved.
@@ -102,7 +103,7 @@ export async function testConnectionForRenderer(
   try {
     resolved = connectionId ? fillStoredSecrets(input, connectionId) : input
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) }
+    return { success: false, error: describeError(err) }
   }
   return testConnection(resolved)
 }

@@ -1,6 +1,7 @@
 import { ipcMain, app, shell } from 'electron'
 import { safeExternalUrl } from '../app/open-external'
 import { checkForUpdate } from '../app/update-check'
+import { describeError } from '../db/describe-error'
 import type {
   AiGatewayIds,
   AiSettingsView,
@@ -95,7 +96,7 @@ function wrap<TArgs extends unknown[], TResult>(
       const data = await handler(...args)
       return { success: true as const, data }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      const message = describeError(err)
       console.error('[ipc]', message)
       return { success: false as const, error: message }
     }

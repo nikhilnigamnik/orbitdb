@@ -20,6 +20,7 @@ import { requireConnection } from '../../../store/connections-store'
 import { recordQuery } from '../../query-log'
 import { invalidateIntrospection } from '../../introspection-cache'
 import { mysqlTlsOptions } from '../../tls'
+import { describeError } from '../../describe-error'
 import type { ActiveMeta } from '.././types'
 
 const pools = new Map<string, Pool>()
@@ -93,7 +94,7 @@ function instrumentMysqlPool(pool: Pool, connectionId: string): void {
         params,
         durationMs: Date.now() - t0,
         success: false,
-        error: err instanceof Error ? err.message : String(err)
+        error: describeError(err)
       })
       throw err
     }
@@ -122,7 +123,7 @@ export async function test(input: ConnectionInput): Promise<TestConnectionResult
     const [rows] = await pool.query<RowDataPacket[]>('select version() as version')
     return { success: true, serverVersion: String(rows[0]?.version ?? '') }
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) }
+    return { success: false, error: describeError(err) }
   } finally {
     if (pool) await pool.end().catch(() => undefined)
   }

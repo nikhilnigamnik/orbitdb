@@ -6,9 +6,11 @@ import icon from '../../resources/icon.png?asset'
 import { safeExternalUrl } from './app/open-external'
 import { registerIpcHandlers } from './ipc'
 import { disconnectAll } from './db/manager'
+import { configureNetwork } from './app/network'
 
 const APP_NAME = 'OrbitDB'
 app.setName(APP_NAME)
+configureNetwork()
 
 /**
  * How long quitting waits for pools to close. `pool.end()` waits for in-flight
