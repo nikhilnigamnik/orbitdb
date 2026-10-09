@@ -9,6 +9,21 @@ export interface SelectOption<T extends string = string> {
   value: T
   label: React.ReactNode
   disabled?: boolean
+  /** Options sharing a group render under one heading, in first-seen order. */
+  group?: string
+}
+
+function groupOptions<T extends string>(
+  options: SelectOption<T>[]
+): { group: string | undefined; options: SelectOption<T>[] }[] {
+  const groups: { group: string | undefined; options: SelectOption<T>[] }[] = []
+  for (const option of options) {
+    const last = groups[groups.length - 1]
+    const existing = groups.find((g) => g.group === option.group)
+    if (existing && (option.group !== undefined || last === existing)) existing.options.push(option)
+    else groups.push({ group: option.group, options: [option] })
+  }
+  return groups
 }
 
 interface SelectProps<T extends string = string> {
@@ -82,23 +97,39 @@ export function Select<T extends string = string>({
           )}
         >
           <SelectPrimitive.Viewport className="p-1">
-            {options.map((option) => (
-              <SelectPrimitive.Item
-                key={option.value}
-                value={option.value}
-                disabled={option.disabled}
-                className={cn(
-                  'relative flex h-8 cursor-pointer select-none items-center gap-2 rounded-md pl-2 pr-7 text-xs text-text outline-none transition-colors',
-                  'focus:bg-surface-elevated',
-                  'data-[state=checked]:text-text',
-                  'data-disabled:pointer-events-none data-disabled:opacity-50'
+            {groupOptions(options).map(({ group, options: groupItems }, groupIndex) => (
+              <SelectPrimitive.Group key={group ?? `ungrouped-${groupIndex}`}>
+                {group && (
+                  <SelectPrimitive.Label
+                    className={cn(
+                      'px-2 pt-1.5 pb-1 text-[12px] font-medium text-text-subtle',
+                      groupIndex > 0 && 'mt-1 border-t border-border pt-2'
+                    )}
+                  >
+                    {group}
+                  </SelectPrimitive.Label>
                 )}
-              >
-                <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
-                <SelectPrimitive.ItemIndicator className="absolute right-2 flex items-center">
-                  <IconCheck size={14} className="text-accent" />
-                </SelectPrimitive.ItemIndicator>
-              </SelectPrimitive.Item>
+                {groupItems.map((option) => (
+                  <SelectPrimitive.Item
+                    key={option.value}
+                    value={option.value}
+                    disabled={option.disabled}
+                    className={cn(
+                      // min-h, not h: an option can carry a second line (a hint), and a
+                      // fixed height let each one spill into the row below.
+                      'relative flex min-h-8 cursor-pointer select-none items-center gap-2 rounded-md py-1.5 pl-2 pr-7 text-xs text-text outline-none transition-colors',
+                      'focus:bg-surface-elevated',
+                      'data-[state=checked]:text-text',
+                      'data-disabled:pointer-events-none data-disabled:opacity-50'
+                    )}
+                  >
+                    <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
+                    <SelectPrimitive.ItemIndicator className="absolute right-2 flex items-center">
+                      <IconCheck size={14} className="text-accent" />
+                    </SelectPrimitive.ItemIndicator>
+                  </SelectPrimitive.Item>
+                ))}
+              </SelectPrimitive.Group>
             ))}
           </SelectPrimitive.Viewport>
         </SelectPrimitive.Content>

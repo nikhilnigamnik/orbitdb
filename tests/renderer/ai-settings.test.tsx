@@ -343,7 +343,12 @@ describe('the Cloudflare provider card', () => {
 
     const list = await screen.findByRole('listbox')
     expect(within(list).getByText('Gemini 3.8 Flash')).toBeTruthy()
-    expect(within(list).getByText('Google - balanced')).toBeTruthy()
+    // Grouped under each vendor, so the hint no longer repeats the vendor name.
+    for (const vendor of ['Anthropic', 'OpenAI', 'Google']) {
+      expect(within(list).getByText(vendor)).toBeTruthy()
+    }
+    expect(within(list).getAllByText('balanced').length).toBeGreaterThan(0)
+    expect(within(list).queryByText('Google - balanced')).toBeNull()
   })
 })
 

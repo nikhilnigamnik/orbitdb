@@ -244,15 +244,23 @@ export function AiProviderCard({
                 renderValue={(option) =>
                   spec.models.find((m) => m.id === option?.value)?.label ?? option?.value
                 }
-                options={spec.models.map((model) => ({
-                  value: model.id,
-                  label: (
-                    <span className="flex flex-col gap-0.5 text-left">
-                      <span>{model.label}</span>
-                      <span className="text-[12px] text-text-subtle">{model.hint}</span>
-                    </span>
-                  )
-                }))}
+                options={spec.models.map((model) => {
+                  // The gateway mixes vendors: group them under a heading and drop
+                  // the "Anthropic - " the hint repeats.
+                  const vendor = gatewayVendor(model.id)
+                  return {
+                    value: model.id,
+                    group: vendor,
+                    label: (
+                      <span className="flex flex-col gap-0.5 text-left">
+                        <span>{model.label}</span>
+                        <span className="text-[12px] text-text-subtle">
+                          {vendor ? model.hint.replace(/^[^-]+ - /, '') : model.hint}
+                        </span>
+                      </span>
+                    )
+                  }
+                })}
               />
             </SettingRow>
 
@@ -283,4 +291,17 @@ export function AiProviderCard({
       </Collapsible>
     </section>
   )
+}
+
+const GATEWAY_VENDOR_LABEL: Record<string, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  'google-ai-studio': 'Google'
+}
+
+/** The vendor behind a gateway model id (`anthropic/claude-...`), or undefined. */
+function gatewayVendor(modelId: string): string | undefined {
+  const slash = modelId.indexOf('/')
+  if (slash === -1) return undefined
+  return GATEWAY_VENDOR_LABEL[modelId.slice(0, slash)] ?? modelId.slice(0, slash)
 }
