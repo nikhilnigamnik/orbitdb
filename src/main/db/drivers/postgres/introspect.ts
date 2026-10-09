@@ -19,7 +19,8 @@ import {
   type TableDetails,
   type TableInfo
 } from '../../../../shared/types'
-import { getPool, tableCacheKey, tableDetailsCache } from './pool'
+import { cachedSchemaGraph, cachedTableDetails } from '../../introspection-cache'
+import { getPool } from './pool'
 
 export const SYSTEM_SCHEMAS = ['pg_catalog', 'information_schema', 'pg_toast']
 export async function listSchemas(connectionId: string): Promise<SchemaInfo[]> {
@@ -95,18 +96,28 @@ async function enumLabelsFor(
   for (const r of enumRes.rows) byType.set(r.type_key, r.labels)
   return byType
 }
-export async function tableDetails(
+export function tableDetails(
   connectionId: string,
   schema: string,
   table: string
 ): Promise<TableDetails> {
-  const cacheKey = tableCacheKey(connectionId, schema, table)
-  const cached = tableDetailsCache.get(cacheKey)
-  if (cached) return cached
-
+  return cachedTableDetails(connectionId, schema, table, () =>
+    loadTableDetails(connectionId, schema, table)
+  )
+}
+/**
+ * The five catalogue reads are independent, so they go out together; only the
+ * enum labels wait, because they need the column types first. A missing table
+ * just makes the other four come back empty.
+ */
+async function loadTableDetails(
+  connectionId: string,
+  schema: string,
+  table: string
+): Promise<TableDetails> {
   const pool = await getPool(connectionId)
 
-  const kindRes = await pool.query<{ kind: string; estimated_rows: string | null }>(
+  const kindPromise = pool.query<{ kind: string; estimated_rows: string | null }>(
     `select c.relkind::text as kind,
             case when c.reltuples >= 0 then c.reltuples::bigint::text else null end as estimated_rows
        from pg_class c
@@ -115,14 +126,7 @@ export async function tableDetails(
       limit 1`,
     [schema, table]
   )
-  if (kindRes.rowCount === 0) {
-    throw new Error(`Table ${schema}.${table} not found`)
-  }
-  const kind = kindRes.rows[0].kind
-  const type: TableDetails['type'] =
-    kind === 'v' ? 'view' : kind === 'm' ? 'materialized_view' : 'table'
-
-  const pkRes = await pool.query<{ column: string }>(
+  const pkPromise = pool.query<{ column: string }>(
     `select a.attname as column
        from pg_index i
        join pg_attribute a on a.attrelid = i.indrelid and a.attnum = any(i.indkey)
@@ -132,9 +136,7 @@ export async function tableDetails(
       order by array_position(i.indkey, a.attnum)`,
     [schema, table]
   )
-  const primaryKey = pkRes.rows.map((r) => r.column)
-
-  const colsRes = await pool.query<{
+  const colsPromise = pool.query<{
     name: string
     data_type: string
     udt_schema: string
@@ -157,23 +159,7 @@ export async function tableDetails(
       order by ordinal_position`,
     [schema, table]
   )
-
-  const enumLabelsByType = await enumLabelsFor(pool, colsRes.rows)
-
-  const pkSet = new Set(primaryKey)
-  const columns: ColumnInfo[] = colsRes.rows.map((r) => ({
-    name: r.name,
-    dataType: r.data_type,
-    udtName: r.udt_name,
-    isNullable: r.is_nullable === 'YES',
-    isPrimaryKey: pkSet.has(r.name),
-    defaultValue: r.default_value,
-    ordinalPosition: r.ordinal_position,
-    characterMaximumLength: r.character_maximum_length,
-    enumValues: enumLabelsByType.get(`${r.udt_schema}.${r.udt_name}`) ?? null
-  }))
-
-  const idxRes = await pool.query<{
+  const idxPromise = pool.query<{
     name: string
     is_unique: boolean
     is_primary: boolean
@@ -195,15 +181,7 @@ export async function tableDetails(
       order by i.relname`,
     [schema, table]
   )
-  const indexes: IndexInfo[] = idxRes.rows.map((r) => ({
-    name: r.name,
-    isUnique: r.is_unique,
-    isPrimary: r.is_primary,
-    columns: r.columns,
-    definition: r.definition
-  }))
-
-  const fkRes = await pool.query<{
+  const fkPromise = pool.query<{
     name: string
     columns: string[]
     referenced_schema: string
@@ -247,6 +225,43 @@ export async function tableDetails(
       order by con.conname`,
     [schema, table]
   )
+
+  const [kindRes, pkRes, colsRes, idxRes, fkRes] = await Promise.all([
+    kindPromise,
+    pkPromise,
+    colsPromise,
+    idxPromise,
+    fkPromise
+  ])
+  if (kindRes.rowCount === 0) {
+    throw new Error(`Table ${schema}.${table} not found`)
+  }
+  const kind = kindRes.rows[0].kind
+  const type: TableDetails['type'] =
+    kind === 'v' ? 'view' : kind === 'm' ? 'materialized_view' : 'table'
+  const primaryKey = pkRes.rows.map((r) => r.column)
+
+  const enumLabelsByType = await enumLabelsFor(pool, colsRes.rows)
+
+  const pkSet = new Set(primaryKey)
+  const columns: ColumnInfo[] = colsRes.rows.map((r) => ({
+    name: r.name,
+    dataType: r.data_type,
+    udtName: r.udt_name,
+    isNullable: r.is_nullable === 'YES',
+    isPrimaryKey: pkSet.has(r.name),
+    defaultValue: r.default_value,
+    ordinalPosition: r.ordinal_position,
+    characterMaximumLength: r.character_maximum_length,
+    enumValues: enumLabelsByType.get(`${r.udt_schema}.${r.udt_name}`) ?? null
+  }))
+  const indexes: IndexInfo[] = idxRes.rows.map((r) => ({
+    name: r.name,
+    isUnique: r.is_unique,
+    isPrimary: r.is_primary,
+    columns: r.columns,
+    definition: r.definition
+  }))
   const foreignKeys: ForeignKeyInfo[] = fkRes.rows.map((r) => ({
     name: r.name,
     columns: r.columns,
@@ -257,7 +272,7 @@ export async function tableDetails(
     onUpdate: r.on_update
   }))
 
-  const result: TableDetails = {
+  return {
     schema,
     name: table,
     type,
@@ -268,8 +283,6 @@ export async function tableDetails(
     estimatedRows:
       kindRes.rows[0].estimated_rows == null ? null : Number(kindRes.rows[0].estimated_rows)
   }
-  tableDetailsCache.set(cacheKey, result)
-  return result
 }
 /**
  * The same constraint catalogue as `tableDetails`, filtered on the referenced
@@ -340,7 +353,10 @@ export async function referencingKeys(
     onUpdate: r.on_update
   }))
 }
-export async function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
+export function getSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
+  return cachedSchemaGraph(connectionId, schema, () => loadSchemaGraph(connectionId, schema))
+}
+async function loadSchemaGraph(connectionId: string, schema: string): Promise<SchemaGraph> {
   const pool = await getPool(connectionId)
 
   const tablesPromise = pool.query<{ name: string }>(

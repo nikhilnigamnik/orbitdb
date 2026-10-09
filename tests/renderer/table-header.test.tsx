@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TableHeader } from '@renderer/features/database/components/table-header'
 import type { TableDetails } from '@renderer/types'
@@ -93,13 +93,44 @@ describe('what kind of relation it is', () => {
 })
 
 describe('hierarchy', () => {
-  it('sets the name apart from its metadata by size, not only weight', () => {
+  it('names the table as the last breadcrumb, under its schema', () => {
     setup({ estimatedRows: 10 })
-    const name = screen.getByRole('heading', { level: 2 })
-    expect(name.className).toContain('text-xs')
+    const nav = screen.getByRole('navigation', { name: 'Breadcrumb' })
+    expect(nav.textContent).toContain('public')
 
-    const schema = screen.getByText('public')
-    expect(schema.parentElement?.className).toContain('text-[10px]')
+    const current = screen.getByText('users').closest('[aria-current="page"]')
+    expect(current, 'the table name is not the current breadcrumb').not.toBeNull()
+    expect(current!.className).toContain('text-sm')
+  })
+
+  it('lets the schema crumb lead back to the connection overview', () => {
+    const onOpenSchema = vi.fn()
+    render(
+      <TableHeader
+        details={details()}
+        activeTab="data"
+        onChangeTab={vi.fn()}
+        totalRows={null}
+        onOpenSchema={onOpenSchema}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /public/ }))
+    expect(onOpenSchema).toHaveBeenCalledOnce()
+  })
+
+  it('sets the size apart from the name as smaller, subtler meta', () => {
+    setup({}, 10)
+    const meta = screen.getByText('10').closest('div')!
+    expect(meta.className).toContain('text-[12px]')
+    expect(meta.className).toContain('text-text-subtle')
+    // Counts are numbers, not code.
+    expect(meta.innerHTML).not.toContain('font-mono')
+  })
+
+  it('puts the Data / Structure switch in the header', () => {
+    setup()
+    expect(screen.getByText('Data')).toBeTruthy()
+    expect(screen.getByText('Structure')).toBeTruthy()
   })
 
   it('carries no leftover group class for a control that moved away', () => {

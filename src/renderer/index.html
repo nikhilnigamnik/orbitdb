@@ -3,25 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <title>OrbitDB</title>
+    <!-- connect-src is widened for the Vite dev server only, by a transform in
+         electron.vite.config.ts; the renderer itself makes no network calls. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' ws: https:"
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self'"
     />
     <style>
       html,
       body {
         margin: 0;
         padding: 0;
-        background: #0e1013;
-        color: #e6e8ec;
+        background: #ffffff;
+        color: #242629;
         font-family:
-          Inter,
+          'Inter Variable',
           -apple-system,
           BlinkMacSystemFont,
           'Segoe UI',
@@ -36,7 +32,7 @@
         align-items: center;
         justify-content: center;
         gap: 14px;
-        background: #0e1013;
+        background: #ffffff;
       }
       #splash .logo {
         width: 64px;
@@ -56,7 +52,26 @@
         font-size: 17px;
         font-weight: 600;
         letter-spacing: -0.01em;
-        color: #9aa1ac;
+        color: #6e7074;
+      }
+      /* Mirrors the dark tokens in main.css, which have not loaded yet. Main sets
+         the theme before the window opens, so this already matches. */
+      @media (prefers-color-scheme: dark) {
+        html,
+        body,
+        #splash {
+          background: #1c1d20;
+          color: #eeeff1;
+        }
+        #splash .brand {
+          color: #8f9298;
+        }
+        #splash .logo stop:first-child {
+          stop-color: #c9cbd0;
+        }
+        #splash .logo stop:last-child {
+          stop-color: #8f9298;
+        }
       }
     </style>
   </head>
@@ -71,54 +86,17 @@
           aria-label="OrbitDB"
         >
           <defs>
-            <linearGradient
-              id="_R_955esnealb_"
-              gradientUnits="userSpaceOnUse"
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="100"
-            >
-              <stop offset="0%" stop-color="#ffffff" />
-              <stop offset="32%" stop-color="#ededed" />
-              <stop offset="52%" stop-color="#cdcdcd" />
-              <stop offset="72%" stop-color="#b0b0b0" />
-              <stop offset="100%" stop-color="#8c8c8c" />
+            <linearGradient id="splash-silver" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#6b6e74" />
+              <stop offset="1" stop-color="#242629" />
             </linearGradient>
           </defs>
-          <circle
-            cx="50"
-            cy="50"
-            r="44"
-            fill="none"
-            stroke="url(#_R_955esnealb_)"
-            stroke-width="4"
-            stroke-linecap="round"
-            stroke-dasharray="226 50"
-          />
-          <circle
-            cx="50"
-            cy="50"
-            r="32"
-            fill="none"
-            stroke="url(#_R_955esnealb_)"
-            stroke-width="4"
-            stroke-linecap="round"
-            stroke-dasharray="150 51"
-            transform="rotate(120 50 50)"
-          />
-          <circle
-            cx="50"
-            cy="50"
-            r="20"
-            fill="none"
-            stroke="url(#_R_955esnealb_)"
-            stroke-width="4"
-            stroke-linecap="round"
-            stroke-dasharray="88 38"
-            transform="rotate(240 50 50)"
-          />
-          <circle cx="50" cy="50" r="6" fill="url(#_R_955esnealb_)" />
+          <g fill="url(#splash-silver)">
+            <path d="M24.00,24.00 L48.00,24.00 A24,24 0 1 1 24.00,0.00 Z" />
+            <path d="M76.00,24.00 L100.00,24.00 A24,24 0 1 0 76.00,48.00 Z" />
+            <path d="M24.00,76.00 L0.00,76.00 A24,24 0 1 0 24.00,52.00 Z" />
+            <path d="M76.00,76.00 L52.00,76.00 A24,24 0 1 1 76.00,100.00 Z" />
+          </g>
         </svg>
         <div class="brand">OrbitDB</div>
       </div>

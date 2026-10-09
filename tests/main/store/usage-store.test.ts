@@ -144,9 +144,10 @@ describe('the windows', () => {
 })
 
 describe('cost', () => {
-  // 2026-09-05 local - past Sonnet 5's 2026-08-31 launch discount, and still
-  // inside the 90-day retention window from NOON.
-  const SEPTEMBER = new Date('2026-09-05T06:30:00Z')
+  // The two local days either side of GPT-5.6 Sol's 2026-11-21 launch discount,
+  // adjacent so both land in the same 30-day window.
+  const DISCOUNT_LAST_DAY = new Date('2026-11-21T06:30:00Z')
+  const DISCOUNT_OVER = new Date('2026-11-22T06:30:00Z')
 
   it('prices a call at its model rate', () => {
     // Opus 5 is $5/$25 per MTok, so 1M in + 1M out is $30.
@@ -160,13 +161,14 @@ describe('cost', () => {
 
   it('prices each day at the rate in effect that day', () => {
     // The rollup is per-day precisely so a mid-window rate change is exact:
-    // Sonnet 5 runs at $2/MTok through August, $3 from September.
-    store.recordUsage(event({ inputTokens: 1_000_000, outputTokens: 0 }), NOON)
-    store.recordUsage(event({ inputTokens: 1_000_000, outputTokens: 0 }), SEPTEMBER)
+    // GPT-5.6 Sol runs at $4/MTok through 2026-11-21, $5 from the 22nd.
+    const sol = { provider: 'openai', model: 'gpt-5.6-sol', inputTokens: 1_000_000 } as const
+    store.recordUsage(event({ ...sol, outputTokens: 0 }), DISCOUNT_LAST_DAY)
+    store.recordUsage(event({ ...sol, outputTokens: 0 }), DISCOUNT_OVER)
 
-    const summary = store.getUsageSummary(SEPTEMBER)
-    expect(summary.today.cost, 'September prices at the standard rate').toBeCloseTo(3, 10)
-    expect(summary.last30.cost, 'the window spans both rates').toBeCloseTo(5, 10)
+    const summary = store.getUsageSummary(DISCOUNT_OVER)
+    expect(summary.today.cost, 'the 22nd prices at the standard rate').toBeCloseTo(5, 10)
+    expect(summary.last30.cost, 'the window spans both rates').toBeCloseTo(9, 10)
   })
 
   it('breaks cost down the same way it breaks tokens down', () => {

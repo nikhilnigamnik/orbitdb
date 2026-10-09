@@ -6,19 +6,33 @@ import {
   IconTable,
   IconTerminal2,
   IconHistory,
-  IconPlug,
   IconPlugOff,
   IconSearch,
   IconCornerDownLeft,
-  IconClock
+  IconClock,
+  IconSun,
+  IconMoon,
+  IconDeviceDesktop
 } from '@tabler/icons-react'
+import { Chip } from '@renderer/components/ui/chip'
 import { Kbd } from '@renderer/components/ui/kbd'
 import { unwrap } from '@renderer/lib/ipc'
+import { cn } from '@renderer/lib/utils'
+import { formatNumber } from '@renderer/lib/format'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
+import { useTheme } from '@renderer/features/settings/theme'
+import { ENGINE_ICON } from '@renderer/features/connections/components/engine-icons'
 import { ROUTES, tableRoute } from '@renderer/config/routes'
+import { CONNECTION_TILE_CLASS } from '@renderer/config/site'
 import { loadRecent, type TableRef } from '@renderer/features/database/lib/table-prefs'
-import type { ActiveConnectionMeta, TableInfo } from '@renderer/types'
-import { Chip } from '@renderer/components/ui/chip'
+import type {
+  ActiveConnectionMeta,
+  SavedConnection,
+  TableInfo,
+  ThemePreference
+} from '@renderer/types'
+
+import { PALETTE_TABLE_LIMIT, filterItems } from '../lib/palette-filter'
 
 interface PaletteTable {
   schema: string
@@ -26,42 +40,83 @@ interface PaletteTable {
   type: TableInfo['type']
 }
 
+interface PaletteAction {
+  id: string
+  icon: React.ReactNode
+  label: string
+  keywords: string[]
+  onSelect: () => void
+  tone?: 'default' | 'danger'
+}
+
+const THEME_ACTIONS: {
+  theme: ThemePreference
+  icon: React.ReactNode
+  label: string
+  keywords: string[]
+}[] = [
+  {
+    theme: 'dark',
+    icon: <IconMoon size={16} />,
+    label: 'Switch to dark theme',
+    keywords: ['dark']
+  },
+  {
+    theme: 'light',
+    icon: <IconSun size={16} />,
+    label: 'Switch to light theme',
+    keywords: ['light']
+  },
+  {
+    theme: 'system',
+    icon: <IconDeviceDesktop size={16} />,
+    label: 'Use system theme',
+    keywords: ['system', 'auto']
+  }
+]
+
 interface CommandPaletteProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-const OVERLAY_CLASSES = 'fixed inset-0 z-40 bg-black/20 backdrop-blur-sm animate-fade-in'
+// Same scrim as the Dialog primitive, so the palette dims the app the way every
+// other modal does.
+const OVERLAY_CLASSES = 'fixed inset-0 z-40 bg-overlay animate-fade-in'
 
 const CONTENT_CLASSES = [
-  'fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(600px,calc(100vw-2rem))]',
-  'overflow-hidden rounded-2xl border border-border bg-surface',
-  'shadow-2xl shadow-black/70',
+  'fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(640px,calc(100vw-2rem))]',
+  'overflow-hidden rounded-2xl bg-popover text-text shadow-pop',
   'animate-scale-in'
 ].join(' ')
 
 const COMMAND_CLASSES = [
   'flex flex-col',
-  '[&_[cmdk-input]]:h-12 [&_[cmdk-input]]:w-full [&_[cmdk-input]]:bg-transparent [&_[cmdk-input]]:px-4 [&_[cmdk-input]]:pl-11',
-  '[&_[cmdk-input]]:text-xs [&_[cmdk-input]]:text-text [&_[cmdk-input]]:outline-none',
+  '[&_[cmdk-input]]:h-12 [&_[cmdk-input]]:w-full [&_[cmdk-input]]:bg-transparent [&_[cmdk-input]]:pr-4 [&_[cmdk-input]]:pl-11',
+  '[&_[cmdk-input]]:text-sm [&_[cmdk-input]]:text-text [&_[cmdk-input]]:outline-none',
   '[&_[cmdk-input]]:placeholder:text-text-subtle',
-  '[&_[cmdk-list]]:max-h-[56vh] [&_[cmdk-list]]:overflow-y-auto [&_[cmdk-list]]:scroll-py-1 [&_[cmdk-list]]:p-2',
+  '[&_[cmdk-list]]:max-h-[56vh] [&_[cmdk-list]]:overflow-y-auto [&_[cmdk-list]]:scroll-py-1.5 [&_[cmdk-list]]:p-1.5',
   '[&_[cmdk-group]]:mb-1 [&_[cmdk-group]:last-child]:mb-0',
-  '[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2',
-  '[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider',
-  '[&_[cmdk-group-heading]]:text-text-subtle',
-  '[&_[cmdk-empty]]:flex [&_[cmdk-empty]]:flex-col [&_[cmdk-empty]]:items-center [&_[cmdk-empty]]:justify-center [&_[cmdk-empty]]:gap-1 [&_[cmdk-empty]]:py-10',
-  '[&_[cmdk-empty]]:text-xs [&_[cmdk-empty]]:text-text-subtle'
+  '[&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:h-8 [&_[cmdk-group-heading]]:items-center [&_[cmdk-group-heading]]:px-2.5',
+  '[&_[cmdk-group-heading]]:text-[12px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-subtle',
+  '[&_[cmdk-empty]]:flex [&_[cmdk-empty]]:flex-col [&_[cmdk-empty]]:items-center [&_[cmdk-empty]]:justify-center [&_[cmdk-empty]]:gap-3 [&_[cmdk-empty]]:py-10',
+  '[&_[cmdk-empty]]:text-sm [&_[cmdk-empty]]:font-medium [&_[cmdk-empty]]:text-text'
 ].join(' ')
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate()
   const { connections, active, connect, disconnect, isConnecting } = useConnection()
+  const { theme, setTheme } = useTheme()
 
   const [tables, setTables] = React.useState<PaletteTable[]>([])
   const [tablesError, setTablesError] = React.useState<string | null>(null)
   const fetchedFor = React.useRef<string | null>(null)
   const [recents, setRecents] = React.useState<TableRef[]>([])
+  const [search, setSearch] = React.useState('')
+
+  React.useEffect(() => {
+    if (!open) setSearch('')
+  }, [open])
 
   React.useEffect(() => {
     if (!open || !active) return
@@ -108,12 +163,82 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     navigate(path)
   }
 
+  function runSetTheme(next: ThemePreference) {
+    close()
+    // A failed save already put the old theme back; the palette has closed,
+    // so there is nowhere left to report it.
+    void setTheme(next).catch(() => undefined)
+  }
+
+  const themeActions: PaletteAction[] = THEME_ACTIONS.filter((a) => a.theme !== theme).map((a) => ({
+    id: `action:theme-${a.theme}`,
+    icon: a.icon,
+    label: a.label,
+    keywords: ['theme', 'appearance', 'mode', ...a.keywords],
+    onSelect: () => runSetTheme(a.theme)
+  }))
+
+  const actions: PaletteAction[] = [
+    {
+      id: 'action:sql',
+      icon: <IconTerminal2 size={16} />,
+      label: 'Open SQL editor',
+      keywords: ['sql', 'query', 'editor'],
+      onSelect: () => runNavigate(ROUTES.query)
+    },
+    {
+      id: 'action:logs',
+      icon: <IconHistory size={16} />,
+      label: 'Open query logs',
+      keywords: ['logs', 'history'],
+      onSelect: () => runNavigate(ROUTES.logs)
+    },
+    {
+      id: 'action:connections',
+      icon: <IconDatabase size={16} />,
+      label: 'Manage connections',
+      keywords: ['connections', 'manage'],
+      onSelect: () => runNavigate(ROUTES.connections)
+    },
+    ...(active
+      ? [
+          {
+            id: 'action:disconnect',
+            icon: <IconPlugOff size={16} />,
+            label: `Disconnect from ${active.currentDatabase}`,
+            keywords: ['disconnect', 'close'],
+            onSelect: () => {
+              close()
+              void disconnect()
+            },
+            tone: 'danger' as const
+          }
+        ]
+      : []),
+    // Found by typing ("dark", "theme"), not listed on an empty palette, where
+    // they would push the actions people open it for further down.
+    ...(search.trim() ? themeActions : [])
+  ]
+
+  // Filtering is done here rather than by cmdk: it scores and reorders every
+  // item it holds on each keystroke, which degrades badly past a couple of
+  // thousand tables. Here the tables are capped before they are rendered.
+  const shownActions = filterItems(actions, search, (a) => [a.label, ...a.keywords]).items
+  const shownRecents = active ? filterItems(recents, search, (r) => [r.table, r.schema]).items : []
+  const shownConnections = filterItems(connections, search, (c) =>
+    [c.name, c.engine, c.host, c.database].filter((field): field is string => !!field)
+  ).items
+  const shownTables = React.useMemo(
+    () => filterItems(tables, search, (t) => [t.name, t.schema], PALETTE_TABLE_LIMIT),
+    [tables, search]
+  )
+
   return (
     <Command.Dialog
       open={open}
       onOpenChange={onOpenChange}
       label="Command palette"
-      shouldFilter
+      shouldFilter={false}
       loop
       className={COMMAND_CLASSES}
       overlayClassName={OVERLAY_CLASSES}
@@ -121,74 +246,63 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     >
       <div className="relative border-b border-border">
         <IconSearch
-          size={14}
-          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-text-subtle"
+          size={16}
+          className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-text-subtle"
         />
-        <Command.Input placeholder="Search tables, connections, actions…" />
+        <Command.Input
+          value={search}
+          onValueChange={setSearch}
+          placeholder="Search tables, connections, actions…"
+        />
       </div>
 
       <Command.List>
         <Command.Empty>
-          <IconSearch size={20} className="text-text-subtle/70" />
+          <span className="flex size-10 items-center justify-center rounded-xl bg-surface-elevated text-text-subtle">
+            <IconSearch size={20} />
+          </span>
           <span>No results found.</span>
         </Command.Empty>
 
-        <Command.Group heading="Actions">
-          <PaletteItem
-            icon={<IconTerminal2 size={14} />}
-            label="Open SQL editor"
-            onSelect={() => runNavigate(ROUTES.query)}
-            keywords={['sql', 'query', 'editor']}
-          />
-          <PaletteItem
-            icon={<IconHistory size={14} />}
-            label="Open query logs"
-            onSelect={() => runNavigate(ROUTES.logs)}
-            keywords={['logs', 'history']}
-          />
-          <PaletteItem
-            icon={<IconDatabase size={14} />}
-            label="Manage connections"
-            onSelect={() => runNavigate(ROUTES.connections)}
-            keywords={['connections', 'manage']}
-          />
-          {active && (
-            <PaletteItem
-              icon={<IconPlugOff size={14} />}
-              label={`Disconnect from ${active.currentDatabase}`}
-              onSelect={() => {
-                close()
-                void disconnect()
-              }}
-              keywords={['disconnect', 'close']}
-              tone="danger"
-            />
-          )}
-        </Command.Group>
-
-        {active && recents.length > 0 && (
-          <Command.Group heading="Recent">
-            {recents.map((r) => (
+        {shownActions.length > 0 && (
+          <Command.Group heading="Actions">
+            {shownActions.map((action) => (
               <PaletteItem
-                key={`${r.schema}.${r.table}`}
-                icon={<IconClock size={14} />}
-                label={r.table}
-                secondary={r.schema}
-                onSelect={() => runNavigate(tableRoute(r.schema, r.table))}
-                keywords={[r.schema, r.table]}
+                key={action.id}
+                value={action.id}
+                icon={action.icon}
+                label={action.label}
+                onSelect={action.onSelect}
+                tone={action.tone}
               />
             ))}
           </Command.Group>
         )}
 
-        {connections.length > 0 && (
+        {shownRecents.length > 0 && (
+          <Command.Group heading="Recent">
+            {shownRecents.map((r) => (
+              <PaletteItem
+                key={`${r.schema}.${r.table}`}
+                value={`recent:${r.schema}.${r.table}`}
+                icon={<IconClock size={16} />}
+                label={r.table}
+                secondary={r.schema}
+                onSelect={() => runNavigate(tableRoute(r.schema, r.table))}
+              />
+            ))}
+          </Command.Group>
+        )}
+
+        {shownConnections.length > 0 && (
           <Command.Group heading="Connections">
-            {connections.map((c) => {
+            {shownConnections.map((c) => {
               const isActive = active?.connectionId === c.id
               return (
                 <PaletteItem
                   key={c.id}
-                  icon={<IconPlug size={14} />}
+                  value={`connection:${c.id}`}
+                  icon={<ConnectionTile connection={c} />}
                   label={c.name}
                   secondary={`${c.engine} · ${c.host || c.database}`}
                   tag={isActive ? 'connected' : undefined}
@@ -198,50 +312,57 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                     if (isActive) runNavigate(ROUTES.database)
                     else void runConnect(c.id)
                   }}
-                  keywords={[c.name, c.engine, c.host, c.database].filter(Boolean) as string[]}
                 />
               )
             })}
           </Command.Group>
         )}
 
-        {active && tables.length > 0 && (
+        {active && shownTables.items.length > 0 && (
           <Command.Group heading="Tables">
-            {tables.map((t) => (
+            {shownTables.items.map((t) => (
               <PaletteItem
                 key={`${t.schema}.${t.name}`}
-                icon={<IconTable size={14} />}
+                value={`table:${t.schema}.${t.name}`}
+                icon={<IconTable size={16} />}
                 label={t.name}
                 secondary={t.schema}
                 tag={t.type !== 'table' ? t.type.replace('_', ' ') : undefined}
                 onSelect={() => runNavigate(tableRoute(t.schema, t.name))}
-                keywords={[t.schema, t.name]}
               />
             ))}
+            {shownTables.total > shownTables.items.length && (
+              <p className="px-2.5 py-2 text-xs text-text-muted">
+                Showing {formatNumber(shownTables.items.length)} of{' '}
+                {formatNumber(shownTables.total)} tables - keep typing to narrow
+              </p>
+            )}
           </Command.Group>
         )}
 
         {active && tables.length === 0 && fetchedFor.current === active.connectionId && (
-          <p className="px-3 py-3 text-xs text-text-subtle">
+          <p className="px-2.5 py-2 text-xs text-text-muted">
             {tablesError ? `Couldn't load tables: ${tablesError}` : 'No tables in this database.'}
           </p>
         )}
       </Command.List>
 
-      <div className="flex items-center justify-between gap-3 border-t border-border bg-surface-elevated/30 px-3 py-2 text-xs text-text-subtle">
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1">
-            <Kbd>↑</Kbd>
-            <Kbd>↓</Kbd>
+      <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-t border-border px-3 text-[12px] text-text-subtle">
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-0.5">
+              <Kbd>↑</Kbd>
+              <Kbd>↓</Kbd>
+            </span>
             navigate
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1.5">
             <Kbd>
-              <IconCornerDownLeft size={9} />
+              <IconCornerDownLeft size={10} />
             </Kbd>
             select
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1.5">
             <Kbd>esc</Kbd>
             close
           </span>
@@ -257,6 +378,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 }
 
 interface PaletteItemProps {
+  /** Unique across the whole palette: cmdk tracks the selection by it. */
+  value: string
   icon: React.ReactNode
   label: string
   secondary?: string
@@ -264,12 +387,12 @@ interface PaletteItemProps {
   tagTone?: 'default' | 'success'
   shortcut?: string
   onSelect: () => void
-  keywords?: string[]
   disabled?: boolean
   tone?: 'default' | 'danger'
 }
 
 function PaletteItem({
+  value,
   icon,
   label,
   secondary,
@@ -277,45 +400,66 @@ function PaletteItem({
   tagTone = 'default',
   shortcut,
   onSelect,
-  keywords,
   disabled,
   tone = 'default'
 }: PaletteItemProps) {
-  const toneText =
-    tone === 'danger'
-      ? 'text-danger aria-selected:text-danger aria-selected:bg-danger/10'
-      : 'text-text-muted aria-selected:bg-surface-elevated aria-selected:text-text'
+  const isDanger = tone === 'danger'
 
   return (
     <Command.Item
       onSelect={onSelect}
       disabled={disabled}
-      value={[label, ...(keywords ?? [])].join(' ')}
-      className={`group flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-xs transition-colors aria-selected:[&_.kbd-shortcut]:opacity-100 data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50 ${toneText}`}
+      value={value}
+      className={cn(
+        'group flex h-9 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-sm transition-colors aria-selected:bg-surface-elevated aria-selected:[&_.kbd-shortcut]:opacity-100 data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50',
+        isDanger ? 'text-danger' : 'text-text'
+      )}
     >
       <span
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
-          tone === 'danger'
-            ? 'border-danger/20 bg-danger/10 text-danger group-aria-selected:border-danger/30 group-aria-selected:bg-danger/15'
-            : 'border-border bg-surface-elevated text-text-muted group-aria-selected:border-border-strong group-aria-selected:bg-surface group-aria-selected:text-text'
-        }`}
+        className={cn(
+          'flex size-5 shrink-0 items-center justify-center',
+          isDanger ? 'text-danger' : 'text-text-subtle group-aria-selected:text-text-muted'
+        )}
       >
         {icon}
       </span>
-      <span className="flex min-w-0 flex-1 flex-col leading-tight">
+      <span className="flex min-w-0 flex-1 items-baseline gap-2">
         <span className="truncate font-medium">{label}</span>
-        {secondary && (
-          <span className="truncate font-mono text-xs text-text-subtle">{secondary}</span>
-        )}
+        {secondary && <span className="truncate text-[12px] text-text-subtle">{secondary}</span>}
       </span>
       {tag && <Chip tone={tagTone === 'success' ? 'emerald' : 'neutral'}>{tag}</Chip>}
       {shortcut && (
-        <span className="kbd-shortcut flex shrink-0 items-center gap-1 opacity-0 transition-opacity">
+        <span className="kbd-shortcut flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity">
           <Kbd>⌘</Kbd>
           <Kbd>{shortcut}</Kbd>
         </span>
       )}
     </Command.Item>
+  )
+}
+
+/**
+ * The connection's own tile, as the sidebar's switcher draws it: a coloured
+ * initial when the user gave it a colour, the engine's mark otherwise.
+ */
+function ConnectionTile({ connection }: { connection: SavedConnection }) {
+  if (connection.color) {
+    return (
+      <span
+        className={cn(
+          'flex size-5 items-center justify-center rounded-md text-[12px] font-semibold',
+          CONNECTION_TILE_CLASS[connection.color]
+        )}
+      >
+        {connection.name.trim().charAt(0).toUpperCase() || '?'}
+      </span>
+    )
+  }
+  const EngineIcon = ENGINE_ICON[connection.engine]
+  return (
+    <span className="flex size-5 items-center justify-center rounded-md bg-control shadow-control">
+      <EngineIcon className="size-3.5" />
+    </span>
   )
 }
 

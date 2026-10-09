@@ -115,3 +115,33 @@ describe('the whole-database map given to free-form SQL', () => {
     expect(await buildSchemaContext('c1', 'postgres')).toBe('')
   })
 })
+
+describe('a database with more tables than the model is shown', () => {
+  it('picks the ones the request is about, drops foreign keys to tables left out, and says so', async () => {
+    const filler = Array.from({ length: 80 }, (_, i) => ({
+      schema: 'public',
+      name: `a_${String(i).padStart(3, '0')}`,
+      columns: [col()]
+    }))
+    stub.graph = {
+      schema: 'public',
+      tables: [...filler, { schema: 'public', name: 'users', columns: [col()] }],
+      edges: [
+        {
+          name: 'fk1',
+          from: { schema: 'public', table: 'a_079', columns: ['user_id'] },
+          to: { schema: 'public', table: 'users', columns: ['id'] }
+        }
+      ]
+    }
+
+    const text = await buildSchemaContext('c1', 'postgres', 'how many users signed up')
+
+    expect(text).toContain('public.users(')
+    expect(text).toContain('most relevant to the request')
+    // a_079 joins users, so it is pulled in with it, edge and all.
+    expect(text).toContain('public.a_079(')
+    expect(text).toContain('FK: a_079(user_id) -> users(id)')
+    expect(text.split('\n').filter((l) => l.startsWith('public.'))).toHaveLength(60)
+  })
+})

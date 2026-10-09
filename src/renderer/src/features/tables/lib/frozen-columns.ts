@@ -7,8 +7,17 @@
  * freezing pins a width if the column does not already have one.
  */
 
+/**
+ * Widths of the checkbox and row-number columns. Applied as inline widths, not
+ * just classes: in the grid's auto-layout table a width class is only a hint,
+ * and the checkbox column collapsed to the 16px of the box itself - flush
+ * against the edge, and 20px short of the offset every frozen column assumes.
+ */
+export const SELECT_COLUMN_WIDTH = 36
+export const INDEX_COLUMN_WIDTH = 40
+
 /** The checkbox and row-number columns, which are pinned whenever anything is. */
-export const LEADING_STICKY_WIDTH = 76
+export const LEADING_STICKY_WIDTH = SELECT_COLUMN_WIDTH + INDEX_COLUMN_WIDTH
 
 /** Applied to a frozen column with no dragged width of its own. */
 export const FROZEN_DEFAULT_WIDTH = 180

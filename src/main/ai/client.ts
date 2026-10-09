@@ -1,7 +1,4 @@
-import { createAnthropic } from '@ai-sdk/anthropic'
-import { createOpenAI } from '@ai-sdk/openai'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { APICallError, generateText, Output } from 'ai'
+import type { generateText } from 'ai'
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import type { z } from 'zod'
 import {
@@ -28,19 +25,38 @@ export class MissingApiKeyError extends Error {
   }
 }
 
+type AiSdk = typeof import('ai')
+type ModelBuilder = (model: string) => LanguageModelV3
+
+/**
+ * The SDK and every provider are loaded on first use rather than at startup:
+ * between them they cost the main process about 100 ms before the window could
+ * open, for features most sessions never touch.
+ */
+let aiSdk: Promise<AiSdk> | null = null
+function loadAiSdk(): Promise<AiSdk> {
+  if (!aiSdk) {
+    aiSdk = import('ai')
+    aiSdk.catch(() => {
+      aiSdk = null
+    })
+  }
+  return aiSdk
+}
+
 /**
  * One line per provider. Each SDK takes the same shape - a factory that closes
  * over the key and returns a model builder - so adding a provider is a row here
  * plus a row in `AI_PROVIDERS`.
  */
-const FACTORY: Record<AiProviderId, (apiKey: string) => (model: string) => LanguageModelV3> = {
-  anthropic: (apiKey) => createAnthropic({ apiKey }),
-  openai: (apiKey) => createOpenAI({ apiKey }),
-  google: (apiKey) => createGoogleGenerativeAI({ apiKey }),
+const FACTORY: Record<AiProviderId, (apiKey: string) => Promise<ModelBuilder>> = {
+  anthropic: async (apiKey) => (await import('@ai-sdk/anthropic')).createAnthropic({ apiKey }),
+  openai: async (apiKey) => (await import('@ai-sdk/openai')).createOpenAI({ apiKey }),
+  google: async (apiKey) => (await import('@ai-sdk/google')).createGoogleGenerativeAI({ apiKey }),
   // Cloudflare is reached through its own gateway rather than a vendor SDK, and
   // needs two ids the others do not - hence the special case in `buildModel`
   // instead of a row that would have to pretend it fits this shape.
-  cloudflare: () => {
+  cloudflare: async () => {
     throw new Error('The Cloudflare provider is built by buildModel, not FACTORY.')
   }
 }
@@ -52,15 +68,15 @@ const FACTORY: Record<AiProviderId, (apiKey: string) => (model: string) => Langu
  * Cloudflare's token is optional - an unauthenticated gateway is a valid setup -
  * so the missing-key check is per provider rather than up front.
  */
-function buildModel(
+async function buildModel(
   provider: AiProviderId,
   apiKey: string,
   model: AiModelId,
   gateway: GatewaySettings
-): LanguageModelV3 {
+): Promise<LanguageModelV3> {
   if (provider === 'cloudflare') return buildGatewayModel(gateway, apiKey, model)
   if (!apiKey) throw new MissingApiKeyError()
-  return FACTORY[provider](apiKey)(model)
+  return (await FACTORY[provider](apiKey))(model)
 }
 
 // The credential is runtime state now, not build-time state, so the model can no
@@ -73,7 +89,7 @@ let cached: {
   apiKey: string
   model: AiModelId
   gateway: string
-  instance: LanguageModelV3
+  instance: Promise<LanguageModelV3>
 } | null = null
 
 /**
@@ -89,7 +105,7 @@ export function resetModelCache(): void {
  * is the active one; this is for testing a key on a card you are not using yet.
  * Not cached - it is pressed by hand, once.
  */
-export function buildModelFor(provider: string): LanguageModelV3 {
+export async function buildModelFor(provider: string): Promise<LanguageModelV3> {
   if (!isAiProviderId(provider)) throw new Error(`Unknown provider: ${provider}`)
   const { apiKey, model } = getProviderSettings(provider)
   return buildModel(provider, apiKey, model, getGatewaySettings())
@@ -101,7 +117,12 @@ function gatewayCacheKey(gateway: GatewaySettings): string {
   return `${gateway.accountId}|${gateway.gatewayId}`
 }
 
-export function getModel(): LanguageModelV3 {
+/**
+ * The build is cached as a promise, so two calls racing the first import share
+ * one build. A build that fails - no key, a half-filled gateway - is not cached,
+ * which is what lets the missing-key error clear the moment a key is saved.
+ */
+export function getModel(): Promise<LanguageModelV3> {
   const { provider, apiKey, model } = getAiSettings()
   const gateway = getGatewaySettings()
   const gatewayKey = gatewayCacheKey(gateway)
@@ -115,21 +136,26 @@ export function getModel(): LanguageModelV3 {
     return cached.instance
   }
   const instance = buildModel(provider, apiKey, model, gateway)
-  cached = { provider, apiKey, model, gateway: gatewayKey, instance }
+  const entry = { provider, apiKey, model, gateway: gatewayKey, instance }
+  cached = entry
+  instance.catch(() => {
+    if (cached === entry) cached = null
+  })
   return instance
 }
 
 type TextArgs = Omit<Parameters<typeof generateText>[0], 'model'>
-
-/** Narrower than the SDK's own args, and enough for everything this app asks for. */
 
 /**
  * The only way this app talks to a model. Everything goes through here so usage is
  * recorded once, in one place - a second path would silently under-count.
  */
 export async function runText(feature: AiFeature, args: TextArgs, provider?: string) {
-  const model = provider ? buildModelFor(provider) : getModel()
-  const result = await generateText({ ...args, model } as Parameters<typeof generateText>[0])
+  const [sdk, model] = await Promise.all([
+    loadAiSdk(),
+    provider ? buildModelFor(provider) : getModel()
+  ])
+  const result = await sdk.generateText({ ...args, model } as Parameters<typeof generateText>[0])
 
   try {
     const active = provider ? getProviderSettings(provider as AiProviderId) : null
@@ -173,8 +199,8 @@ function extractJson(text: string): string {
  * limit, a timeout. Retrying those buys a second round-trip and, in the rate
  * limit's case, makes the thing it is retrying worse.
  */
-function isWorthRetrying(err: unknown): boolean {
-  if (APICallError.isInstance(err)) return false
+function isWorthRetrying(err: unknown, sdk: AiSdk): boolean {
+  if (sdk.APICallError.isInstance(err)) return false
   // AbortSignal.timeout - the model was too slow, and it will be again.
   if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
     return false
@@ -221,16 +247,17 @@ export async function generateJson<T>(opts: {
   // rather than as the retry's generic "invalid JSON".
   let structuredFailure: unknown
   if (supportsStructuredOutput()) {
+    const sdk = await loadAiSdk()
     try {
       const { output } = await runText(opts.feature, {
         system: opts.system,
         prompt: opts.prompt,
-        output: Output.object({ schema: opts.schema }),
+        output: sdk.Output.object({ schema: opts.schema }),
         abortSignal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
       })
       if (output != null) return output as T
     } catch (err) {
-      if (!isWorthRetrying(err)) throw err
+      if (!isWorthRetrying(err, sdk)) throw err
       structuredFailure = err
     }
   }

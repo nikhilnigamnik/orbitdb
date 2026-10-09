@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconArrowUpRight, IconLink } from '@tabler/icons-react'
+import { IconArrowUpRight, IconLink, IconTable } from '@tabler/icons-react'
 import { Spinner } from '@renderer/components/ui/spinner'
 import { Chip } from '@renderer/components/ui/chip'
 import { formatNumber } from '@renderer/lib/format'
@@ -95,7 +95,7 @@ export function ReferencedBy({ connectionId, schema, table, row, onNavigate }: R
   if (error) {
     return (
       <Panel>
-        <p className="px-3 py-2 text-xs text-text-subtle">Could not read relationships: {error}</p>
+        <p className="px-3 py-2.5 text-xs text-text-muted">Could not read relationships: {error}</p>
       </Panel>
     )
   }
@@ -103,7 +103,7 @@ export function ReferencedBy({ connectionId, schema, table, row, onNavigate }: R
   if (links === null) {
     return (
       <Panel>
-        <div className="flex items-center gap-2 px-3 py-2 text-xs text-text-subtle">
+        <div className="flex h-11 items-center gap-2 px-3 text-xs text-text-muted">
           <Spinner size={12} />
           Looking for related rows…
         </div>
@@ -115,7 +115,7 @@ export function ReferencedBy({ connectionId, schema, table, row, onNavigate }: R
 
   return (
     <Panel count={links.length}>
-      <div className="divide-y divide-border/60">
+      <div className="divide-y divide-border">
         {links.map((link) => {
           const label = childTableLabel(link.key)
           const isLinkable = link.filters != null
@@ -131,26 +131,35 @@ export function ReferencedBy({ connectionId, schema, table, row, onNavigate }: R
                 navigate(tableRouteWithFilters(link.key.schema, link.key.table, link.filters))
               }}
               className={cn(
-                'group/link flex w-full items-center gap-2 px-3 py-2 text-left transition-colors',
-                isLinkable ? 'cursor-pointer hover:bg-surface-elevated/50' : 'cursor-default'
+                'group/link flex min-h-11 w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors',
+                isLinkable ? 'cursor-pointer hover:bg-surface-elevated/60' : 'cursor-default'
               )}
             >
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate font-mono text-xs text-text">{label}</span>
-                <span className="truncate font-mono text-[10px] text-text-subtle">
+              <span
+                aria-hidden
+                className={cn(
+                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white',
+                  tileClass(link.key.table)
+                )}
+              >
+                <IconTable size={14} />
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-sm font-medium text-text">{label}</span>
+                <span className="truncate text-[12px] text-text-subtle">
                   {link.key.columns.join(', ')}
                   {!isLinkable && ' · no value to match'}
                 </span>
               </div>
               {/* Worth its own badge: these rows go with the parent, silently. */}
               {isCascade && <Chip tone="rose">cascade</Chip>}
-              <span className="shrink-0 font-mono text-xs tabular-nums text-text-muted">
+              <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-surface-elevated px-1.5 text-[12px] font-medium tabular-nums text-text-muted">
                 {link.count == null ? '-' : formatNumber(link.count)}
               </span>
               {isLinkable && (
                 <IconArrowUpRight
-                  size={12}
-                  className="shrink-0 text-accent-text opacity-0 transition-opacity group-hover/link:opacity-100"
+                  size={14}
+                  className="shrink-0 text-text-subtle opacity-0 transition-opacity group-hover/link:opacity-100"
                 />
               )}
             </button>
@@ -161,22 +170,44 @@ export function ReferencedBy({ connectionId, schema, table, row, onNavigate }: R
   )
 }
 
+/**
+ * Attio gives every object a coloured tile. Tables have no colour of their own,
+ * so one is derived from the name - stable across renders and sessions, which is
+ * what lets the tile work as a landmark.
+ */
+const TILE_CLASSES = [
+  'bg-tag-blue',
+  'bg-tag-violet',
+  'bg-tag-cyan',
+  'bg-tag-green',
+  'bg-tag-amber',
+  'bg-tag-orange',
+  'bg-tag-rose',
+  'bg-tag-slate'
+] as const
+
+function tileClass(name: string): string {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0
+  return TILE_CLASSES[Math.abs(hash) % TILE_CLASSES.length]
+}
+
 function Panel({ count, children }: { count?: number; children: React.ReactNode }) {
   return (
     // `shrink-0` because this renders inside a scrolling flex column: its own
     // `overflow-hidden` drops its automatic minimum size to zero, so without it
     // the panel collapses and clips its links rather than letting them scroll.
-    <div className="shrink-0 overflow-hidden rounded-lg border border-border bg-surface-elevated/20">
-      <div className="flex items-center gap-1.5 border-b border-border px-3 py-1.5">
-        <IconLink size={11} className="text-text-subtle" />
-        <span className="text-[10px] font-semibold tracking-wide text-text-muted uppercase">
-          Referenced by
-        </span>
+    <section className="flex shrink-0 flex-col gap-2">
+      <div className="flex items-center gap-2 px-1">
+        <IconLink size={16} className="text-text-subtle" />
+        <h3 className="text-sm font-semibold text-text">Referenced by</h3>
         {count != null && (
-          <span className="font-mono text-[10px] text-text-subtle/70">{count}</span>
+          <span className="text-[12px] font-medium tabular-nums text-text-subtle">{count}</span>
         )}
       </div>
-      {children}
-    </div>
+      <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-surface">
+        {children}
+      </div>
+    </section>
   )
 }

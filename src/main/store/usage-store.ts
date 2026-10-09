@@ -1,10 +1,14 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { format, subDays } from 'date-fns'
+import { existsSync, mkdirSync } from 'fs'
+// Subpaths, not the barrel: main is a CJS bundle with date-fns external, and
+// requiring the barrel loads every function in the library at startup.
+import { format } from 'date-fns/format'
+import { subDays } from 'date-fns/subDays'
 import type { AiFeature, AiModelId, AiProviderId } from '../../shared/ai-models'
 import { costOf } from '../../shared/ai-pricing'
 import type { UsageBreakdown, UsageSummary, UsageWindow } from '../../shared/types'
+import { quarantineJsonFile, readJsonFile, writeJsonFileAtomic } from './json-file'
 
 const FILE_NAME = 'usage.json'
 
@@ -51,25 +55,24 @@ function rowKey(provider: string, model: string, feature: string): string {
 function read(): StoreShape {
   if (cache) return cache
   const path = storePath()
-  if (!existsSync(path)) {
+  // A corrupt usage file is not worth failing a launch over, but it is kept
+  // aside rather than overwritten by the next call.
+  const parsed = readJsonFile(path) as Partial<StoreShape> | null | undefined
+  if (parsed === undefined) {
     cache = emptyState()
     return cache
   }
-  try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<StoreShape>
-    cache =
-      parsed?.days && typeof parsed.days === 'object'
-        ? { version: 1, days: parsed.days }
-        : emptyState()
-  } catch {
-    // A corrupt usage file is not worth failing a launch over.
+  if (!parsed?.days || typeof parsed.days !== 'object') {
+    quarantineJsonFile(path, 'no days map')
     cache = emptyState()
+    return cache
   }
+  cache = { version: 1, days: parsed.days }
   return cache
 }
 
 function write(state: StoreShape): void {
-  writeFileSync(storePath(), JSON.stringify(state), 'utf8')
+  writeJsonFileAtomic(storePath(), state)
   cache = state
 }
 

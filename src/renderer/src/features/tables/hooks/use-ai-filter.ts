@@ -16,6 +16,7 @@ import { isMissingAiKeyError } from '@renderer/components/common/ai-key-required
 import { ROUTES } from '@renderer/config/routes'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { buildFilterSuggestions } from '../lib/filter-suggestions'
+import { isDialogInTheWay } from '../lib/dialog-guard'
 import type { RowFilter, SortDirection, TableDetails } from '@renderer/types'
 
 interface AiFilterOptions {
@@ -47,11 +48,22 @@ export function useAiFilter({
   )
   const aiPrompt = useDisclosure(false)
   const [isAiFiltering, setIsAiFiltering] = React.useState(false)
+  // A model call takes seconds; by the time it answers the user may be on
+  // another table, where applying it would write this table's filters into
+  // that one's URL.
+  const isMountedRef = React.useRef(true)
+  React.useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   const openAiPrompt = aiPrompt.open
   React.useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'i') {
+        if (isDialogInTheWay(e.target)) return
         e.preventDefault()
         openAiPrompt()
       }
@@ -71,6 +83,7 @@ export function useAiFilter({
           prompt
         })
       )
+      if (!isMountedRef.current) return
       // Every condition was dropped. Applying an empty filter set would widen the
       // view to the whole table and read as an answer - say so and let the user
       // rephrase instead.
@@ -87,6 +100,7 @@ export function useAiFilter({
         toast.warning('Some conditions were dropped', { description: result.notes.join('\n') })
       }
     } catch (err) {
+      if (!isMountedRef.current) return
       const message = errorMessage(err)
       // A missing key is a setup step, not a failure - say what to do about it.
       if (isMissingAiKeyError(message)) {

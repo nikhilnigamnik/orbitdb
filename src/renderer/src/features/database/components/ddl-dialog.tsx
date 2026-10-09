@@ -1,12 +1,13 @@
 import * as React from 'react'
 import { IconAlertTriangle } from '@tabler/icons-react'
-import { Sheet } from '@renderer/components/ui/sheet'
+import { Dialog } from '@renderer/components/ui/dialog'
 import { Button } from '@renderer/components/ui/button'
 import { Input } from '@renderer/components/ui/input'
 import { Switch } from '@renderer/components/ui/switch'
 import { Checkbox } from '@renderer/components/ui/checkbox'
 import { useDebounce } from '@renderer/hooks/use-debounce'
 import { unwrap } from '@renderer/lib/ipc'
+import { cn } from '@renderer/lib/utils'
 import type { ColumnInfo, DdlFormKind, DdlOperation } from '@renderer/types'
 
 interface DdlDialogProps {
@@ -182,23 +183,23 @@ export function DdlDialog({
   }
 
   return (
-    <Sheet
-      openSheet={isOpen}
-      setOpenSheet={(open) => {
+    <Dialog
+      title={TITLES[kind]}
+      open={isOpen}
+      setOpen={(open) => {
         if (!open && !isExecuting) onClose()
       }}
-      side="right"
-      sheetContentClassName="sm:max-w-md"
+      className="flex max-h-[76vh] w-[min(520px,calc(100vw-2rem))] flex-col"
       content={
-        <div className="flex h-full min-h-0 flex-col">
-          <div className="flex shrink-0 flex-col gap-0.5 border-b border-border px-4 py-3 pr-12">
-            <h2 className="text-xs font-semibold text-text">{TITLES[kind]}</h2>
-            <p className="text-xs text-text-subtle">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 flex-col gap-0.5 px-5 pt-5 pb-3">
+            <h2 className="text-[15px] font-semibold text-text">{TITLES[kind]}</h2>
+            <p className="truncate text-xs text-text-muted">
               {schema}.{table}
             </p>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto px-4 py-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-5 pt-1 pb-5">
             {kind === 'add-column' && (
               <div className="flex flex-col gap-4">
                 <Field label="Column name">
@@ -273,20 +274,22 @@ export function DdlDialog({
                   />
                 </Field>
                 <Field label="Columns" hint="Pick one or more, in index order">
-                  <div className="flex max-h-48 flex-col gap-0.5 overflow-auto rounded-md border border-border p-1">
+                  <div className="flex max-h-48 flex-col overflow-auto rounded-lg bg-control p-1 shadow-control">
                     {columns.map((col) => {
                       const checked = indexColumns.includes(col.name)
                       return (
                         <label
                           key={col.name}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs text-text-muted transition-colors hover:bg-surface-elevated"
+                          className="flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-md px-2 text-sm text-text transition-colors hover:bg-surface-elevated"
                         >
                           <Checkbox
                             checked={checked}
                             onCheckedChange={(v) => toggleIndexColumn(col.name, !!v)}
                           />
-                          <span className="font-medium text-text">{col.name}</span>
-                          <span className="font-mono text-xs text-text-subtle">{col.dataType}</span>
+                          <span className="min-w-0 truncate">{col.name}</span>
+                          <span className="ml-auto shrink-0 font-mono text-[12px] text-text-subtle">
+                            {col.dataType}
+                          </span>
                         </label>
                       )
                     })}
@@ -302,22 +305,17 @@ export function DdlDialog({
             )}
 
             {isDestructive && (
-              <div className="flex items-start gap-2 rounded-lg border border-danger/20 bg-danger/5 px-3 py-2.5 text-xs text-danger">
-                <IconAlertTriangle size={15} className="mt-px shrink-0" stroke={2} />
-                <span>
-                  {kind === 'drop-column'
-                    ? `Dropping column "${target}" permanently removes its data.`
-                    : `Dropping index "${target}" cannot be undone from here.`}
-                </span>
-              </div>
+              <Notice tone="danger">
+                {kind === 'drop-column'
+                  ? `Dropping column "${target}" permanently removes its data.`
+                  : `Dropping index "${target}" cannot be undone from here.`}
+              </Notice>
             )}
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-                Generated SQL
-              </span>
+              <span className="text-xs font-medium text-text-muted">Generated SQL</span>
               {previewError ? (
-                <p className="rounded-lg border border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger">
+                <p className="rounded-lg border border-danger/15 bg-danger/5 px-3 py-2.5 text-xs text-danger">
                   {previewError}
                 </p>
               ) : (
@@ -332,39 +330,26 @@ export function DdlDialog({
             </div>
 
             {needsDefault && (
-              <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/5 px-3 py-2.5 text-xs text-warning">
-                <IconAlertTriangle size={15} className="mt-px shrink-0" stroke={2} />
-                <span>
-                  A NOT NULL column needs a default before it can be added to a table that already
-                  has rows.
-                </span>
-              </div>
+              <Notice tone="warning">
+                A NOT NULL column needs a default before it can be added to a table that already has
+                rows.
+              </Notice>
             )}
 
             {execError && (
-              <p className="rounded-lg border border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger">
+              <p className="rounded-lg border border-danger/15 bg-danger/5 px-3 py-2.5 text-xs text-danger">
                 {execError}
               </p>
             )}
           </div>
 
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface-elevated/20 px-4 py-3">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-text-muted hover:bg-surface-elevated hover:text-text"
-              onClick={onClose}
-              disabled={isExecuting}
-            >
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-4">
+            <Button size="sm" variant="outline" onClick={onClose} disabled={isExecuting}>
               Cancel
             </Button>
             <Button
               size="sm"
-              className={
-                isDestructive
-                  ? 'bg-danger-fill text-white shadow-[inset_0_-2px_0_0_var(--color-danger-shade),0_1px_3px_0_rgba(0,0,0,0.4)] hover:bg-danger hover:shadow-none active:shadow-none'
-                  : ''
-              }
+              variant={isDestructive ? 'destructive' : 'default'}
               onClick={handleConfirm}
               disabled={!operation || !sql || isExecuting || needsDefault}
             >
@@ -374,6 +359,22 @@ export function DdlDialog({
         </div>
       }
     />
+  )
+}
+
+function Notice({ tone, children }: { tone: 'danger' | 'warning'; children: React.ReactNode }) {
+  return (
+    <div
+      className={cn(
+        'flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs',
+        tone === 'danger'
+          ? 'border-danger/15 bg-danger/5 text-danger'
+          : 'border-warning/20 bg-warning/5 text-warning'
+      )}
+    >
+      <IconAlertTriangle size={16} className="shrink-0" />
+      <span>{children}</span>
+    </div>
   )
 }
 
@@ -388,9 +389,9 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text">{label}</span>
+      <span className="text-xs font-medium text-text-muted">{label}</span>
       {children}
-      {hint && <span className="text-xs text-text-subtle">{hint}</span>}
+      {hint && <span className="text-[12px] text-text-subtle">{hint}</span>}
     </label>
   )
 }
@@ -406,13 +407,26 @@ function ToggleRow({
   checked: boolean
   onChange: (checked: boolean) => void
 }) {
+  const id = React.useId()
+  const hintId = `${id}-hint`
   return (
     <div className="flex items-center justify-between gap-4">
-      <div className="flex flex-col">
-        <span className="text-xs font-medium text-text">{label}</span>
-        {hint && <span className="text-xs text-text-subtle">{hint}</span>}
+      <div className="flex flex-col gap-0.5">
+        <label htmlFor={id} className="cursor-pointer text-sm font-medium text-text">
+          {label}
+        </label>
+        {hint && (
+          <span id={hintId} className="text-xs text-text-muted">
+            {hint}
+          </span>
+        )}
       </div>
-      <Switch checked={checked} onCheckedChange={onChange} />
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onChange}
+        aria-describedby={hint ? hintId : undefined}
+      />
     </div>
   )
 }

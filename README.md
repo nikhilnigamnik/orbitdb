@@ -8,10 +8,9 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 
 **Browsing and editing**
 
-- **Multi-engine connections** - saved profiles per engine, credentials encrypted at rest via the OS keychain, testable before you connect.
-- **SSH tunnels** - reach a database that only its bastion can see. Authenticate with your running SSH agent, a key file, or a password, and the bastion's host key is pinned on first connect so a changed key stops the connection rather than going unnoticed.
-- **Schema browser** - schemas, tables, views, columns, indexes and foreign keys in a sidebar tree, with pinned tables and per-table actions.
-- **Data grid** - paginated rows with sorting, resizable columns, multi-row selection and foreign-key jumps. Row counts are exact rather than estimated wherever counting is affordable.
+- **Multi-engine connections** - saved profiles per engine, credentials encrypted at rest via the OS keychain and never handed to the UI, optional TLS certificate verification, testable before you connect.
+- **Schema browser** - schemas, tables, views, columns, indexes and foreign keys, with your tables listed in the sidebar, pinned ones under Favorites, and per-table actions.
+- **Data grid** - paginated rows with sorting, resizable columns, multi-row selection and foreign-key jumps, fully usable from the keyboard. Row counts are exact rather than estimated wherever counting is affordable.
 - **Relationships both ways** - follow a foreign key out to its parent from any cell, and see from the row editor which rows in other tables reference the one you are editing, counted, with cascading deletes flagged.
 - **Connection overview** - connecting lands on the shape of the database: table and view counts, size, the largest tables, and your recent queries.
 - **Record view** - one row read top to bottom, with long values wrapped rather than truncated, links out along foreign keys, and the rows that reference it.
@@ -19,6 +18,7 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 - **Keyboard and clipboard** - a cell cursor driven by the arrow keys, shift to extend a block, Enter to edit, and `Cmd+C` to copy it as spreadsheet-ready text (`Cmd+Shift+C` for JSON). Selected rows can be copied as JSON or as `INSERT` statements from the export menu.
 - **A view that stays put** - sort, page size, hidden columns, frozen columns and column widths are remembered per table.
 - **Shortcuts** - press `?` anywhere for the full list.
+- **Light and dark themes** - or follow your system. Settings → Appearance, or type "dark" in Quick actions.
 - **Inline cell editing** - edit in place with type-aware editors (dropdowns for enums and booleans, a date picker for dates, an expanding pane for JSON and long text), keyboard navigation across cells, and undo on a committed edit.
 - **Filters** - pick a column, then build the predicate. Filters combine with AND or OR, live in the URL so a filtered view can be shared, and suggest real values from the column.
 - **Structure editing** - add, rename and drop columns, create and drop indexes, rename and truncate tables. Every statement is previewed before it runs.
@@ -27,7 +27,7 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 
 **SQL**
 
-- **Query editor** - CodeMirror with SQL highlighting, line numbers and completion for your own tables and columns. Resizable results pane, a draft that survives navigating away, and destructive statements ask before running.
+- **Query editor** - CodeMirror with SQL highlighting, line numbers and completion for your own tables and columns. Resizable results pane, a draft that survives navigating away, and destructive statements ask before running. The editor keeps its own database session, so a transaction you open carries across runs without touching the grid.
 - **Query library** - every run is kept per connection; star one to name it and keep it out of the history cap. Stored alongside your connections rather than in browser storage.
 - **Check references** - from the connection overview, sweep for rows pointing at parents that no longer exist. Covers declared foreign keys _and_ columns like `user_id` that never had one, and flags a declared constraint with orphans behind it as not actually enforced (SQLite, and therefore D1, ships with foreign keys off).
 - **Find a value anywhere** - `Mod+Shift+F` sweeps every searchable column of every table for a value and shows where it appears, with counts. Click a result to open that table already filtered. Useful for undeclared foreign keys and tracking down stray data.
@@ -35,18 +35,20 @@ A desktop database client for **PostgreSQL**, **MySQL/MariaDB**, and **Cloudflar
 
 **AI (optional)**
 
-- **Natural language → SQL**, grounded in your schema. The result lands in the editor for review rather than executing itself.
+- **Natural language → SQL**, grounded in your schema - or describe a change ("only last week", "group by city") and it edits the query already in the editor. The result lands in the editor for review rather than executing itself.
+- **Fix with AI** - when a query fails, one click sends the SQL and the database's error and puts a corrected query in the editor, with a sentence on what was wrong.
+- **Explain query** - a plain-English walk-through of what the SQL in the editor does, flagging things like voided rows being counted or a join that multiplies rows.
 - **Natural language → filters** on the current table.
 - **Explain a table**, **suggest indexes**, and **generate seed data** - the model returns values, and the inserts are built in code with engine-correct quoting.
 
 Bring your own API key - **Anthropic**, **OpenAI**, **Google** or a **Cloudflare AI Gateway** - paste it in **Settings → AI**, and pick a model:
 
-| Provider   | Models                                               |
-| ---------- | ---------------------------------------------------- |
-| Anthropic  | Sonnet 5 · Haiku 4.5 · Opus 5                        |
-| OpenAI     | GPT-5.2 · GPT-5 mini · GPT-5.2 Pro                   |
-| Google     | Gemini 3.6 Flash · Gemini 2.5 Flash · Gemini 3.1 Pro |
-| Cloudflare | Any of the above, through your own gateway           |
+| Provider   | Models                                                    |
+| ---------- | --------------------------------------------------------- |
+| Anthropic  | Sonnet 5.5 · Haiku 5.5 · Opus 5.5 · Fable 5.1             |
+| OpenAI     | GPT-6.1 Sol · GPT-6 Luna · GPT-6 Astra                    |
+| Google     | Gemini 3.8 Flash · Gemini 3.5 Flash-Lite · Gemini 3.1 Pro |
+| Cloudflare | Any of the above, through your own gateway                |
 
 **Usage** - Settings shows tokens by provider, model and feature for today, the last 30 days, and all time. Counted from what the API reports, kept on your machine for 90 days, and clearable.
 
@@ -56,13 +58,13 @@ Each provider keeps its own key and model, so switching between them costs nothi
 
 ## Supported engines
 
-| Engine        | Driver   | Connection                           | SSH tunnel |
-| ------------- | -------- | ------------------------------------ | ---------- |
-| PostgreSQL    | `pg`     | host / port / user / password / SSL  | yes        |
-| MySQL/MariaDB | `mysql2` | host / port / user / password / SSL  | yes        |
-| Cloudflare D1 | REST API | account ID + database ID + API token | n/a        |
+| Engine        | Driver   | Connection                           |
+| ------------- | -------- | ------------------------------------ |
+| PostgreSQL    | `pg`     | host / port / user / password / SSL  |
+| MySQL/MariaDB | `mysql2` | host / port / user / password / SSL  |
+| Cloudflare D1 | REST API | account ID + database ID + API token |
 
-Postgres-compatible hosts - Neon, Supabase, Timescale - connect through the Postgres option. D1 speaks over the Cloudflare REST API rather than a socket, so there is nothing for a tunnel to forward.
+Postgres-compatible hosts - Neon, Supabase, Timescale - connect through the Postgres option. D1 speaks over the Cloudflare REST API rather than a socket.
 
 ## Install
 
@@ -90,9 +92,7 @@ Connection details live in `connections.json`, and your AI provider keys in `set
 | Windows  | `%APPDATA%\OrbitDB\`                     |
 | Linux    | `~/.config/OrbitDB/`                     |
 
-Passwords, database API tokens, SSH credentials and AI provider keys are encrypted at rest with Electron `safeStorage`, backed by the OS keychain (Keychain on macOS, DPAPI on Windows, libsecret on Linux). If no keychain is available the app says so and falls back to plaintext.
-
-An SSH private key is read once when you pick it and stored encrypted alongside the rest, rather than referenced by path - so moving or renaming the file does not silently break the connection. Choosing SSH agent authentication instead stores no credential at all.
+Passwords, database API tokens and AI provider keys are encrypted at rest with Electron `safeStorage`, backed by the OS keychain (Keychain on macOS, DPAPI on Windows, libsecret on Linux). If no keychain is available the app says so and falls back to plaintext.
 
 Nothing is sent anywhere except to the databases you connect to - and, if you add an AI key, your schema (table and column names, not row data) to the provider you selected, or to Cloudflare first if you turn the gateway on.
 

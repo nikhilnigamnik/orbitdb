@@ -33,11 +33,20 @@ function detectSsl(url: URL, engine: DatabaseEngine): boolean {
     if (['0', 'false', 'no', 'disable', 'disabled'].includes(lowered)) return false
     return true
   }
-  // Neon / managed Postgres URLs frequently include sslmode=require but some
-  // omit it and require SSL anyway. Heuristic: hosts ending in .neon.tech or
-  // .supabase.co etc. need SSL. We avoid that guesswork and default false.
+  // No mode in the URL. These providers refuse an unencrypted connection
+  // outright (Neon answers "connection is insecure"), so a URL copied without
+  // its query string would otherwise save a connection that can never open.
+  // Anywhere else stays off, since plenty of local servers have no TLS at all.
   void engine
-  return false
+  return isTlsOnlyHost(url.hostname)
+}
+
+/** Managed hosts that reject a connection without TLS. Suffixes, matched on a dot. */
+const TLS_ONLY_HOST_SUFFIXES = ['neon.tech', 'supabase.co', 'supabase.com', 'psdb.cloud']
+
+function isTlsOnlyHost(hostname: string): boolean {
+  const host = hostname.toLowerCase()
+  return TLS_ONLY_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))
 }
 
 export function parseConnectionUrl(input: string): ParsedConnection | null {

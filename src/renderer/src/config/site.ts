@@ -1,14 +1,15 @@
-import type {
-  ConnectionColor,
-  ConnectionEnvironment,
-  DatabaseEngine,
-  SshAuthMethod
-} from '@renderer/types'
-import { SSH_DEFAULT_PORT } from '../../../shared/types'
+import type { ConnectionColor, ConnectionEnvironment, DatabaseEngine } from '@renderer/types'
 
 // Same rule as the AI re-exports above: a value crossing the shared boundary
 // comes through config/ rather than a relative path from a component.
-export { usesSshTunnel, normalizeFolder, CONNECTION_COLORS } from '../../../shared/types'
+export {
+  normalizeFolder,
+  CONNECTION_COLORS,
+  canReuseStoredSecrets,
+  THEME_PREFERENCES,
+  DEFAULT_THEME_PREFERENCE,
+  isThemePreference
+} from '../../../shared/types'
 
 // Re-exported so components follow the usual "constants come from config/" rule
 // rather than reaching across the shared boundary by relative path.
@@ -18,6 +19,7 @@ export {
   DEFAULT_AI_PROVIDER,
   MISSING_AI_KEY_MESSAGE,
   aiFeatureLabel,
+  isAiSetupMessage,
   aiModelLabel,
   aiProvider,
   needsGatewayIds
@@ -27,7 +29,6 @@ export { formatCost, isPricedModel, rateFor } from '../../../shared/ai-pricing'
 
 export const APP_NAME = 'OrbitDB'
 export const APP_TAGLINE = 'Postgres + MySQL, made friendly'
-export const APP_VERSION = '0.1.0'
 
 export const GITHUB_REPO_URL = 'https://github.com/nikhilnigamnik/orbitdb'
 
@@ -114,6 +115,22 @@ export const CONNECTION_COLOR_CLASS: Record<ConnectionColor, string> = {
   rose: 'bg-tag-rose'
 }
 
+/**
+ * A tag filled behind a letter (the sidebar's connection tile). Ink follows
+ * the fill so the initial holds 4.5:1: dark on the light tags, white on the
+ * dark ones, and green and rose - which carry neither - on deeper fills.
+ */
+export const CONNECTION_TILE_CLASS: Record<ConnectionColor, string> = {
+  slate: 'bg-tag-slate text-tag-ink',
+  blue: 'bg-tag-blue text-white',
+  violet: 'bg-tag-violet text-white',
+  cyan: 'bg-tag-cyan text-tag-ink',
+  green: 'bg-tag-green-deep text-white',
+  amber: 'bg-tag-amber text-tag-ink',
+  orange: 'bg-tag-orange text-tag-ink',
+  rose: 'bg-tag-rose-deep text-white'
+}
+
 export const CONNECTION_COLOR_LABEL: Record<ConnectionColor, string> = {
   slate: 'Slate',
   blue: 'Blue',
@@ -131,22 +148,6 @@ export const MAX_FOLDER_NAME_LENGTH = 40
 /** Heading for the connections that were never filed anywhere. */
 export const UNGROUPED_FOLDER_LABEL = 'Ungrouped'
 
-export const SSH_AUTH_METHODS: SshAuthMethod[] = ['agent', 'key', 'password']
-
-export const SSH_AUTH_LABEL: Record<SshAuthMethod, string> = {
-  agent: 'SSH agent',
-  key: 'Private key',
-  password: 'Password'
-}
-
-export const SSH_AUTH_HINT: Record<SshAuthMethod, string> = {
-  agent: 'Uses the key already loaded in your running ssh-agent. Nothing is stored.',
-  key: 'The key file is read once and stored encrypted - not referenced by path.',
-  password: 'Stored encrypted, the same way the database password is.'
-}
-
-export const DEFAULT_SSH_PORT = SSH_DEFAULT_PORT
-
 export const DEFAULT_CONNECTION_VALUES = {
   name: '',
   engine: 'postgres' as DatabaseEngine,
@@ -161,14 +162,5 @@ export const DEFAULT_CONNECTION_VALUES = {
   ssl: false,
   accountId: '',
   databaseId: '',
-  apiToken: '',
-  sshEnabled: false,
-  sshHost: '',
-  sshPort: DEFAULT_SSH_PORT,
-  sshUser: '',
-  sshAuthMethod: 'agent' as SshAuthMethod,
-  sshPassword: '',
-  sshPrivateKey: '',
-  sshPassphrase: '',
-  sshHostKeyFingerprint: ''
+  apiToken: ''
 }

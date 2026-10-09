@@ -14,10 +14,17 @@ interface LoadingStateProps {
  */
 export function LoadingState({ size = 20, label, className }: LoadingStateProps) {
   return (
-    <div className={cn('flex h-full min-h-0 w-full flex-1 items-center justify-center', className)}>
-      <div className="flex flex-col items-center gap-2">
+    <div
+      role="status"
+      className={cn('flex h-full min-h-0 w-full flex-1 items-center justify-center', className)}
+    >
+      <div className="flex flex-col items-center gap-2.5">
         <Spinner size={size} className="text-text-subtle" />
-        {label && <p className="text-xs text-text-subtle">{label}</p>}
+        {label ? (
+          <p className="text-xs text-text-muted">{label}</p>
+        ) : (
+          <span className="sr-only">Loading</span>
+        )}
       </div>
     </div>
   )

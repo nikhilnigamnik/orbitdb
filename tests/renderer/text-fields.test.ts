@@ -52,28 +52,32 @@ const fields = [
   }
 ]
 
-// The Switch is a track, not a field - its unchecked fill stays a raised surface
-// so the white thumb reads against it. It shares the focus treatment only.
+// The Switch is a track, not a field - its unchecked fill is a grey track so
+// the white thumb reads against it. It shares the focus treatment only.
 const controls = [...fields, { name: 'Switch', element: () => createElement(Switch) }]
 
 describe.each(fields)('$name', ({ element }) => {
-  it('fills with the input token, not a raised surface', () => {
+  it('sits white on the canvas, not on a raised grey surface', () => {
     const resting = restingClassesOf(markupOf(element()))
-    expect(resting).toContain('bg-input')
+    expect(resting.some((c) => c === 'bg-input' || c === 'bg-surface')).toBe(true)
     expect(resting.filter((c) => c.startsWith('bg-surface-elevated'))).toEqual([])
+  })
+
+  it('answers hover by darkening its edge, as Attio fields do, not by filling', () => {
+    const classes = classesOf(markupOf(element()))
+    expect(classes).toMatch(/hover:border-/)
+    expect(classes).not.toMatch(/hover:bg-/)
   })
 })
 
 describe.each(controls)('$name', ({ element }) => {
   const classes = () => classesOf(markupOf(element()))
 
-  it('does not shift its border on hover', () => {
-    expect(classes()).not.toMatch(/hover:border/)
-  })
-
-  it('focuses to the same blue as a primary button, not the lighter text blue', () => {
-    expect(classes()).toContain('focus-visible:border-accent ')
-    expect(classes()).toContain('focus-visible:ring-accent/40')
+  it('focuses to a solid ring in the primary blue, not the text blue', () => {
+    // Solid, not a translucent halo: keyboard focus has to clear 3:1, which
+    // accent/20 never did.
+    expect(classes()).toMatch(/focus-visible:(ring|outline)-accent(\s|$)/)
+    expect(classes()).not.toMatch(/focus-visible:(ring|outline)-accent\//)
     expect(classes()).not.toMatch(/accent-text/)
   })
 })
@@ -118,13 +122,8 @@ describe('control heights', () => {
   const fieldShapedTriggers = [
     {
       what: 'the AI filter field',
-      file: 'src/renderer/src/features/tables/components/table-data-view.tsx',
+      file: 'src/renderer/src/features/tables/components/ai-filter-button.tsx',
       ariaLabel: 'Filter this table with natural language'
-    },
-    {
-      what: 'the sidebar table search',
-      file: 'src/renderer/src/features/database/components/schema-tree.tsx',
-      ariaLabel: 'Open command palette'
     }
   ]
 
@@ -159,25 +158,14 @@ describe('Kbd', () => {
   const kbdClasses = () => classesOf(markupOf(createElement(Kbd, null, '⌘'))).split(/\s+/)
 
   it('stays small enough to sit inside a control without crowding it', () => {
-    expect(kbdClasses()).toContain('h-4')
-    expect(kbdClasses()).toContain('min-w-4')
-    expect(kbdClasses()).toContain('text-[10px]')
+    // 18px inside a 28px (h-7) control leaves 5px either side.
+    expect(kbdClasses()).toContain('h-[18px]')
+    expect(kbdClasses()).toContain('text-[11px]')
   })
 
-  it('lends its hairline-over-a-whisper surface to the subtle button', () => {
-    // The invariant is "these two match", not two copies of the same literal -
-    // restyling Kbd should report the button as drifted, not pass quietly.
-    const surface = kbdClasses().filter(
-      (c) => c.startsWith('border-text-muted/') || c.startsWith('bg-text-muted/')
-    )
-    expect(surface).toHaveLength(2)
-
-    const button = classesOf(markupOf(createElement(Button, { variant: 'subtle' }, 'Quiet'))).split(
-      /\s+/
-    )
-    for (const token of surface) {
-      expect(button, `the subtle button is missing ${token}`).toContain(token)
-    }
+  it('sets keys in the UI face, as Attio does, not monospace', () => {
+    expect(kbdClasses()).toContain('font-sans')
+    expect(kbdClasses()).not.toContain('font-mono')
   })
 })
 
@@ -198,8 +186,10 @@ describe('the filter row', () => {
   const markup = () => render([{ column: 'id', operator: '=', value: '1' }])
 
   it('offers each applied filter for editing, not only for removal', () => {
-    expect(markup()).toContain('aria-label="Edit filter on id"')
-    expect(markup()).toContain('aria-label="Remove filter"')
+    // The label carries the whole condition, not just the column, so a screen
+    // reader hears what the chip shows.
+    expect(markup()).toContain('aria-label="Edit filter: id = 1"')
+    expect(markup()).toContain('aria-label="Remove filter on id"')
   })
 
   it('offers clear-all only once a second filter makes it worth having', () => {
@@ -216,7 +206,7 @@ describe('the filter row', () => {
   it('shows a unary filter without an empty value segment', () => {
     const unary = render([{ column: 'deleted_at', operator: 'is null', value: '' }])
     expect(unary).toContain('is null')
-    expect(unary).toContain('aria-label="Edit filter on deleted_at"')
+    expect(unary).toContain('aria-label="Edit filter: deleted_at is null"')
   })
 
   it('stands the applied-filter chip at control height, level with the trigger', () => {
@@ -233,63 +223,64 @@ describe('the filter row', () => {
     expect(trigger![1]).toBe('subtle')
     expect(trigger![2]).toBe('icon-sm')
   })
+
+  it('draws the empty trigger as an Attio dashed chip that names itself', () => {
+    const empty = render([])
+    const trigger = /<button[^>]*aria-label="Open filters"[^>]*>/.exec(empty)
+    expect(trigger, 'the filter trigger lost its aria-label').not.toBeNull()
+    const classes = /class="([^"]*)"/.exec(trigger![0])![1].split(/\s+/)
+    expect(classes).toContain('border-dashed')
+    expect(classes).toContain('border-border-strong')
+    expect(empty).toContain('Filter')
+  })
+
+  it('draws an applied filter as a control chip on the hairline halo, not a grey fill', () => {
+    // bg-control: white in the light theme, a lifted fill in the dark one, where
+    // the halo alone left the chip invisible against the toolbar.
+    const chip = /class="(inline-flex[^"]*)"/.exec(markup())![1].split(/\s+/)
+    expect(chip).toContain('bg-control')
+    expect(chip).toContain('shadow-control')
+    expect(chip.filter((c) => c.startsWith('bg-surface-elevated'))).toEqual([])
+  })
 })
 
 describe('the floating selection toolbar', () => {
-  /**
-   * Rendering the bar needs a loaded table, so it is read from the source. The
-   * class list is split so a test can assert on what is absent as well as
-   * present - this button inherits from Button's `default` variant, and the bug
-   * it keeps hitting is an accent token that was never overridden.
-   */
-  function deleteButtonClasses(): string[] {
-    const source = readFileSync(
-      resolve('src/renderer/src/features/tables/components/selection-bar.tsx'),
-      'utf8'
-    )
-    const button = /className="([^"]*bg-danger-fill[^"]*)"/.exec(source)
-    expect(button, 'could not find the solid delete button').not.toBeNull()
-    return button![1].split(/\s+/)
-  }
+  // Rendering the bar needs a loaded table, so it is read from the source.
+  const source = () =>
+    readFileSync(resolve('src/renderer/src/features/tables/components/selection-bar.tsx'), 'utf8')
 
-  it('is rounded, not a pill', () => {
-    // Rendering it needs a loaded table, so it is checked at the source, keyed
-    // on the entrance animation the bar is the only user of.
-    const source = readFileSync(
-      resolve('src/renderer/src/features/tables/components/selection-bar.tsx'),
-      'utf8'
-    )
-    const bar = /className="(animate-slide-up-fade pointer-events-auto[^"]*)"/.exec(source)
+  it('floats as a card: the popover surface, soft shadow, rounded rather than a pill', () => {
+    // Keyed on the entrance animation the bar is the only user of.
+    const bar = /className="(animate-slide-up-fade pointer-events-auto[^"]*)"/.exec(source())
     expect(bar, 'could not find the floating selection bar').not.toBeNull()
-    expect(bar![1].split(/\s+/)).toContain('rounded-lg')
-    expect(source, 'nothing in this view should be a pill any more').not.toMatch(/rounded-full/)
+    const classes = bar![1].split(/\s+/)
+    expect(classes).toContain('rounded-xl')
+    // bg-popover: white in the light theme, lifted off the canvas in the dark.
+    expect(classes).toContain('bg-popover')
+    expect(classes).toContain('shadow-pop')
+    expect(source(), 'nothing in this view should be a pill any more').not.toMatch(/rounded-full/)
+  })
+
+  it('carries nothing left over from the dark theme', () => {
+    expect(source()).not.toMatch(/white\/|black\/|backdrop-blur|shadow-2xl/)
   })
 
   it('does not make the delete button glow', () => {
     // A coloured drop shadow under a red fill reads as a halo, not depth.
-    const source = readFileSync(
-      resolve('src/renderer/src/features/tables/components/selection-bar.tsx'),
-      'utf8'
-    )
-    expect(source).not.toMatch(/shadow-danger/)
+    expect(source()).not.toMatch(/shadow-danger/)
   })
 
-  it('does not focus the delete button in accent blue', () => {
-    // Button's base focus treatment is accent blue, and closing the confirm
-    // dialog restores focus to the trigger - so a solid red fill has to override
-    // it or the button sits there ringed in blue.
-    const classes = deleteButtonClasses()
-    expect(classes.some((c) => /^focus-visible:(border|ring)-white/.test(c))).toBe(true)
-  })
+  it('takes the delete button from the destructive variant instead of repainting the primary', () => {
+    // Repainting `default` was a trap: its blue bevel and blue focus ring had to
+    // be overridden one by one, and closing the confirm dialog restores focus to
+    // this button. The destructive variant has neither to begin with.
+    const button = /<Button[^>]*variant="([^"]*)"[^>]*onClick=\{onDelete\}/.exec(source())
+    expect(button, 'could not find the delete button').not.toBeNull()
+    expect(button![1]).toBe('destructive')
 
-  it('bevels the delete button in danger, not the accent blue it inherits', () => {
-    // The real trap: `default` paints an inset bevel in --color-accent-shade,
-    // which is blue. Overriding only bg- leaves that blue line along the bottom,
-    // and it is invisible in the className until you look for what is *missing*.
-    const shadow = deleteButtonClasses().find((c) => c.startsWith('shadow-['))
-    expect(shadow, 'the delete button does not override the inherited bevel').toBeDefined()
-    expect(shadow).toContain('--color-danger-shade')
-    expect(shadow).not.toContain('accent')
+    const classes = classesOf(markupOf(createElement(Button, { variant: 'destructive' }, 'Delete')))
+    expect(classes).toContain('bg-danger-fill')
+    expect(classes).not.toMatch(/accent/)
   })
 })
 

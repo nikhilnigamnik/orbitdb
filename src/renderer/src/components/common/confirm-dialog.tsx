@@ -1,5 +1,5 @@
 import { IconAlertTriangle } from '@tabler/icons-react'
-import { Sheet } from '@renderer/components/ui/sheet'
+import { Dialog, DialogDescription, DialogTitle } from '@renderer/components/ui/dialog'
 import { Button } from '@renderer/components/ui/button'
 import { cn } from '@renderer/lib/utils'
 
@@ -15,6 +15,7 @@ interface ConfirmDialogProps {
   isLoading?: boolean
 }
 
+/** Attio's confirmation: a small centred modal, title and reason, then the two choices. */
 export function ConfirmDialog({
   isOpen,
   onClose,
@@ -28,43 +29,41 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const isDanger = variant === 'danger'
   return (
-    <Sheet
-      openSheet={isOpen}
-      setOpenSheet={(open) => {
+    <Dialog
+      open={isOpen}
+      setOpen={(open) => {
         if (!open && !isLoading) onClose()
       }}
-      side="right"
-      sheetContentClassName="sm:max-w-sm"
+      role="alertdialog"
+      className="top-[20vh] w-[min(440px,calc(100vw-2rem))]"
       content={
-        <div className="flex h-full min-h-0 flex-col">
-          <div className="relative flex flex-1 flex-col items-start gap-4 px-6 py-7">
-            <div aria-hidden className={cn('pointer-events-none absolute inset-x-0 top-0 h-px')} />
-            <div
+        <div className="flex flex-col">
+          <div className="flex items-start gap-3 px-5 pt-5 pb-3">
+            <span
               className={cn(
-                'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset',
-                isDanger
-                  ? 'bg-danger/12 text-danger ring-danger/25'
-                  : 'bg-text-muted/12 text-text-muted ring-text-muted/25'
+                'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                isDanger ? 'bg-danger/10 text-danger' : 'bg-surface-elevated text-text-muted'
               )}
             >
-              <IconAlertTriangle size={20} stroke={2} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <h2 className="text-xs font-semibold leading-tight tracking-tight text-text">
+              <IconAlertTriangle size={16} aria-hidden />
+            </span>
+            <div className="flex min-w-0 flex-col gap-1 pt-1">
+              <DialogTitle className="text-[15px] leading-tight font-semibold text-text">
                 {title}
-              </h2>
+              </DialogTitle>
               {description && (
-                <p className="text-xs leading-relaxed text-text-muted">{description}</p>
+                <DialogDescription className="text-xs text-text-muted">
+                  {description}
+                </DialogDescription>
               )}
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface-elevated/20 px-4 py-3">
+          <div className="flex items-center justify-end gap-2 px-5 py-4">
             <Button
               type="button"
               size="sm"
-              variant="ghost"
-              className="text-text-muted hover:bg-surface-elevated hover:text-text"
+              variant="outline"
               onClick={onClose}
               disabled={isLoading}
             >
@@ -73,11 +72,7 @@ export function ConfirmDialog({
             <Button
               type="button"
               size="sm"
-              className={
-                isDanger
-                  ? 'bg-danger-fill text-white shadow-[inset_0_-2px_0_0_var(--color-danger-shade),0_1px_3px_0_rgba(0,0,0,0.4)] hover:bg-danger hover:shadow-none active:shadow-none'
-                  : ''
-              }
+              variant={isDanger ? 'destructive' : 'default'}
               onClick={onConfirm}
               disabled={isLoading}
             >

@@ -1,28 +1,36 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { RowSelectionState } from '@tanstack/react-table'
-import { IconSeeding } from '@tabler/icons-react'
+import { IconAlertTriangle, IconPlus, IconSeeding } from '@tabler/icons-react'
+
+import { PageToolbar } from '@renderer/components/layout/page-header'
 import { Button } from '@renderer/components/ui/button'
-import { Kbd } from '@renderer/components/ui/kbd'
 import { useToast } from '@renderer/components/ui/toast'
-import { AiPrompt } from '@renderer/features/query/components/ai-prompt'
-import { SeedDataDialog } from '@renderer/features/database/components/seed-data-dialog'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { LoadingState } from '@renderer/components/common/loading-state'
+import { AiPrompt } from '@renderer/features/query/components/ai-prompt'
+import { SeedDataDialog } from '@renderer/features/database/components/seed-data-dialog'
+import { tableRouteWithFk } from '@renderer/config/routes'
+import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { formatNumber } from '@renderer/lib/format'
 import { errorMessage } from '@renderer/lib/errors'
+import type { DatabaseEngine, SortDirection, TableDetails } from '@renderer/types'
+
 import {
   MAX_FROZEN_COLUMNS,
   saveViewPrefs,
   toggleFrozenColumn,
   toggleHiddenColumn,
   type TableViewPrefs
-} from '@renderer/features/tables/lib/view-prefs'
+} from '../lib/view-prefs'
 import { useAiFilter } from '../hooks/use-ai-filter'
-import { tableRouteWithFk } from '@renderer/config/routes'
-import { useDisclosure } from '@renderer/hooks/use-disclosure'
-import type { DatabaseEngine, SortDirection, TableDetails } from '@renderer/types'
+import { useFilterParams } from '../hooks/use-filter-params'
+import { useTableRows } from '../hooks/use-table-rows'
+import { useCellUndo } from '../hooks/use-cell-undo'
+import { useRowMutations } from '../hooks/use-row-mutations'
+import { useStableCallback } from '../hooks/use-stable-callback'
+import type { CopyFormat } from '../hooks/use-grid-cursor'
 import { DataGrid } from './data-grid'
 import { TableOverflowMenu } from './table-overflow-menu'
 import { FiltersBar } from './filters-bar'
@@ -31,14 +39,10 @@ import { RowEditorSheet } from './row-editor-sheet'
 import { RecordViewSheet } from './record-view-sheet'
 import { ColumnVisibilityMenu } from './column-visibility-menu'
 import { CascadeDeleteDialog } from './cascade-delete-dialog'
-import type { CopyFormat } from '../hooks/use-grid-cursor'
-
-import { useFilterParams } from '../hooks/use-filter-params'
-import { useTableRows } from '../hooks/use-table-rows'
-import { useCellUndo } from '../hooks/use-cell-undo'
-import { useRowMutations } from '../hooks/use-row-mutations'
+import { AiFilterButton } from './ai-filter-button'
 import { UndoPrompt } from './undo-prompt'
 import { SelectionBar } from './selection-bar'
+import { SortChip } from './sort-chip'
 
 interface TableDataViewProps {
   connectionId: string
@@ -49,9 +53,9 @@ interface TableDataViewProps {
   onRenameTable?: () => void
   /** Fires once the first page of rows has loaded, so the container can reveal chrome. */
   onReady?: () => void
+  /** The container's unfiltered count, reused by the pager while no filter is set. */
+  unfilteredTotal?: number | null
 }
-
-const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
 const COPY_FORMAT_LABEL: Record<CopyFormat, string> = {
   tsv: 'text',
@@ -64,7 +68,8 @@ export function TableDataView({
   details,
   engine = 'postgres',
   onRenameTable,
-  onReady
+  onReady,
+  unfilteredTotal
 }: TableDataViewProps) {
   const navigate = useNavigate()
   const toast = useToast()
@@ -114,7 +119,8 @@ export function TableDataView({
     setFilterJoinState,
     writeFilterParams,
     setRowSelection,
-    onReady
+    onReady,
+    unfilteredTotal
   })
 
   const fkByColumn = React.useMemo(() => {
@@ -186,21 +192,36 @@ export function TableDataView({
     saveViewPrefs(connectionId, details.schema, details.name, next)
   }
 
-  function handleSort(column: string) {
-    let nextOrderBy: string | null = column
-    let nextOrderDir: SortDirection = 'asc'
-    if (orderBy === column) {
-      if (orderDir === 'asc') {
-        nextOrderDir = 'desc'
-      } else {
-        nextOrderBy = null
-      }
-    }
+  function applySort(nextOrderBy: string | null, nextOrderDir: SortDirection) {
     setOrderBy(nextOrderBy)
     setOrderDir(nextOrderDir)
     setOffset(0)
     persistPrefs({ orderBy: nextOrderBy, orderDir: nextOrderDir })
   }
+
+  // Stable, because the grid's rows are memoised and an inline closure is a new
+  // prop on every render - which re-rendered every row on any state change.
+  /** The header arrows cycle asc, desc, off. */
+  const handleSort = useStableCallback((column: string) => {
+    if (orderBy !== column) return applySort(column, 'asc')
+    if (orderDir === 'asc') return applySort(column, 'desc')
+    applySort(null, 'asc')
+  })
+  const openEditor = useStableCallback((row: Record<string, unknown>) => {
+    setEditingRow(row)
+    editModal.open()
+  })
+  const openRecord = useStableCallback((row: Record<string, unknown>) => {
+    setInspectingRow(row)
+    recordView.open()
+  })
+  const confirmDelete = useStableCallback((row: Record<string, unknown>) => {
+    setPendingDelete(row)
+    deleteConfirm.open()
+  })
+  const commitColumnSizing = useStableCallback((columnSizing: Record<string, number>) =>
+    persistPrefs({ columnSizing })
+  )
 
   const visibleColumns = React.useMemo(
     () => columns.filter((column) => !prefs.hiddenColumns.includes(column.name)),
@@ -251,8 +272,10 @@ export function TableDataView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-2">
+      <PageToolbar className="h-auto min-h-12 justify-between gap-3 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
+          <SortChip columns={columns} orderBy={orderBy} orderDir={orderDir} onChange={applySort} />
+          <span aria-hidden className="h-4 w-px shrink-0 bg-border-strong" />
           <FiltersBar
             connectionId={connectionId}
             schema={details.schema}
@@ -267,21 +290,8 @@ export function TableDataView({
             }}
           />
         </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={aiPrompt.open}
-            aria-label="Filter this table with natural language"
-            className="group flex h-7 w-72 cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-input px-2.5 text-left transition-colors hover:bg-surface-elevated/40 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none"
-          >
-            <span className="flex-1 truncate text-xs text-text-subtle transition-colors group-hover:text-text-muted">
-              Describe the rows you want…
-            </span>
-            <span className="flex shrink-0 items-center gap-0.5">
-              <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
-              <Kbd>I</Kbd>
-            </span>
-          </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <AiFilterButton onClick={aiPrompt.open} />
           <ColumnVisibilityMenu
             columns={columns}
             hiddenColumns={prefs.hiddenColumns}
@@ -309,17 +319,17 @@ export function TableDataView({
           {details.type === 'table' && (
             <Button
               size="sm"
-              variant="ghost"
-              className="text-text-muted hover:bg-surface-elevated hover:text-text"
+              variant="outline"
               onClick={seedDialog.open}
               title="Generate sample rows with AI"
             >
-              <IconSeeding size={12} />
+              <IconSeeding size={14} className="text-text-subtle" />
               Seed data
             </Button>
           )}
           {canMutate && (
             <Button size="sm" onClick={insertModal.open}>
+              <IconPlus size={14} />
               Insert row
             </Button>
           )}
@@ -332,10 +342,11 @@ export function TableDataView({
             onRenameTable={onRenameTable}
           />
         </div>
-      </div>
+      </PageToolbar>
 
       {!canMutate && details.type === 'table' && (
-        <div className="border-b border-warning/20 bg-warning/5 px-3 py-2 text-xs text-warning">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-warning/6 px-4 py-2 text-xs text-warning">
+          <IconAlertTriangle size={14} className="shrink-0" />
           This table has no primary key - rows cannot be edited or deleted from the UI.
         </div>
       )}
@@ -347,18 +358,9 @@ export function TableDataView({
           orderBy={orderBy}
           orderDir={orderDir}
           onSort={handleSort}
-          onEditRow={(row) => {
-            setEditingRow(row)
-            editModal.open()
-          }}
-          onInspectRow={(row) => {
-            setInspectingRow(row)
-            recordView.open()
-          }}
-          onDeleteRow={(row) => {
-            setPendingDelete(row)
-            deleteConfirm.open()
-          }}
+          onEditRow={openEditor}
+          onInspectRow={openRecord}
+          onDeleteRow={confirmDelete}
           onEditCell={canMutate ? handleEditCell : undefined}
           canMutate={canMutate}
           rowOffset={offset}
@@ -372,7 +374,8 @@ export function TableDataView({
           insertTarget={{ schema: details.schema, table: details.name, engine }}
           columnSizing={prefs.columnSizing}
           frozenColumns={prefs.frozenColumns}
-          onColumnSizingCommit={(columnSizing) => persistPrefs({ columnSizing })}
+          onColumnSizingCommit={commitColumnSizing}
+          totalRows={totalExact}
           onCopied={(format, cellCount) =>
             toast.success(
               `Copied ${cellCount} cell${cellCount === 1 ? '' : 's'} as ${COPY_FORMAT_LABEL[format]}`
@@ -462,8 +465,7 @@ export function TableDataView({
           canMutate
             ? (row) => {
                 recordView.close()
-                setEditingRow(row)
-                editModal.open()
+                openEditor(row)
               }
             : undefined
         }

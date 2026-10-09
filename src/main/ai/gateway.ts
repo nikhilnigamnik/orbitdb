@@ -1,5 +1,3 @@
-import { createAiGateway } from 'ai-gateway-provider'
-import { createUnified } from 'ai-gateway-provider/providers/unified'
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 import { INCOMPLETE_GATEWAY_MESSAGE } from '../../shared/ai-models'
 import type { GatewaySettings } from '../store/settings-store'
@@ -43,6 +41,17 @@ function relaxStrictSchema(args: Record<string, unknown>): Record<string, unknow
   return args
 }
 
+type CreateAiGateway = (typeof import('ai-gateway-provider'))['createAiGateway']
+type UnifiedProvider = ReturnType<
+  (typeof import('ai-gateway-provider/providers/unified'))['createUnified']
+>
+
+interface GatewaySdk {
+  createAiGateway: CreateAiGateway
+  structuredUnified: UnifiedProvider
+  plainUnified: UnifiedProvider
+}
+
 /**
  * Two providers, not one. `createUnified` defaults `supportsStructuredOutputs`
  * to false, which silently downgrades a schema request to `{type:'json_object'}`
@@ -50,13 +59,29 @@ function relaxStrictSchema(args: Record<string, unknown>): Record<string, unknow
  * which is an `APICallError` and so is never retried. Every AI feature on an
  * `openai/*` gateway model failed on it.
  *
- * Both hold no credential, so there is nothing per-call about either.
+ * Both hold no credential, so there is nothing per-call about either. Built on
+ * first use, like the vendor SDKs in `client.ts`, so startup does not pay for them.
  */
-const structuredUnified = createUnified({
-  supportsStructuredOutputs: true,
-  transformRequestBody: relaxStrictSchema
-})
-const plainUnified = createUnified()
+let gatewaySdk: Promise<GatewaySdk> | null = null
+function loadGatewaySdk(): Promise<GatewaySdk> {
+  if (!gatewaySdk) {
+    gatewaySdk = Promise.all([
+      import('ai-gateway-provider'),
+      import('ai-gateway-provider/providers/unified')
+    ]).then(([{ createAiGateway }, { createUnified }]) => ({
+      createAiGateway,
+      structuredUnified: createUnified({
+        supportsStructuredOutputs: true,
+        transformRequestBody: relaxStrictSchema
+      }),
+      plainUnified: createUnified()
+    }))
+    gatewaySdk.catch(() => {
+      gatewaySdk = null
+    })
+  }
+  return gatewaySdk
+}
 
 /**
  * A model on Cloudflare's unified endpoint, addressed by the catalog slug that
@@ -67,13 +92,14 @@ const plainUnified = createUnified()
  * its own stored keys (BYOK) or Unified Billing credits, and the only key this
  * app sends is the gateway token.
  */
-export function buildGatewayModel(
+export async function buildGatewayModel(
   gateway: GatewaySettings,
   token: string,
   model: string
-): LanguageModelV3 {
+): Promise<LanguageModelV3> {
   if (!gateway.accountId || !gateway.gatewayId) throw new Error(INCOMPLETE_GATEWAY_MESSAGE)
 
+  const { createAiGateway, structuredUnified, plainUnified } = await loadGatewaySdk()
   const aigateway = createAiGateway({
     accountId: gateway.accountId,
     gateway: gateway.gatewayId,

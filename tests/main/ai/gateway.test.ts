@@ -32,40 +32,40 @@ beforeEach(async () => {
 })
 
 /** The config `model` was ultimately built from. */
-function configFor(model: string): Record<string, unknown> {
-  const built = gateway.buildGatewayModel(settings, 'token', model) as unknown as {
+async function configFor(model: string): Promise<Record<string, unknown>> {
+  const built = (await gateway.buildGatewayModel(settings, 'token', model)) as unknown as {
     builtBy: number
   }
   return unified.configs[built.builtBy]
 }
 
 describe('which gateway upstreams get a native schema', () => {
-  it('gives one to OpenAI', () => {
+  it('gives one to OpenAI', async () => {
     expect(gateway.gatewaySupportsStructuredOutput('openai/gpt-5.6-luna')).toBe(true)
-    expect(configFor('openai/gpt-5.6-luna').supportsStructuredOutputs).toBe(true)
+    expect((await configFor('openai/gpt-5.6-luna')).supportsStructuredOutputs).toBe(true)
   })
 
-  it('withholds it from Anthropic, whose answer comes back as a tool call', () => {
+  it('withholds it from Anthropic, whose answer comes back as a tool call', async () => {
     // `content: null` + `tool_calls` is not text, so Output.object reads nothing.
     expect(gateway.gatewaySupportsStructuredOutput('anthropic/claude-sonnet-5')).toBe(false)
-    expect(configFor('anthropic/claude-sonnet-5').supportsStructuredOutputs).toBeUndefined()
+    expect((await configFor('anthropic/claude-sonnet-5')).supportsStructuredOutputs).toBeUndefined()
   })
 
-  it('withholds it from Google', () => {
+  it('withholds it from Google', async () => {
     expect(gateway.gatewaySupportsStructuredOutput('google-ai-studio/gemini-3.6-flash')).toBe(false)
   })
 
-  it('matches on the prefix, not a substring of the model half', () => {
+  it('matches on the prefix, not a substring of the model half', async () => {
     expect(gateway.gatewaySupportsStructuredOutput('anthropic/claude-openai/x')).toBe(false)
   })
 })
 
 describe('the outgoing request body', () => {
-  it('forces strict off, which a schema with an optional field needs', () => {
+  it('forces strict off, which a schema with an optional field needs', async () => {
     // OpenAI strict mode requires every property in `required`; filter-table
     // omits `value` for `is null`, and a strict request is a 400 rather than a
     // relaxed one.
-    const config = configFor('openai/gpt-5.6-luna')
+    const config = await configFor('openai/gpt-5.6-luna')
     const transform = config.transformRequestBody as (
       args: Record<string, unknown>
     ) => Record<string, unknown>
@@ -79,8 +79,8 @@ describe('the outgoing request body', () => {
     )
   })
 
-  it('leaves a body carrying no schema alone', () => {
-    const config = configFor('openai/gpt-5.6-luna')
+  it('leaves a body carrying no schema alone', async () => {
+    const config = await configFor('openai/gpt-5.6-luna')
     const transform = config.transformRequestBody as (
       args: Record<string, unknown>
     ) => Record<string, unknown>
@@ -93,15 +93,15 @@ describe('the outgoing request body', () => {
 })
 
 describe('a half-configured gateway', () => {
-  it('refuses without an account id', () => {
-    expect(() => gateway.buildGatewayModel({ accountId: '', gatewayId: 'gw' }, 't', 'm')).toThrow(
-      /account id/
-    )
+  it('refuses without an account id', async () => {
+    await expect(
+      gateway.buildGatewayModel({ accountId: '', gatewayId: 'gw' }, 't', 'm')
+    ).rejects.toThrow(/account id/)
   })
 
-  it('refuses without a gateway id', () => {
-    expect(() => gateway.buildGatewayModel({ accountId: 'a', gatewayId: '' }, 't', 'm')).toThrow(
-      /gateway id/
-    )
+  it('refuses without a gateway id', async () => {
+    await expect(
+      gateway.buildGatewayModel({ accountId: 'a', gatewayId: '' }, 't', 'm')
+    ).rejects.toThrow(/gateway id/)
   })
 })

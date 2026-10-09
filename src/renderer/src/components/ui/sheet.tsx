@@ -1,24 +1,40 @@
-'use client'
-
 import * as React from 'react'
 import * as SheetPrimitive from '@radix-ui/react-dialog'
-import * as VisuallyHidden from '@radix-ui/react-visually-hidden'
 import { IconX } from '@tabler/icons-react'
 import { PropsWithChildren, ReactNode, WheelEventHandler } from 'react'
+
 import { cn } from '@renderer/lib/utils'
 
-export type SheetProps = PropsWithChildren<{
+import {
+  DialogDescription as SheetDescription,
+  DialogHeadingScope,
+  DialogTitle as SheetTitle,
+  useDialogHeading
+} from './dialog-heading'
+
+export interface SheetProps extends PropsWithChildren {
   content: ReactNode | string
   side?: 'top' | 'right' | 'bottom' | 'left'
   openSheet: boolean
   setOpenSheet: (open: boolean) => void
+  /**
+   * What a screen reader announces when the sheet opens, rendered visually
+   * hidden. Content that shows its own heading uses `SheetTitle` instead.
+   */
+  title?: string
+  /** Read after the title. Content with a visible one uses `SheetDescription`. */
+  description?: string
   sheetContentClassName?: string
   floating?: boolean
+  /**
+   * Radix moves focus to the first focusable control on open. Call
+   * `event.preventDefault()` here to keep it on the trigger instead.
+   */
   onOpenAutoFocus?: SheetPrimitive.DialogContentProps['onOpenAutoFocus']
   onEscapeKeyDown?: (event: KeyboardEvent) => void
   onWheel?: WheelEventHandler
   onPointerDownOutside?: SheetPrimitive.DialogContentProps['onPointerDownOutside']
-}>
+}
 
 function Sheet({
   children,
@@ -26,12 +42,16 @@ function Sheet({
   side = 'right',
   openSheet,
   setOpenSheet,
+  title,
+  description,
   sheetContentClassName,
   floating = true,
+  onOpenAutoFocus,
   onEscapeKeyDown,
   onWheel,
   onPointerDownOutside
 }: SheetProps) {
+  const heading = useDialogHeading({ title, description, fallbackTitle: 'Sheet' })
   return (
     <SheetPrimitive.Root open={openSheet} onOpenChange={setOpenSheet} data-slot="sheet">
       {children && <SheetPrimitive.Trigger asChild>{children}</SheetPrimitive.Trigger>}
@@ -39,12 +59,14 @@ function Sheet({
         side={side}
         floating={floating}
         className={sheetContentClassName}
-        onOpenAutoFocus={(e) => e.preventDefault()}
+        onOpenAutoFocus={onOpenAutoFocus}
         onEscapeKeyDown={onEscapeKeyDown}
         onWheel={onWheel}
         onPointerDownOutside={onPointerDownOutside}
+        heading={heading.hidden}
+        {...heading.contentProps}
       >
-        {content}
+        <DialogHeadingScope registry={heading.registry}>{content}</DialogHeadingScope>
       </SheetContent>
     </SheetPrimitive.Root>
   )
@@ -62,7 +84,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'fixed inset-0 z-50 bg-black/20 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:duration-150 data-[state=open]:duration-200',
+        'fixed inset-0 z-50 bg-overlay-soft data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:duration-150 data-[state=open]:duration-200',
         className
       )}
       {...props}
@@ -75,16 +97,18 @@ function SheetContent({
   children,
   side = 'right',
   floating = true,
+  heading,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: 'top' | 'right' | 'bottom' | 'left'
   floating?: boolean
+  heading: ReactNode
 }) {
   const floatingStyles = floating
     ? {
         left: 'left-0 top-0 bottom-0 h-[calc(100%-3rem)] w-[88vw] md:w-3/4 data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm',
         right:
-          'right-0 top-0 bottom-0 h-[calc(100%-0.5rem)] w-[88vw] md:w-3/4 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm'
+          'right-0 top-0 bottom-0 h-[calc(100%-0.75rem)] w-[88vw] md:w-3/4 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm'
       }
     : {
         left: 'inset-y-0 left-0 h-full w-3/4 data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm',
@@ -101,7 +125,7 @@ function SheetContent({
           // `overflow-hidden` is load-bearing, not cosmetic: without it a taller
           // child spills past the rounded edge and the inner `overflow-auto`
           // region never becomes the thing that scrolls.
-          'fixed z-50 m-1 flex flex-col overflow-hidden rounded-lg border border-border-strong bg-surface shadow-2xl shadow-black/70 transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-150 data-[state=open]:duration-200',
+          'fixed z-50 m-1.5 flex flex-col overflow-hidden rounded-xl bg-surface text-text shadow-dialog transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-150 data-[state=open]:duration-200',
           side === 'right' && floatingStyles.right,
           side === 'left' && floatingStyles.left,
           side === 'top' &&
@@ -112,21 +136,17 @@ function SheetContent({
         )}
         {...props}
       >
-        <VisuallyHidden.Root>
-          <SheetPrimitive.Title>Sheet</SheetPrimitive.Title>
-          <SheetPrimitive.Description>Sheet content</SheetPrimitive.Description>
-        </VisuallyHidden.Root>
+        {heading}
         {children}
         <SheetPrimitive.Close
           aria-label="Close"
-          className="absolute right-2 top-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border border-border bg-surface-elevated/60 text-text-subtle transition-colors hover:bg-surface-elevated hover:text-text"
+          className="absolute right-2.5 top-2.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-text-subtle transition-colors hover:bg-surface-elevated hover:text-text"
         >
-          <IconX className="size-3" />
-          <span className="sr-only">Close</span>
+          <IconX className="size-4" aria-hidden />
         </SheetPrimitive.Close>
       </SheetPrimitive.Content>
     </SheetPortal>
   )
 }
 
-export { Sheet }
+export { Sheet, SheetTitle, SheetDescription }

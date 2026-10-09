@@ -1,6 +1,18 @@
-import type { ColumnInfo, DatabaseEngine, TableDetails } from '../../shared/types'
+import type {
+  ColumnInfo,
+  DatabaseEngine,
+  SchemaGraphEdge,
+  SchemaGraphTable,
+  TableDetails
+} from '../../shared/types'
 import { getSchemaGraph, listSchemas } from '../db/manager'
-import { MAX_ENUM_LABELS, MAX_SCHEMA_TABLES } from './config'
+import {
+  MAX_CANDIDATE_TABLES,
+  MAX_ENUM_LABELS,
+  MAX_SCHEMA_TABLES,
+  SCHEMA_FETCH_CONCURRENCY
+} from './config'
+import { selectRelevantTables } from './schema-relevance'
 
 const SYSTEM_SCHEMAS: Record<DatabaseEngine, string[]> = {
   postgres: ['information_schema', 'pg_catalog', 'pg_toast'],
@@ -35,58 +47,79 @@ export function asData(tag: string, content: string): string {
   return `<${tag}>\n${content.replace(closing, `<\u2215${tag}>`)}\n</${tag}>`
 }
 
-/** Compact, whole-database schema map for grounding free-form SQL generation. */
+/**
+ * Compact, whole-database schema map for grounding free-form SQL.
+ *
+ * `focus` is whatever the model is about to be asked - the request, the SQL,
+ * the error. When the database has more than `MAX_SCHEMA_TABLES` tables, it
+ * decides which ones make the cut (`selectRelevantTables`); without it the
+ * first ones in catalogue order do, as they always did.
+ */
 export async function buildSchemaContext(
   connectionId: string,
-  engine: DatabaseEngine
+  engine: DatabaseEngine,
+  focus = ''
 ): Promise<string> {
   const ignored = SYSTEM_SCHEMAS[engine]
   const schemas = (await listSchemas(connectionId)).filter((s) => !ignored.includes(s.name))
 
-  const lines: string[] = []
-  let tableCount = 0
-  let wasTruncated = false
-
-  for (const schema of schemas) {
-    if (tableCount >= MAX_SCHEMA_TABLES) {
-      wasTruncated = true
+  // Every table is a candidate, not only the first MAX_SCHEMA_TABLES - the cut
+  // is made by relevance below. Fetched a few schemas at a time, and bounded:
+  // a database with hundreds of schemas stops being read once there are far
+  // more candidates than will ever be shown.
+  const tables: SchemaGraphTable[] = []
+  const edges: SchemaGraphEdge[] = []
+  let wereSchemasSkipped = false
+  for (let start = 0; start < schemas.length; start += SCHEMA_FETCH_CONCURRENCY) {
+    if (tables.length >= MAX_CANDIDATE_TABLES) {
+      wereSchemasSkipped = true
       break
     }
-    const graph = await getSchemaGraph(connectionId, schema.name)
-
-    for (const table of graph.tables) {
-      if (tableCount >= MAX_SCHEMA_TABLES) {
-        wasTruncated = true
-        break
-      }
-      const cols = table.columns
-        .map((c) => {
-          const flags = [c.isPrimaryKey ? 'PK' : '', c.isNullable ? '' : 'NOT NULL']
-            .filter(Boolean)
-            .join(' ')
-          // Same renderer as the single-table context: an enum has to arrive as
-          // its type name plus its labels, or generated SQL guesses the value.
-          return `${c.name} ${columnType(c)}${flags ? ' ' + flags : ''}${enumSuffix(c)}`
-        })
-        .join(', ')
-      lines.push(`${table.schema}.${table.name}(${cols})`)
-      tableCount += 1
+    const batch = schemas.slice(start, start + SCHEMA_FETCH_CONCURRENCY)
+    const graphs = await Promise.all(batch.map((s) => getSchemaGraph(connectionId, s.name)))
+    for (const graph of graphs) {
+      tables.push(...graph.tables)
+      edges.push(...graph.edges)
     }
+  }
 
-    for (const edge of graph.edges) {
-      lines.push(
-        `FK: ${edge.from.table}(${edge.from.columns.join(', ')}) -> ` +
-          `${edge.to.table}(${edge.to.columns.join(', ')})`
-      )
-    }
+  const shown = selectRelevantTables(tables, edges, focus, MAX_SCHEMA_TABLES)
+  const shownKeys = new Set(shown.map((t) => `${t.schema}.${t.name}`))
+
+  const lines: string[] = []
+  for (const table of shown) {
+    const cols = table.columns
+      .map((c) => {
+        const flags = [c.isPrimaryKey ? 'PK' : '', c.isNullable ? '' : 'NOT NULL']
+          .filter(Boolean)
+          .join(' ')
+        // Same renderer as the single-table context: an enum has to arrive as
+        // its type name plus its labels, or generated SQL guesses the value.
+        return `${c.name} ${columnType(c)}${flags ? ' ' + flags : ''}${enumSuffix(c)}`
+      })
+      .join(', ')
+    lines.push(`${table.schema}.${table.name}(${cols})`)
+  }
+
+  // Only edges between tables that are shown: a foreign key to a table the
+  // model was never given invites it to guess that table's columns.
+  for (const edge of edges) {
+    const from = `${edge.from.schema}.${edge.from.table}`
+    const to = `${edge.to.schema}.${edge.to.table}`
+    if (!shownKeys.has(from) || !shownKeys.has(to)) continue
+    lines.push(
+      `FK: ${edge.from.table}(${edge.from.columns.join(', ')}) -> ` +
+        `${edge.to.table}(${edge.to.columns.join(', ')})`
+    )
   }
 
   // Say so rather than letting the model treat a partial map as the whole
   // database and confidently reference tables it was never shown.
-  if (wasTruncated) {
+  if (shown.length < tables.length || wereSchemasSkipped) {
     lines.push(
-      `-- NOTE: only the first ${MAX_SCHEMA_TABLES} tables are listed; this database has more. ` +
-        `If the request needs a table that is not above, say so instead of guessing its shape.`
+      `-- NOTE: this database has more tables than are listed; these ${shown.length} were ` +
+        `picked as the most relevant to the request. If it needs a table that is not above, ` +
+        `say so instead of guessing its shape.`
     )
   }
 

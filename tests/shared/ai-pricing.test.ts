@@ -4,9 +4,28 @@ import { AI_PROVIDERS } from '../../src/shared/ai-models'
 
 describe('the rate for a model', () => {
   it('prices a model at its published list rate', () => {
+    expect(rateFor('claude-opus-5-5')).toEqual({ input: 4, output: 20 })
+    expect(rateFor('gpt-6.1-sol')).toEqual({ input: 2, output: 10 })
+    expect(rateFor('gemini-3.8-flash', '2027-01-01')).toEqual({ input: 1.5, output: 7.5 })
+  })
+
+  it('still prices spend recorded under a model since retired from the picker', () => {
+    // Dropping a model from Settings must not rewrite the cost of calls already
+    // made with it - that history would otherwise fall into `unpricedCalls`.
+    const offered = AI_PROVIDERS.flatMap((p) => p.models.map((m) => m.id as string))
+    for (const retired of ['claude-opus-5', 'gpt-5.6-terra', 'gemini-3.6-flash']) {
+      expect(offered).not.toContain(retired)
+      expect(isPricedModel(retired), retired).toBe(true)
+    }
     expect(rateFor('claude-opus-5')).toEqual({ input: 5, output: 25 })
-    expect(rateFor('gpt-5.6-terra')).toEqual({ input: 2, output: 12 })
-    expect(rateFor('gemini-3.6-flash')).toEqual({ input: 1.5, output: 7.5 })
+  })
+
+  it('prices Gemini 3.8 Flash at its introductory rate until the end of 2026', () => {
+    expect(rateFor('gemini-3.8-flash', '2026-12-31')).toEqual({ input: 0.75, output: 3.75 })
+    expect(rateFor('google-ai-studio/gemini-3.8-flash', '2027-01-01')).toEqual({
+      input: 1.5,
+      output: 7.5
+    })
   })
 
   it('still prices spend recorded under a model id that has since been renamed', () => {
@@ -18,18 +37,26 @@ describe('the rate for a model', () => {
   })
 
   it('applies a launch discount to usage inside its window', () => {
-    // Sonnet 5 lists at $3/$15 but runs at $2/$10 through 2026-08-31.
-    expect(rateFor('claude-sonnet-5', '2026-08-10')).toEqual({ input: 2, output: 10 })
-    expect(rateFor('claude-sonnet-5', '2026-08-31')).toEqual({ input: 2, output: 10 })
+    // GPT-5.6 Sol lists at $5/$30 but runs at $4/$20 through 2026-11-21.
+    expect(rateFor('gpt-5.6-sol', '2026-09-06')).toEqual({ input: 4, output: 20 })
+    expect(rateFor('gpt-5.6-sol', '2026-11-21')).toEqual({ input: 4, output: 20 })
   })
 
   it('reverts to the standard rate the day the discount ends', () => {
-    expect(rateFor('claude-sonnet-5', '2026-09-01')).toEqual({ input: 3, output: 15 })
+    expect(rateFor('gpt-5.6-sol', '2026-11-22')).toEqual({ input: 5, output: 30 })
   })
 
   it('falls back to the standard rate when no day is given', () => {
     // Better to overstate than to quietly bill a promo that may have expired.
-    expect(rateFor('claude-sonnet-5')).toEqual({ input: 3, output: 15 })
+    expect(rateFor('gpt-5.6-sol')).toEqual({ input: 5, output: 30 })
+  })
+
+  it('prices a discount that became permanent as the flat rate', () => {
+    // Sonnet 5's $2/$10 was introductory through 2026-08-31; Anthropic cancelled
+    // the step up to $3/$15, so no day either side of that date is dearer.
+    expect(rateFor('claude-sonnet-5', '2026-08-10')).toEqual({ input: 2, output: 10 })
+    expect(rateFor('claude-sonnet-5', '2026-09-01')).toEqual({ input: 2, output: 10 })
+    expect(rateFor('claude-sonnet-5')).toEqual({ input: 2, output: 10 })
   })
 
   it('returns null for a model it has no rate for', () => {
@@ -49,11 +76,11 @@ describe('costing a rollup row', () => {
   })
 
   it('prices at the rate in effect on the day of the usage', () => {
-    const promo = costOf('claude-sonnet-5', 1_000_000, 0, '2026-08-10')
-    const standard = costOf('claude-sonnet-5', 1_000_000, 0, '2026-09-01')
+    const promo = costOf('gpt-5.6-sol', 1_000_000, 0, '2026-11-21')
+    const standard = costOf('gpt-5.6-sol', 1_000_000, 0, '2026-11-22')
 
-    expect(promo).toBeCloseTo(2, 10)
-    expect(standard).toBeCloseTo(3, 10)
+    expect(promo).toBeCloseTo(4, 10)
+    expect(standard).toBeCloseTo(5, 10)
   })
 
   it('is null rather than zero for an unpriced model', () => {

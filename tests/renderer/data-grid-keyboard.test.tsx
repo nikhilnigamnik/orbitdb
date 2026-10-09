@@ -211,3 +211,100 @@ describe('Enter', () => {
     expect(screen.queryByDisplayValue('Ada')).toBeNull()
   })
 })
+
+describe('row keys on the cursor row', () => {
+  it('toggles the row selection on Space', () => {
+    const onRowSelectionChange = vi.fn()
+    const { grid } = mount({ rowSelection: {}, onRowSelectionChange })
+    fireEvent.mouseDown(cell('Grace'))
+    fireEvent.keyDown(grid, { key: ' ' })
+
+    expect(onRowSelectionChange).toHaveBeenCalledWith({ 1: true })
+  })
+
+  it('opens the record on Shift+Enter, without starting an edit', () => {
+    const onInspectRow = vi.fn()
+    const { grid } = mount({ canMutate: true, onEditCell: vi.fn(), onInspectRow })
+    fireEvent.mouseDown(cell('Ada'))
+    fireEvent.keyDown(grid, { key: 'Enter', shiftKey: true })
+
+    expect(onInspectRow).toHaveBeenCalledWith(ROWS[0])
+    expect(screen.queryByDisplayValue('Ada')).toBeNull()
+  })
+
+  it.each(['Delete', 'Backspace'])('asks to delete the row on %s', (key) => {
+    // onDeleteRow opens the confirm in the table view; the key never deletes.
+    const onDeleteRow = vi.fn()
+    const { grid } = mount({ canMutate: true, onDeleteRow })
+    fireEvent.mouseDown(cell('Grace'))
+    fireEvent.keyDown(grid, { key })
+
+    expect(onDeleteRow).toHaveBeenCalledWith(ROWS[1])
+  })
+
+  it('does not offer delete on a table that cannot be edited', () => {
+    const onDeleteRow = vi.fn()
+    const { grid } = mount({ onDeleteRow })
+    fireEvent.mouseDown(cell('Grace'))
+    fireEvent.keyDown(grid, { key: 'Delete' })
+
+    expect(onDeleteRow).not.toHaveBeenCalled()
+  })
+
+  it('leaves Space to a focused checkbox inside the grid', () => {
+    const onRowSelectionChange = vi.fn()
+    mount({ rowSelection: {}, onRowSelectionChange })
+    fireEvent.mouseDown(cell('Ada'))
+    fireEvent.keyDown(screen.getByLabelText('Select row 1'), { key: ' ' })
+
+    expect(onRowSelectionChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('tab stops', () => {
+  it('keeps row controls out of the tab order until the cursor is on their row', () => {
+    mount({ canMutate: true, onInspectRow: vi.fn() })
+    const tabbable = (label: string) =>
+      screen.getAllByLabelText(label).map((node) => node.getAttribute('tabindex'))
+
+    expect(tabbable('Edit row')).toEqual(['-1', '-1'])
+
+    fireEvent.mouseDown(cell('Grace'))
+    expect(tabbable('Edit row')).toEqual(['-1', '0'])
+    expect(screen.getByLabelText('Select row 2').getAttribute('tabindex')).toBe('0')
+    expect(screen.getByLabelText('Select row 1').getAttribute('tabindex')).toBe('-1')
+  })
+})
+
+describe('grid semantics', () => {
+  it('puts the grid role on the table, with grid cells and column headers', () => {
+    const { grid } = mount()
+    expect(grid.tagName).toBe('TABLE')
+    expect(screen.getAllByRole('columnheader').length).toBeGreaterThan(0)
+    expect(cell('Ada').getAttribute('role')).toBe('gridcell')
+  })
+
+  it('points the active descendant at the cursor cell', () => {
+    const { grid } = mount()
+    fireEvent.mouseDown(cell('Ada'))
+    expect(grid.getAttribute('aria-activedescendant')).toBe(cell('Ada').id)
+  })
+
+  it('reports aria-sort on the sorted header cell itself', () => {
+    mount({ orderBy: 'name', orderDir: 'desc' })
+    const th = screen.getByText('name').closest('th')!
+    expect(th.getAttribute('aria-sort')).toBe('descending')
+    expect(screen.getByText('city').closest('th')!.getAttribute('aria-sort')).toBe('none')
+  })
+
+  it('says it is busy while a page loads', () => {
+    const { grid } = mount({ isLoading: true })
+    expect(grid.getAttribute('aria-busy')).toBe('true')
+  })
+
+  it('counts every matching row, not just the page, when the total is known', () => {
+    const { grid } = mount({ totalRows: 120, rowOffset: 50 })
+    expect(grid.getAttribute('aria-rowcount')).toBe('121')
+    expect(cell('Ada').closest('tr')!.getAttribute('aria-rowindex')).toBe('52')
+  })
+})

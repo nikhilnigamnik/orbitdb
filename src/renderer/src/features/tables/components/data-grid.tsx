@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { IconFilterOff, IconTable } from '@tabler/icons-react'
 import {
   flexRender,
   getCoreRowModel,
@@ -8,13 +9,19 @@ import {
   type SortingState
 } from '@tanstack/react-table'
 import { cn } from '@renderer/lib/utils'
-import { formatCellValue } from '@renderer/lib/format'
 import { LoadingState } from '@renderer/components/common/loading-state'
-import { CellInlineEditor } from './cell-inline-editor'
+import { Button } from '@renderer/components/ui/button'
+import type { ColumnInfo, SortDirection } from '@renderer/types'
 import { useGridCursor, type CopyFormat } from '../hooks/use-grid-cursor'
+import { useGridColumns } from '../hooks/use-grid-columns'
+import { useCellEditing } from '../hooks/use-cell-editing'
+import { useColumnSizing } from '../hooks/use-column-sizing'
+import { useRowSelection } from '../hooks/use-row-selection'
+import { useStableCallback } from '../hooks/use-stable-callback'
 import { revealDelta, stickyWidth } from '../lib/reveal-cell'
-import { orderColumns } from '../lib/frozen-columns'
+import { INDEX_COLUMN_WIDTH, SELECT_COLUMN_WIDTH, orderColumns } from '../lib/frozen-columns'
 import type { InsertTarget } from '../lib/clipboard-format'
+import { isSingleCell } from '../lib/grid-cursor'
 import {
   ACTIONS_COLUMN_ID,
   INDEX_COLUMN_ID,
@@ -22,11 +29,7 @@ import {
   type ForeignKeyTarget,
   type Row
 } from '../lib/grid-types'
-import { useGridColumns } from '../hooks/use-grid-columns'
-import { useCellEditing } from '../hooks/use-cell-editing'
-import { useColumnSizing } from '../hooks/use-column-sizing'
-import { useRowSelection } from '../hooks/use-row-selection'
-import type { ColumnInfo, SortDirection } from '@renderer/types'
+import { GridRow, gridCellId, type GridRowHandlers, type GridRowLayout } from './grid-row'
 
 interface DataGridProps {
   columns: ColumnInfo[]
@@ -36,7 +39,7 @@ interface DataGridProps {
   onSort: (column: string) => void
   onEditRow: (row: Row) => void
   onDeleteRow: (row: Row) => void
-  /** Opens the read-only record view. Also bound to Space on the cursor row. */
+  /** Opens the read-only record view. Also bound to Shift+Enter on the cursor row. */
   onInspectRow?: (row: Row) => void
   onEditCell?: (row: Row, column: string, value: unknown) => Promise<void>
   canMutate: boolean
@@ -62,6 +65,8 @@ interface DataGridProps {
   onColumnSizingCommit?: (sizing: Record<string, number>) => void
   onCopied?: (format: CopyFormat, cellCount: number) => void
   onCopyFailed?: (error: unknown) => void
+  /** Rows matching the current filters, across every page, when known. */
+  totalRows?: number | null
 }
 
 export function DataGrid({
@@ -87,10 +92,11 @@ export function DataGrid({
   pendingUndoRow,
   insertTarget,
   columnSizing: savedColumnSizing,
-  frozenColumns = [],
+  frozenColumns = NO_FROZEN,
   onColumnSizingCommit,
   onCopied,
-  onCopyFailed
+  onCopyFailed,
+  totalRows
 }: DataGridProps) {
   // Pinned columns move to the front here rather than at the call site, so the
   // cursor and the clipboard both see the order actually on screen.
@@ -124,13 +130,64 @@ export function DataGrid({
     [orderBy, orderDir]
   )
 
-  const gridRef = React.useRef<HTMLDivElement>(null)
-  const cursorCellRef = React.useRef<HTMLTableCellElement>(null)
+  const gridId = React.useId()
+  const scrollRef = React.useRef<HTMLDivElement>(null)
+  const gridRef = React.useRef<HTMLTableElement>(null)
+
+  const tableColumns = useGridColumns({
+    columns,
+    orderBy,
+    orderDir,
+    onSort,
+    hasActions: canMutate || !!onInspectRow
+  })
+
+  const {
+    columnSizing,
+    setColumnSizing,
+    isAnyFrozen,
+    widthVars,
+    cellStyles,
+    resizingColumn,
+    startResize,
+    resetColumnSize
+  } = useColumnSizing({
+    columnIds: dataColumnIds,
+    savedColumnSizing,
+    frozenColumns,
+    onColumnSizingCommit
+  })
+
+  const table = useReactTable<Row>({
+    data: rows,
+    columns: tableColumns,
+    state: { sorting, rowSelection, columnSizing },
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
+    onColumnSizingChange: setColumnSizing,
+    manualSorting: true,
+    getCoreRowModel: getCoreRowModel()
+  })
+  const tableRows = table.getRowModel().rows
+
+  const toggleRow = useStableCallback((rowIndex: number, isSelected?: boolean) => {
+    tableRows[rowIndex]?.toggleSelected(isSelected)
+  })
+  const rowAt = (rowIndex: number): Row | undefined => rows[rowIndex]
+  const openRowAt = useStableCallback((rowIndex: number) => {
+    const row = rowAt(rowIndex)
+    if (row) onInspectRow?.(row)
+  })
+  const deleteRowAt = useStableCallback((rowIndex: number) => {
+    const row = rowAt(rowIndex)
+    if (row) onDeleteRow(row)
+  })
+
   const {
     cursor,
+    range,
     selectCell,
     clear: clearCursor,
-    isCellInRange,
     handleKeyDown
   } = useGridCursor({
     rows,
@@ -140,9 +197,13 @@ export function DataGrid({
       ? ({ rowIndex, columnIndex }) =>
           setEditingCell({ rowIndex, columnId: dataColumnIds[columnIndex] })
       : undefined,
-    insertTarget: insertTarget ?? { schema: '', table: '', engine: 'postgres' },
+    insertTarget: insertTarget ?? NO_INSERT_TARGET,
     onCopied,
-    onCopyFailed
+    onCopyFailed,
+    onToggleRow: toggleRow,
+    onOpenRow: onInspectRow ? openRowAt : undefined,
+    // The handler opens the existing confirm; nothing is deleted from a key.
+    onDeleteRow: canMutate ? deleteRowAt : undefined
   })
 
   /**
@@ -153,9 +214,10 @@ export function DataGrid({
    * where it had gone.
    */
   React.useEffect(() => {
-    const container = gridRef.current
-    const cell = cursorCellRef.current
-    if (!container || !cell) return
+    const container = scrollRef.current
+    if (!container || !cursor) return
+    const cell = document.getElementById(gridCellId(gridId, cursor.rowIndex, cursor.columnIndex))
+    if (!cell) return
 
     const row = cell.parentElement
     const insets = {
@@ -169,50 +231,106 @@ export function DataGrid({
       insets
     )
     if (left !== 0 || top !== 0) container.scrollBy({ left, top })
-  }, [cursor?.rowIndex, cursor?.columnIndex])
+  }, [cursor, gridId])
 
-  const tableColumns = useGridColumns({
-    columns,
-    canMutate,
-    orderBy,
-    orderDir,
-    onSort,
-    onEditRow,
-    onDeleteRow,
-    onInspectRow,
-    rowOffset,
-    fkColumns,
-    onOpenForeignKey
-  })
-
-  const {
-    columnSizing,
-    setColumnSizing,
-    resizedWidth,
-    isAnyFrozen,
-    stickyStyle,
-    resizingColumn,
-    startResize,
-    resetColumnSize
-  } = useColumnSizing({ savedColumnSizing, frozenColumns, onColumnSizingCommit })
-
-  const table = useReactTable<Row>({
-    data: rows,
-    columns: tableColumns,
-    state: { sorting, rowSelection, columnSizing },
-    enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
-    onColumnSizingChange: setColumnSizing,
-    manualSorting: true,
-    getCoreRowModel: getCoreRowModel()
-  })
-
-  const udtByColumn = React.useMemo(
-    () => new Map(columns.map((c) => [c.name, c.udtName])),
-    [columns]
+  const handleSelectCell = useStableCallback(
+    (rowIndex: number, columnIndex: number, extend: boolean) => {
+      selectCell(rowIndex, columnIndex, extend)
+      // The mousedown's preventDefault can cost the grid its focus, and without
+      // focus the arrow keys go nowhere.
+      if (!editingCell) gridRef.current?.focus()
+    }
+  )
+  const startEditing = useStableCallback((rowIndex: number, columnId: string) =>
+    setEditingCell({ rowIndex, columnId })
+  )
+  const closeEditor = useStableCallback(() => setEditingCell(null))
+  const saveCell = useStableCallback(
+    async (rowIndex: number, row: Row, columnId: string, value: unknown) => {
+      if (!onEditCell) return
+      keepEditingOnRowsChange.current = true
+      try {
+        await onEditCell(row, columnId, value)
+      } catch (err) {
+        keepEditingOnRowsChange.current = false
+        throw err
+      }
+      markSaved(rowIndex, columnId)
+    }
+  )
+  const handleMoveEditing = useStableCallback(moveEditing)
+  const inspectRow = useStableCallback((row: Row) => onInspectRow?.(row))
+  const editRow = useStableCallback(onEditRow)
+  const deleteRow = useStableCallback(onDeleteRow)
+  const openForeignKey = useStableCallback((column: string, value: unknown) =>
+    onOpenForeignKey?.(column, value)
+  )
+  // Whether a handler exists decides what a row renders, so that much does
+  // reach the rows; the handlers themselves never change.
+  const hasInspect = !!onInspectRow
+  const hasForeignKeys = !!onOpenForeignKey
+  const rowHandlers = React.useMemo<GridRowHandlers>(
+    () => ({
+      selectCell: handleSelectCell,
+      startEditing,
+      closeEditor,
+      saveCell,
+      moveEditing: handleMoveEditing,
+      setIsEditorDirty,
+      toggleRow,
+      inspectRow: hasInspect ? inspectRow : undefined,
+      editRow,
+      deleteRow,
+      openForeignKey: hasForeignKeys ? openForeignKey : undefined
+    }),
+    [
+      handleSelectCell,
+      startEditing,
+      closeEditor,
+      saveCell,
+      handleMoveEditing,
+      setIsEditorDirty,
+      toggleRow,
+      hasInspect,
+      inspectRow,
+      editRow,
+      deleteRow,
+      hasForeignKeys,
+      openForeignKey
+    ]
   )
 
-  const visibleColCount = tableColumns.length
+  const frozenSet = React.useMemo(() => new Set(frozenColumns), [frozenColumns])
+  const layout = React.useMemo<GridRowLayout>(
+    () => ({
+      gridId,
+      columns,
+      cellStyles,
+      frozen: frozenSet,
+      isAnyFrozen,
+      canMutate,
+      canEditCells,
+      hasActions: canMutate || hasInspect,
+      rowOffset,
+      fkColumns
+    }),
+    [
+      gridId,
+      columns,
+      cellStyles,
+      frozenSet,
+      isAnyFrozen,
+      canMutate,
+      canEditCells,
+      hasInspect,
+      rowOffset,
+      fkColumns
+    ]
+  )
+
+  // A single cell is the cursor, not a range: the range fill only shows once
+  // the selection has been extended.
+  const multiRange = range && !isSingleCell(range) ? range : null
 
   if (isInitialLoad) {
     return <LoadingState />
@@ -220,57 +338,74 @@ export function DataGrid({
 
   return (
     <div
-      ref={gridRef}
-      // Focusable so the grid can own arrow keys and copy. tabIndex 0 rather
-      // than -1: reaching the data by keyboard alone should not need a mouse
-      // click first.
-      tabIndex={0}
-      role="grid"
-      aria-label="Table rows"
-      onKeyDown={handleKeyDown}
-      onBlur={(e) => {
-        // Keep the cursor while focus moves inside (the inline editor, a FK
-        // button); drop it only when the grid as a whole is left.
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) clearCursor()
-      }}
+      ref={scrollRef}
       className={cn(
-        'min-h-0 flex-1 overflow-auto transition-opacity duration-150 outline-none',
+        'min-h-0 flex-1 overflow-auto transition-opacity duration-150',
         isLoading && 'pointer-events-none opacity-50',
         resizingColumn && 'cursor-col-resize select-none'
       )}
     >
-      <table className="min-w-full border-separate border-spacing-0 text-xs">
+      <table
+        ref={gridRef}
+        role="grid"
+        aria-label="Table rows"
+        aria-multiselectable
+        aria-busy={isLoading || undefined}
+        aria-rowcount={totalRows != null ? totalRows + 1 : undefined}
+        aria-activedescendant={
+          cursor ? gridCellId(gridId, cursor.rowIndex, cursor.columnIndex) : undefined
+        }
+        // Focusable so the grid can own arrow keys and copy. tabIndex 0 rather
+        // than -1: reaching the data by keyboard alone should not need a mouse
+        // click first.
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        onBlur={(e) => {
+          // Keep the cursor while focus moves inside (the inline editor, a FK
+          // button); drop it only when the grid as a whole is left.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) clearCursor()
+        }}
+        style={widthVars}
+        className="min-w-full border-separate border-spacing-0 text-sm outline-none"
+      >
         <thead className="sticky top-0 z-10">
           {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id}>
+            <tr key={headerGroup.id} role="row" aria-rowindex={1}>
               {headerGroup.headers.map((header) => {
                 const isSelect = header.column.id === SELECT_COLUMN_ID
                 const isIndex = header.column.id === INDEX_COLUMN_ID
                 const isActions = header.column.id === ACTIONS_COLUMN_ID
                 const isDataColumn = !isSelect && !isIndex && !isActions
-                const width = isDataColumn ? resizedWidth(header.column.id) : undefined
-                const sticky = isDataColumn ? stickyStyle(header.column.id) : undefined
+                const isFrozen = isDataColumn && frozenSet.has(header.column.id)
                 return (
                   <th
                     key={header.id}
+                    role="columnheader"
+                    aria-sort={header.column.columnDef.meta?.ariaSort}
                     style={
-                      sticky ??
-                      (width !== undefined
-                        ? { width, minWidth: width, maxWidth: width }
-                        : undefined)
+                      isDataColumn
+                        ? cellStyles.get(header.column.id)
+                        : isSelect
+                          ? SELECT_STYLE
+                          : isIndex
+                            ? INDEX_STYLE
+                            : undefined
                     }
+                    // Attio's header: white, hairlines on both axes, no fill.
+                    // Every th is bg-surface so rows scrolling under the sticky
+                    // header never show through it.
                     className={cn(
-                      'border-b border-border bg-surface text-left font-medium',
-                      isSelect && 'w-9 px-2 py-2',
+                      'h-9 border-b border-border bg-surface text-left text-xs font-medium text-text-muted',
+                      isSelect && 'w-9 px-0 text-center',
                       isIndex &&
-                        'w-10 border-r border-r-border/40 px-3 py-2 text-xs text-text-subtle',
+                        'w-10 border-r border-border px-2 text-right text-[12px] font-normal text-text-subtle',
                       // The leading display columns pin too, or a frozen data
                       // column would slide over them at left: 0.
                       isAnyFrozen && isSelect && 'sticky left-0 z-20',
                       isAnyFrozen && isIndex && 'sticky left-9 z-20',
-                      isActions && 'sticky right-0 w-20 px-3 py-2',
-                      isDataColumn && 'relative p-0 text-xs text-text-muted',
-                      sticky && 'sticky z-20 border-r border-r-border'
+                      isActions && 'sticky right-0 w-20 px-3',
+                      isDataColumn && 'relative border-r border-border p-0',
+                      isFrozen && 'sticky z-20'
                     )}
                   >
                     {header.isPlaceholder
@@ -281,11 +416,17 @@ export function DataGrid({
                         onMouseDown={(e) => startResize(e, header.column.id)}
                         onDoubleClick={() => resetColumnSize(header.column.id)}
                         title="Drag to resize, double-click to reset"
-                        className="absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize touch-none select-none"
+                        className="group/resize absolute inset-y-0 -right-0.5 z-10 w-1 cursor-col-resize touch-none select-none"
                       >
-                        {/* right-0.5 puts the line on the exact pixel the td
-                            border-r occupies, so header and body dividers align */}
-                        <div className="absolute inset-y-0 right-0.5 w-px bg-border/40" />
+                        {/* right-0.5 puts the line on the exact pixel the th
+                            border-r occupies, so it darkens the divider already
+                            there rather than drawing a second one beside it */}
+                        <div
+                          className={cn(
+                            'absolute inset-y-0 right-0.5 w-px transition-colors group-hover/resize:bg-border-strong',
+                            resizingColumn === header.column.id && 'bg-accent'
+                          )}
+                        />
                       </div>
                     )}
                   </th>
@@ -295,175 +436,56 @@ export function DataGrid({
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.length === 0 ? (
-            <tr>
-              <td
-                colSpan={visibleColCount}
-                className="px-3 py-10 text-center text-xs text-text-subtle"
-              >
-                {hasFilters ? (
-                  <span className="inline-flex items-center gap-2">
-                    No rows match the current filters.
-                    {onClearFilters && (
-                      <button
-                        type="button"
-                        onClick={onClearFilters}
-                        className="cursor-pointer rounded-md border border-text-muted/15 bg-text-muted/8 px-2 py-0.5 text-text-muted transition-colors hover:bg-text-muted/15 hover:text-text"
-                      >
-                        Clear filters
-                      </button>
+          {tableRows.length === 0 ? (
+            <tr role="row">
+              <td role="gridcell" colSpan={tableColumns.length} className="px-4 py-16">
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-surface-elevated">
+                    {hasFilters ? (
+                      <IconFilterOff size={20} className="text-text-subtle" />
+                    ) : (
+                      <IconTable size={20} className="text-text-subtle" />
                     )}
-                  </span>
-                ) : (
-                  'This table is empty.'
-                )}
+                  </div>
+                  <p className="text-sm font-medium text-text">
+                    {hasFilters ? 'No rows match the current filters.' : 'This table is empty.'}
+                  </p>
+                  {hasFilters && onClearFilters && (
+                    <Button size="sm" variant="outline" onClick={onClearFilters}>
+                      Clear filters
+                    </Button>
+                  )}
+                </div>
               </td>
             </tr>
           ) : (
-            table.getRowModel().rows.map((row) => {
-              const isSelected = row.getIsSelected()
-              const isPendingUndo =
-                pendingUndoRow != null &&
-                Object.entries(pendingUndoRow).every(([key, value]) => row.original[key] === value)
+            tableRows.map((row) => {
+              const rowIndex = row.index
+              const isInRange =
+                multiRange != null &&
+                rowIndex >= multiRange.rowStart &&
+                rowIndex <= multiRange.rowEnd
               return (
-                <tr
+                <GridRow
                   key={row.id}
-                  className={cn(
-                    // transition-colors would animate outline-color from currentColor
-                    // (white) on select - only transition the background
-                    'group cursor-default transition-[background-color]',
-                    isSelected
-                      ? // tr can't render Tailwind ring (box-shadow); outline works in Chromium
-                        'bg-surface-elevated/70 outline outline-border-strong -outline-offset-1'
-                      : isPendingUndo
-                        ? // Points at the row the undo prompt is about: a
-                          // truncated key could never identify it, and the row is
-                          // on screen anyway.
-                          'bg-accent/8 outline outline-accent/40 -outline-offset-1'
-                        : 'hover:bg-surface-elevated/40'
-                  )}
-                >
-                  {row.getVisibleCells().map((cell) => {
-                    const isSelect = cell.column.id === SELECT_COLUMN_ID
-                    const isIndex = cell.column.id === INDEX_COLUMN_ID
-                    const isActions = cell.column.id === ACTIONS_COLUMN_ID
-                    const isData = !isSelect && !isIndex && !isActions
-                    const isEditingThis =
-                      isData &&
-                      editingCell?.rowIndex === row.index &&
-                      editingCell?.columnId === cell.column.id
-                    const editColumn = isEditingThis
-                      ? columns.find((c) => c.name === cell.column.id)
-                      : undefined
-                    const udtName = isData ? udtByColumn.get(cell.column.id) : undefined
-                    const cellValue = row.original[cell.column.id]
-                    const isSavedFlash =
-                      isData &&
-                      savedCell?.rowIndex === row.index &&
-                      savedCell?.columnId === cell.column.id
-                    const width = isData ? resizedWidth(cell.column.id) : undefined
-                    const sticky = isData ? stickyStyle(cell.column.id) : undefined
-                    const dataColumnIndex = isData ? dataColumnIds.indexOf(cell.column.id) : -1
-                    const isCursor =
-                      isData &&
-                      cursor?.rowIndex === row.index &&
-                      cursor?.columnIndex === dataColumnIndex
-                    const isRangeCell = isData && isCellInRange(row.index, dataColumnIndex)
-                    return (
-                      <td
-                        key={cell.id}
-                        ref={isCursor ? cursorCellRef : undefined}
-                        aria-selected={isCursor || isRangeCell || undefined}
-                        // Read by the reveal maths: these overlay the scroll
-                        // area rather than shrink it, so a cell brought to the
-                        // edge would otherwise land underneath them.
-                        data-sticky={
-                          isActions
-                            ? 'right'
-                            : (isAnyFrozen && (isSelect || isIndex)) || sticky
-                              ? 'left'
-                              : undefined
-                        }
-                        style={
-                          sticky ??
-                          (width !== undefined
-                            ? { width, minWidth: width, maxWidth: width }
-                            : undefined)
-                        }
-                        className={cn(
-                          'border-b border-border/60 px-3 py-1.5',
-                          isSelect && 'px-2',
-                          (isIndex || isData) && 'border-r border-r-border/40',
-                          isIndex && 'text-xs text-text-subtle',
-                          isActions && 'sticky right-0 bg-surface px-2 py-1 group-hover:bg-surface',
-                          // Opaque, or the scrolling columns show through. Same
-                          // trade as the actions column: the row tint stops here.
-                          isAnyFrozen && isSelect && 'sticky left-0 z-10 bg-surface',
-                          isAnyFrozen && isIndex && 'sticky left-9 z-10 bg-surface',
-                          sticky && 'sticky z-10 border-r border-r-border bg-surface',
-                          isData && 'max-w-xs truncate font-mono text-xs',
-                          isData && canEditCells && 'cursor-text',
-                          // Range fill first, so the cursor's own ring wins on the
-                          // cell that has both.
-                          isRangeCell && !isEditingThis && 'bg-accent/8',
-                          isCursor && !isEditingThis && 'ring-1 ring-inset ring-accent-text/70',
-                          isEditingThis && 'bg-accent/10 ring-1 ring-inset',
-                          isEditingThis && (isEditorDirty ? 'ring-accent' : 'ring-accent-text/50'),
-                          isSavedFlash && 'animate-cell-saved'
-                        )}
-                        title={
-                          isData && !isEditingThis ? formatCellValue(cellValue, udtName) : undefined
-                        }
-                        onMouseDown={
-                          // While the editor popover is open its portal events bubble
-                          // through this td in the React tree - skip the handler so
-                          // double-click text selection inside the editor still works.
-                          isData && !isEditingThis
-                            ? (e) => {
-                                // Stop the browser's double-click word-selection (the
-                                // highlight) while keeping single-click selection intact.
-                                if (canEditCells && e.detail > 1) e.preventDefault()
-                                selectCell(row.index, dataColumnIndex, e.shiftKey)
-                                // preventDefault above can cost the container its
-                                // focus, and without focus the arrow keys go nowhere.
-                                if (!editingCell) gridRef.current?.focus()
-                              }
-                            : undefined
-                        }
-                        onDoubleClick={
-                          isData && canEditCells && !isEditingThis
-                            ? () =>
-                                setEditingCell({ rowIndex: row.index, columnId: cell.column.id })
-                            : undefined
-                        }
-                      >
-                        {isEditingThis && editColumn && onEditCell ? (
-                          <CellInlineEditor
-                            column={editColumn}
-                            value={cellValue}
-                            onSave={async (newValue) => {
-                              keepEditingOnRowsChange.current = true
-                              try {
-                                await onEditCell(row.original, cell.column.id, newValue)
-                              } catch (err) {
-                                keepEditingOnRowsChange.current = false
-                                throw err
-                              }
-                              markSaved(row.index, cell.column.id)
-                            }}
-                            onClose={() => setEditingCell(null)}
-                            onNavigate={(direction) =>
-                              moveEditing(row.index, cell.column.id, direction)
-                            }
-                            onDirtyChange={setIsEditorDirty}
-                          />
-                        ) : (
-                          flexRender(cell.column.columnDef.cell, cell.getContext())
-                        )}
-                      </td>
+                  row={row.original}
+                  rowIndex={rowIndex}
+                  layout={layout}
+                  handlers={rowHandlers}
+                  isSelected={row.getIsSelected()}
+                  isPendingUndo={
+                    pendingUndoRow != null &&
+                    Object.entries(pendingUndoRow).every(
+                      ([key, value]) => row.original[key] === value
                     )
-                  })}
-                </tr>
+                  }
+                  cursorColumn={cursor?.rowIndex === rowIndex ? cursor.columnIndex : -1}
+                  rangeStart={isInRange ? multiRange.colStart : -1}
+                  rangeEnd={isInRange ? multiRange.colEnd : -1}
+                  editingColumnId={editingCell?.rowIndex === rowIndex ? editingCell.columnId : null}
+                  isEditorDirty={editingCell?.rowIndex === rowIndex && isEditorDirty}
+                  savedColumnId={savedCell?.rowIndex === rowIndex ? savedCell.columnId : null}
+                />
               )
             })
           )}
@@ -473,11 +495,25 @@ export function DataGrid({
   )
 }
 
+const NO_FROZEN: string[] = []
+const NO_INSERT_TARGET: InsertTarget = { schema: '', table: '', engine: 'postgres' }
+const SELECT_STYLE: React.CSSProperties = {
+  width: SELECT_COLUMN_WIDTH,
+  minWidth: SELECT_COLUMN_WIDTH,
+  maxWidth: SELECT_COLUMN_WIDTH
+}
+const INDEX_STYLE: React.CSSProperties = {
+  width: INDEX_COLUMN_WIDTH,
+  minWidth: INDEX_COLUMN_WIDTH,
+  maxWidth: INDEX_COLUMN_WIDTH
+}
+
 declare module '@tanstack/react-table' {
   // TData/TValue must mirror TanStack's ColumnMeta signature for declaration
-  // merging, even though this augmentation only adds `dataType`.
+  // merging, even though this augmentation does not use them.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData extends RowData, TValue> {
     dataType?: string
+    ariaSort?: 'ascending' | 'descending' | 'none'
   }
 }

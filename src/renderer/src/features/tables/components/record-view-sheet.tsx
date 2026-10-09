@@ -2,6 +2,7 @@ import * as React from 'react'
 import { IconArrowUpRight, IconCopy, IconPencil, IconSearch } from '@tabler/icons-react'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { Button } from '@renderer/components/ui/button'
+import { Input } from '@renderer/components/ui/input'
 import { Chip } from '@renderer/components/ui/chip'
 import { formatColumnType } from '@renderer/lib/column-type'
 import { formatCellValue, isBlankString } from '@renderer/lib/format'
@@ -9,6 +10,7 @@ import { cn } from '@renderer/lib/utils'
 import type { ColumnInfo, ForeignKeyInfo } from '@renderer/types'
 import { ReferencedBy } from './referenced-by'
 import { toJsonText } from '../lib/clipboard-format'
+import { isJsonType } from '../lib/cell-value'
 
 interface ForeignKeyTarget {
   schema: string
@@ -106,6 +108,7 @@ export function RecordViewSheet({
 
   return (
     <Sheet
+      title="Record"
       openSheet={isOpen}
       setOpenSheet={(open) => {
         if (!open) onClose()
@@ -117,54 +120,46 @@ export function RecordViewSheet({
         // percentage height leaves the scroll region measuring against the
         // wrong box when the content outgrows it.
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3 pr-12">
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <h2 className="text-xs font-semibold text-text">Record</h2>
-              <p className="truncate font-mono text-xs text-text-subtle">
+          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 pr-12">
+            <div className="flex min-w-0 flex-1 items-baseline gap-2">
+              <h2 className="shrink-0 text-sm font-semibold text-text">Record</h2>
+              <p className="truncate text-[12px] text-text-subtle">
                 {schema}.{table}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-text-muted hover:bg-surface-elevated hover:text-text"
-                onClick={() => void copyRow()}
-                disabled={!row}
-              >
-                <IconCopy size={12} />
-                Copy
-              </Button>
-              {onEdit && row && (
-                <Button size="sm" variant="ghost" onClick={() => onEdit(row)}>
-                  <IconPencil size={12} />
-                  Edit
-                </Button>
-              )}
-            </div>
+            <Button
+              size="sm"
+              variant="subtle"
+              className="shrink-0"
+              onClick={() => void copyRow()}
+              disabled={!row}
+            >
+              <IconCopy size={14} />
+              Copy
+            </Button>
           </div>
 
           {row && columns.length >= FILTER_FROM_COLUMNS && (
-            <div className="shrink-0 px-4 pt-3">
+            <div className="shrink-0 px-4 pt-4">
               <div className="relative">
                 <IconSearch
-                  size={12}
-                  className="absolute top-1/2 left-2.5 -translate-y-1/2 text-text-subtle"
+                  size={14}
+                  className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-subtle"
                 />
-                <input
+                <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Filter fields…"
                   aria-label="Filter fields"
-                  className="h-7 w-full rounded-md bg-surface-elevated/40 pr-2 pl-8 font-mono text-xs text-text outline-none placeholder:font-sans placeholder:text-text-subtle"
+                  className="pl-8"
                 />
               </div>
             </div>
           )}
 
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto p-4">
             {row && visible.length === 0 && (
-              <p className="px-1 py-6 text-center text-xs text-text-subtle">
+              <p className="py-6 text-center text-xs text-text-muted">
                 No field matches &ldquo;{search}&rdquo;
               </p>
             )}
@@ -172,10 +167,10 @@ export function RecordViewSheet({
             {row && visible.length > 0 && (
               // `shrink-0` is what makes this scroll. A flex item whose overflow
               // is not `visible` has an automatic minimum size of zero, so this
-              // card was shrinking to fit the viewport and clipping its own rows
+              // list was shrinking to fit the viewport and clipping its own rows
               // instead of overflowing and letting the parent scroll.
-              <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-                <dl className="divide-y divide-border/60">
+              <div className="-mx-2 shrink-0 overflow-hidden">
+                <dl className="flex flex-col">
                   {visible.map((column) => (
                     <Field
                       key={column.name}
@@ -198,6 +193,20 @@ export function RecordViewSheet({
                 row={row}
                 onNavigate={onClose}
               />
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-4 py-3">
+            <span className="text-xs text-text-muted">
+              <span className="text-text tabular-nums">{visible.length}</span>
+              {visible.length === columns.length ? '' : ` of ${columns.length}`}{' '}
+              {columns.length === 1 ? 'field' : 'fields'}
+            </span>
+            {onEdit && row && (
+              <Button size="sm" onClick={() => onEdit(row)}>
+                <IconPencil size={14} />
+                Edit
+              </Button>
             )}
           </div>
         </div>
@@ -225,29 +234,31 @@ function Field({
   const type = formatColumnType(column.dataType, column.udtName)
 
   return (
-    <div className="group grid grid-cols-[10.5rem_1fr] items-start gap-4 px-3 py-2.5 transition-colors hover:bg-surface-elevated/40">
+    <div className="group grid grid-cols-[140px_1fr] items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated/60">
       {/* The type belongs here, not beside the value: it describes the column.
           Under the value it read as part of the data and cost every field a
           second line. */}
-      <dt className="flex min-w-0 flex-col gap-0.5">
+      <dt className="flex min-w-0 flex-col gap-0.5 pt-px">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate font-mono text-xs text-text" title={column.name}>
+          <span className="truncate text-xs text-text-muted" title={column.name}>
             {column.name}
           </span>
           {column.isPrimaryKey && <Chip tone="emerald">PK</Chip>}
         </span>
-        <span className="truncate font-mono text-[10px] text-text-subtle" title={type}>
+        <span className="truncate font-mono text-[12px] text-text-subtle" title={type}>
           {type}
         </span>
       </dt>
 
-      <dd className="flex min-w-0 items-start gap-1.5">
+      <dd className="flex min-w-0 items-start gap-1">
         {/* Wrapping, not truncating: the whole point of this view is to show
             the value a grid cell had to cut off. */}
         <span
           className={cn(
-            'min-w-0 flex-1 font-mono text-xs break-words whitespace-pre-wrap',
-            isNull || isBlank ? 'text-text-subtle italic' : 'text-text'
+            'min-w-0 flex-1 break-words whitespace-pre-wrap',
+            // Structured values keep their indentation readable in a fixed-width face.
+            isJsonType(column.udtName) ? 'font-mono text-xs leading-5' : 'text-sm',
+            isNull || isBlank ? 'text-text-subtle' : 'text-text'
           )}
         >
           {isNull ? 'NULL' : isBlank ? `'${String(value)}'` : display}
@@ -261,9 +272,9 @@ function Field({
             aria-label={`Copy ${column.name}`}
             // Revealed on hover: one of these per field, always on, would out-shout
             // the values they belong to. Focus keeps it reachable by keyboard.
-            className="cursor-pointer rounded p-1 text-text-subtle opacity-0 transition group-hover:opacity-100 hover:bg-surface hover:text-text focus-visible:opacity-100"
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-text-subtle opacity-0 transition group-hover:opacity-100 hover:bg-surface-active hover:text-text focus-visible:opacity-100"
           >
-            <IconCopy size={12} />
+            <IconCopy size={14} />
           </button>
           {target && !isNull && (
             // Named, not a bare arrow: where it goes is the useful part, and a
@@ -273,10 +284,10 @@ function Field({
               onClick={onFollow}
               title={`Go to ${target.schema}.${target.table}.${target.column}`}
               aria-label={`Go to ${target.schema}.${target.table}.${target.column}`}
-              className="flex max-w-[8rem] cursor-pointer items-center gap-1 rounded px-1.5 py-1 text-accent-text transition-colors hover:bg-accent/15"
+              className="flex h-6 max-w-[8rem] cursor-pointer items-center gap-1 rounded-md px-1.5 text-accent-text transition-colors hover:bg-accent/8"
             >
-              <span className="truncate font-mono text-[10px]">{target.table}</span>
-              <IconArrowUpRight size={12} className="shrink-0" />
+              <span className="truncate text-[12px] font-medium">{target.table}</span>
+              <IconArrowUpRight size={14} className="shrink-0" />
             </button>
           )}
         </div>

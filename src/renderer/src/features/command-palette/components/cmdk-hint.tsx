@@ -27,13 +27,13 @@ export function CmdKHint({
         onClick={open}
         aria-label={label}
         className={cn(
-          'flex h-7 w-64 cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-input px-2.5 text-text-subtle transition-colors hover:bg-surface-elevated/40 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none',
+          'flex h-7 w-64 cursor-pointer items-center gap-2 rounded-lg border border-border-strong bg-input px-2.5 text-text-subtle shadow-[0_1px_2px_0_rgba(0,0,0,0.03)] transition-colors hover:text-text-muted focus-visible:border-accent focus-visible:ring-[3px] focus-visible:ring-accent/15 focus-visible:outline-none',
           className
         )}
       >
         <IconSearch size={14} className="shrink-0" />
         <span className="flex-1 truncate text-left text-xs">{label}</span>
-        <span className="flex shrink-0 items-center gap-1">
+        <span className="flex shrink-0 items-center gap-0.5">
           <Kbd>{modKey}</Kbd>
           <Kbd>K</Kbd>
         </span>
@@ -49,7 +49,7 @@ export function CmdKHint({
           onClick={open}
           aria-label={label}
           className={cn(
-            'flex h-7 cursor-pointer items-center gap-1 rounded-md border border-border bg-surface-elevated/40 px-1.5 transition-colors hover:border-border-strong hover:bg-surface-elevated',
+            'flex h-7 cursor-pointer items-center gap-0.5 rounded-lg bg-control px-1.5 shadow-control transition-colors hover:bg-control-hover',
             className
           )}
         >

@@ -7,7 +7,7 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
       aria-hidden
       className={cn(
         'rounded-md bg-size-[200%_100%] animate-shimmer',
-        'bg-[linear-gradient(90deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.10)_50%,rgba(255,255,255,0.04)_80%)]',
+        'bg-[linear-gradient(90deg,var(--color-skeleton)_0%,var(--color-skeleton-shine)_50%,var(--color-skeleton)_80%)]',
         className
       )}
       {...props}

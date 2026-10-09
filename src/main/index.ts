@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, nativeImage } from 'electron'
+import { app, shell, BrowserWindow, nativeImage, session } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -6,9 +6,25 @@ import icon from '../../resources/icon.png?asset'
 import { safeExternalUrl } from './app/open-external'
 import { registerIpcHandlers } from './ipc'
 import { disconnectAll } from './db/manager'
+import { applyStoredTheme, windowBackground } from './app/theme'
+import { configureNetwork } from './app/network'
 
 const APP_NAME = 'OrbitDB'
 app.setName(APP_NAME)
+configureNetwork()
+
+/**
+ * How long quitting waits for pools to close. `pool.end()` waits for in-flight
+ * queries, so a long-running one would otherwise hold the app open forever.
+ */
+const QUIT_DISCONNECT_TIMEOUT_MS = 3_000
+
+/**
+ * The only web permission the renderer uses: `navigator.clipboard.writeText`
+ * behind every Copy action. Paste goes through the paste event's own
+ * clipboardData, which needs none.
+ */
+const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set(['clipboard-sanitized-write'])
 
 /** The one file the renderer is ever allowed to be. */
 const rendererFile = join(__dirname, '../renderer/index.html')
@@ -46,6 +62,19 @@ function isRendererUrl(url: string): boolean {
   }
 }
 
+function isPermissionAllowed(permission: string, url: string | undefined): boolean {
+  return ALLOWED_PERMISSIONS.has(permission) && url !== undefined && isRendererUrl(url)
+}
+
+function restrictPermissions(): void {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(isPermissionAllowed(permission, webContents.getURL()))
+  })
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) =>
+    isPermissionAllowed(permission, webContents?.getURL())
+  )
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1280,
@@ -54,11 +83,17 @@ function createWindow(): void {
     minHeight: 640,
     autoHideMenuBar: true,
     title: APP_NAME,
-    backgroundColor: '#0e1013',
+    backgroundColor: windowBackground(),
+    // macOS: the traffic lights sit inside the sidebar's top row, as in Attio's
+    // desktop app. The renderer leaves room for them and makes that row, and
+    // each page header, the drag handle. Other platforms keep their frame.
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 18 } }
+      : {}),
     icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: true
     }
   })
 
@@ -110,6 +145,9 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  restrictPermissions()
+  // Before the window, so its first paint is already in the right theme.
+  applyStoredTheme()
   registerIpcHandlers()
   createWindow()
 
@@ -125,26 +163,39 @@ app.on('window-all-closed', () => {
     return
   }
   // macOS keeps the app in the dock with no window, and there is nothing left
-  // for the pools and their tunnels to serve until one reopens.
+  // for the pools to serve until one reopens.
   void disconnectAll().catch((err) => console.error('[app] could not close connections', err))
 })
 
 /**
- * Closing pools and tunnels belongs here, not on `window-all-closed`.
+ * Closing pools belongs here, not on `window-all-closed`.
  *
  * Electron does not emit `window-all-closed` when the app is quit by
  * `app.quit()` or Cmd+Q, which is the ordinary way to leave the app on macOS -
  * so the cleanup hung off it never ran on the path that needed it most, and
- * live SSH tunnels were torn down by process exit instead.
+ * live pools were torn down by process exit instead.
  */
 let hasClosedConnections = false
+let isClosingConnections = false
 app.on('before-quit', (event) => {
   if (hasClosedConnections) return
   event.preventDefault()
-  void disconnectAll()
-    .catch((err) => console.error('[app] could not close connections', err))
-    .finally(() => {
-      hasClosedConnections = true
-      app.quit()
-    })
+  if (isClosingConnections) return
+  isClosingConnections = true
+
+  let timer: NodeJS.Timeout | undefined
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn('[app] connections still closing; quitting without waiting further')
+      resolve()
+    }, QUIT_DISCONNECT_TIMEOUT_MS)
+  })
+  const closing = disconnectAll().catch((err) =>
+    console.error('[app] could not close connections', err)
+  )
+  void Promise.race([closing, timeout]).finally(() => {
+    clearTimeout(timer)
+    hasClosedConnections = true
+    app.quit()
+  })
 })

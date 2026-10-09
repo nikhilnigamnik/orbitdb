@@ -1,68 +1,256 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/*
+ * Modelled on Attio's product UI. The light theme: a #FBFBFB sidebar beside a
+ * white canvas, hairline #EEEFF1 dividers, near-black #242629 ink, Inter at
+ * 13-14px with slightly tightened tracking, and one blue (#266DF0) for primary
+ * actions. Surfaces are opaque - depth comes from hairline borders and very
+ * soft shadows, never from translucency.
+ *
+ * The dark theme overrides these same tokens further down, so a component never
+ * names a theme. Which one applies is `prefers-color-scheme`, driven by
+ * `nativeTheme.themeSource` in main (src/main/app/theme.ts).
+ */
 @theme {
   --font-sans:
-    'DM Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
+    'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono:
     'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
 
-  --color-bg: #0e1013; /* window chrome, behind the floating panels */
-  --color-surface: #131519; /* panels, sidebars, popovers */
-  --color-surface-elevated: #1c2026; /* hover / selected rows */
-  --color-input: #15181c; /* text fields - reads as a well, not a raised chip */
-  --color-surface-sunken: #0b0d10; /* code blocks, SQL editor, DDL preview */
+  /* Attio sets dense UI at 13px and primary text at 14px. Most of this app
+     sizes with text-xs, so moving the scale moves the app with it. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
 
-  --color-border: #202429;
-  --color-border-strong: #2c3138;
+  --color-bg: #fbfbfb; /* sidebar and window chrome */
+  --color-surface: #ffffff; /* the canvas, popovers, sheets */
+  --color-surface-elevated: #f4f5f6; /* hover / selected rows */
+  --color-surface-active: #eeeff1; /* selected nav item */
+  --color-input: #ffffff;
+  /* Buttons, chips and the other white controls. White on the white canvas
+     here, edged by shadow-control; in the dark theme a halo alone vanishes
+     against the page, so the control carries a fill a step above it. */
+  --color-control: #ffffff;
+  --color-control-hover: #f4f5f6;
+  /* The groove a segmented control's pill slides in. */
+  --color-track: #f4f5f6;
+  /* Menus, popovers, toasts - anything floating over the canvas. White like the
+     canvas here; a step lighter than it in the dark theme, where a shadow alone
+     cannot lift a surface off a near-black page. */
+  --color-popover: #ffffff;
+  --color-surface-sunken: #f8f9fa; /* code blocks, SQL editor gutter, DDL preview */
+  /* Grid row states, opaque on purpose: sticky cells (frozen columns, the row
+     actions) must cover what scrolls beneath them yet still carry the row's
+     tint. These equal surface-elevated / surface-active at 60% over white. */
+  --color-row-hover: #f8f9f9;
+  --color-row-selected: #f5f5f7;
 
-  --color-text: #e6e8ec;
-  --color-text-muted: #9aa1ac;
-  --color-text-subtle: #6a7280;
+  --color-border: #eeeff1;
+  --color-border-strong: #e3e4e8;
 
-  /* #1249dc is a fill colour - 7.0:1 under white ink, but only 2.7:1 as text on
-     --color-bg. Anything that renders accent-coloured *text* uses accent-text. */
-  --color-accent: #1249dc;
+  /* text-subtle carries real information (NULLs, hints, placeholders, key
+     caps), so it clears 4.5:1 on white and on the hover grey alike; muted sits
+     a clear step darker to keep the three-level hierarchy. */
+  --color-text: #242629;
+  --color-text-muted: #55575c;
+  --color-text-subtle: #6e7074;
+  /* The edge of a control that has no fill of its own - an unchecked checkbox,
+     an off switch. 3:1 against the canvas, the sidebar and a hovered row. */
+  --color-border-control: #86898e;
+
+  --color-accent: #266df0;
   --color-accent-fg: #ffffff;
-  --color-accent-text: #5c8af5;
-  --color-accent-hover: #1b43b1; /* same hue, darker - buttons darken on hover */
-  --color-accent-shade: #143285; /* 2px inset bottom bevel under the fill */
+  --color-accent-text: #266df0;
+  --color-accent-hover: #1f5fd9;
+  --color-accent-shade: #1c56c2;
 
-  --color-success: #3fb950;
-  --color-warning: #d29922;
-  --color-danger: #f85149;
-  --color-danger-fill: #c93c37; /* solid destructive fills; #f85149 is 3.3:1 under white */
-  --color-danger-shade: #8f2b27; /* bevel under destructive fills */
-  --color-info: #5c8af5;
-  --color-orange: #db6d28;
+  --color-success: #17924f;
+  --color-warning: #b9770e;
+  --color-danger: #e0383e;
+  --color-danger-fill: #e0383e;
+  --color-danger-shade: #b52b30;
+  --color-info: #266df0;
+  --color-orange: #dd5f12;
+  /* Status colours as small text on their own /10 tint (chips, badges, menu
+     items). The fills above stay bright; these clear 4.5:1 on the tint. */
+  --color-success-text: #127740;
+  --color-warning-text: #905c0a;
+  --color-danger-text: #c03035;
+  --color-info-text: #2161d5;
+  --color-orange-text: #ae4b0e;
 
-  /* Connection accents. Their own tokens rather than the status colours: these
-     have to stay apart from *each other*, and a green connection tagged with
-     --color-success would read as "healthy" next to the health dot. */
-  --color-tag-slate: #8b949e;
-  --color-tag-blue: #4c8dff;
-  --color-tag-violet: #a371f7;
-  --color-tag-cyan: #39c5cf;
-  --color-tag-green: #3fb950;
-  --color-tag-amber: #d29922;
-  --color-tag-orange: #db6d28;
-  --color-tag-rose: #f778ba;
+  /* Connection accents - kept apart from the status colours, so a green
+     connection never reads as "healthy" beside the health dot. */
+  --color-tag-slate: #8f9297;
+  --color-tag-blue: #266df0;
+  --color-tag-violet: #7c4ddb;
+  --color-tag-cyan: #1a9fb5;
+  --color-tag-green: #17924f;
+  --color-tag-amber: #d39a00;
+  --color-tag-orange: #ea6a16;
+  --color-tag-rose: #e0457b;
+  /* Deeper fills for the two tags that carry neither white nor dark ink at
+     4.5:1, used where a tag holds a letter (the connection tile). */
+  --color-tag-green-deep: #127740;
+  --color-tag-rose-deep: #c02a62;
+  /* A tag as 12px text on its own tint (enum pills in the grid). The fills
+     themselves fall short of 4.5:1 there - amber managed 2.3 - so, like the
+     status colours, each has a deeper ink here and a lifted one in dark. */
+  --color-tag-blue-text: #1f5bcc;
+  --color-tag-violet-text: #6539c4;
+  --color-tag-cyan-text: #0d7180;
+  --color-tag-green-text: #127740;
+  --color-tag-amber-text: #855f00;
+  --color-tag-orange-text: #ae4b0e;
+  --color-tag-rose-text: #b52e5d;
+  /* The dark ink on a light tag fill. Fixed in both themes: the fills do not
+     change, so the ink that reads on them must not flip with --color-text. */
+  --color-tag-ink: #242629;
+
+  --color-tooltip: #242629;
+  --color-tooltip-fg: #ffffff;
+  /* Behind a dialog, and the lighter wash behind a sheet. */
+  --color-overlay: rgba(28, 40, 64, 0.18);
+  --color-overlay-soft: rgba(28, 40, 64, 0.12);
+  --color-scrollbar: rgba(36, 38, 41, 0.14);
+  --color-scrollbar-hover: rgba(36, 38, 41, 0.26);
+  --color-skeleton: rgba(28, 40, 64, 0.04);
+  --color-skeleton-shine: rgba(28, 40, 64, 0.08);
+  --color-minimap-mask: rgba(244, 245, 246, 0.7);
+
+  /* Shadows read a variable rather than holding the value: Tailwind copies a
+     literal shadow into every shadow-* class, which left the dark theme drawing
+     the light theme's navy shadows - a blue glow around every dialog. */
+  --shadow-control: var(--elevation-control);
+  --shadow-primary: var(--elevation-primary);
+  --shadow-card: var(--elevation-card);
+  --shadow-pop: var(--elevation-pop);
+  --shadow-dialog: var(--elevation-dialog);
+  --shadow-tooltip: var(--elevation-tooltip);
+  --shadow-kbd: var(--elevation-kbd);
+}
+
+/*
+ * Attio's dark theme: a near-black sidebar beside a slightly lifted canvas,
+ * cool neutral greys, the same blue. Every text and boundary token holds the
+ * contrast the light theme does - tests/renderer/theme-tokens.test.ts runs the
+ * same checks over both.
+ *
+ * In @layer base so it wins over @theme's :root block, which Tailwind emits in
+ * the earlier theme layer.
+ */
+@layer base {
+  :root {
+    color-scheme: light;
+
+    /* Attio's control shadow: a 2px hairline halo plus a whisper of drop. */
+    --elevation-control: 0 0 2px 0 rgba(28, 40, 64, 0.18), 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+    --elevation-primary:
+      0 1px 2px -1px rgba(15, 107, 233, 0.32), 0 1.5px 3px -1px rgba(15, 107, 233, 0.24);
+    --elevation-card: 0 1px 2px 0 rgba(0, 0, 0, 0.04), 0 1px 3px 0 rgba(0, 0, 0, 0.06);
+    --elevation-pop:
+      0 0 0 1px rgba(28, 40, 64, 0.06), 0 4px 8px -2px rgba(28, 40, 64, 0.06),
+      0 12px 24px -4px rgba(28, 40, 64, 0.1);
+    --elevation-dialog: 0 0 0 1px rgba(28, 40, 64, 0.06), 0 24px 48px -12px rgba(28, 40, 64, 0.28);
+    --elevation-tooltip: 0 4px 12px -2px rgba(28, 40, 64, 0.24);
+    --elevation-kbd: inset 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+
+      --color-bg: #161719;
+      --color-surface: #1c1d20;
+      --color-surface-elevated: #26272b;
+      --color-surface-active: #2d2f33;
+      --color-input: #1f2023;
+      --color-control: #232428;
+      --color-control-hover: #2a2b2f;
+      --color-track: #161719;
+      --color-popover: #222327;
+      --color-surface-sunken: #18191b;
+      --color-row-hover: #222327;
+      --color-row-selected: #27282c;
+
+      --color-border: #232428;
+      --color-border-strong: #303237;
+
+      --color-text: #eeeff1;
+      --color-text-muted: #b2b4b9;
+      --color-text-subtle: #8f9298;
+      --color-border-control: #76797f;
+
+      --color-accent: #266df0;
+      --color-accent-fg: #ffffff;
+      --color-accent-text: #6b9df7;
+      --color-accent-hover: #1f5fd9;
+      --color-accent-shade: #1c56c2;
+
+      --color-success: #2ea56a;
+      --color-warning: #d4951f;
+      --color-danger: #ef5b60;
+      --color-danger-fill: #d93d42;
+      --color-danger-shade: #b52b30;
+      --color-info: #4a88f5;
+      --color-orange: #e8722a;
+      --color-success-text: #4cc98a;
+      --color-warning-text: #e8b04a;
+      --color-danger-text: #f47a7e;
+      --color-info-text: #78a6f8;
+      --color-orange-text: #f39a62;
+
+      --color-tag-blue-text: #6b9df7;
+      --color-tag-violet-text: #a98bf0;
+      --color-tag-cyan-text: #4cc3d6;
+      --color-tag-green-text: #4cc98a;
+      --color-tag-amber-text: #e8b93a;
+      --color-tag-orange-text: #f39a62;
+      --color-tag-rose-text: #f57fa6;
+
+      --color-tooltip: #34363b;
+      --color-tooltip-fg: #eeeff1;
+      --color-overlay: rgba(0, 0, 0, 0.5);
+      --color-overlay-soft: rgba(0, 0, 0, 0.4);
+      --color-scrollbar: rgba(238, 239, 241, 0.14);
+      --color-scrollbar-hover: rgba(238, 239, 241, 0.26);
+      --color-skeleton: rgba(238, 239, 241, 0.04);
+      --color-skeleton-shine: rgba(238, 239, 241, 0.09);
+      --color-minimap-mask: rgba(22, 23, 25, 0.7);
+
+      /* A shadow barely reads on a dark page, so edges come from a faint light
+         ring instead and the drop only adds depth beneath it. */
+      --elevation-control: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+      --elevation-primary: 0 1px 2px -1px rgba(0, 0, 0, 0.5);
+      --elevation-card: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+      --elevation-pop:
+        0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 8px -2px rgba(0, 0, 0, 0.4),
+        0 12px 24px -4px rgba(0, 0, 0, 0.5);
+      --elevation-dialog: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 24px 48px -12px rgba(0, 0, 0, 0.6);
+      --elevation-tooltip: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 12px -2px rgba(0, 0, 0, 0.5);
+      --elevation-kbd: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+    }
+  }
 }
 
 .orbit-flow {
+  /* colorMode="system" brings xyflow's own dark palette; the canvas stays ours. */
+  --xy-background-color: var(--color-surface);
   --xy-controls-button-background-color: var(--color-surface);
   --xy-controls-button-background-color-hover: var(--color-surface-elevated);
   --xy-controls-button-color: var(--color-text-muted);
   --xy-controls-button-color-hover: var(--color-text);
   --xy-controls-button-border-color: var(--color-border);
-  --xy-controls-box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --xy-controls-box-shadow: var(--shadow-pop);
 
   --xy-minimap-background-color: var(--color-surface);
-  --xy-minimap-mask-background-color: rgba(0, 0, 0, 0.55);
-  --xy-minimap-node-background-color: rgba(92, 138, 245, 0.5);
+  --xy-minimap-mask-background-color: var(--color-minimap-mask);
+  --xy-minimap-node-background-color: rgba(38, 109, 240, 0.35);
   --xy-minimap-node-stroke-color: transparent;
 
   --xy-edge-stroke: var(--color-border-strong);
@@ -78,17 +266,26 @@
 
   html,
   body {
-    @apply bg-bg text-text font-sans antialiased selection:bg-accent selection:text-accent-fg;
-    letter-spacing: -0.005em;
+    @apply bg-surface text-text font-sans antialiased selection:bg-accent/20 selection:text-text;
+    letter-spacing: -0.01em;
+    font-feature-settings: 'cv11', 'ss01';
   }
 
   /* Without this, anything that doesn't define its own focus style falls back to
      Chromium's `outline: auto`, which paints the macOS system accent colour and
-     lands outside the palette. Components that set `outline-none` still win. */
+     lands outside the palette. Solid accent so keyboard focus clears 3:1. */
   :focus-visible {
-    outline: 2px solid var(--color-accent-text);
+    outline: 2px solid var(--color-accent);
     outline-offset: 1px;
-    border-radius: inherit;
+  }
+
+  /* Panels that only take focus programmatically - a Radix dialog moves focus
+     to its content on open - are not controls, and ringing the whole panel in
+     blue read as a selection. Real controls inside still get their ring. */
+  [tabindex='-1']:focus-visible,
+  [role='dialog']:focus-visible,
+  [role='alertdialog']:focus-visible {
+    outline: none;
   }
 
   ::-webkit-scrollbar {
@@ -99,13 +296,13 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: rgba(230, 232, 236, 0.16);
+    background-color: var(--color-scrollbar);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(230, 232, 236, 0.28);
+    background-color: var(--color-scrollbar-hover);
     background-clip: padding-box;
     border: 2px solid transparent;
   }
@@ -134,24 +331,8 @@
 }
 
 @layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .shadow-transition {
-    @apply transition-shadow;
-  }
-  .shadow-transition:hover {
-    box-shadow: 0px 0px 42px -9px rgba(0, 0, 0, 0.1);
-  }
   .animate-slide-up-fade {
     animation: slide-up-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .animate-fade-up {
-    animation: fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .animate-fade-in {
     animation: fade-in 0.2s ease-out forwards;
@@ -161,9 +342,6 @@
   }
   .animate-cell-saved {
     animation: cell-saved 0.9s ease-out;
-  }
-  .shadow-minimal {
-    box-shadow: 0px 0px 42px -9px rgba(0, 0, 0, 0.1);
   }
 }
 
@@ -180,59 +358,14 @@
 
 @keyframes cell-saved {
   from {
-    background-color: rgba(63, 185, 80, 0.28);
+    background-color: rgba(23, 146, 79, 0.14);
   }
   to {
     background-color: transparent;
   }
 }
 
-::view-transition-group(root) {
-  animation-duration: 0.5s;
-  animation-timing-function: var(--custom-ease);
-}
-
-::view-transition-new(root) {
-  animation-name: reveal-light;
-  animation-fill-mode: both;
-}
-
-::view-transition-old(root),
-.dark::view-transition-old(root) {
-  animation: none;
-  animation-fill-mode: both;
-  z-index: -1;
-}
-
-.dark::view-transition-new(root) {
-  animation-name: reveal-dark;
-  animation-fill-mode: both;
-}
-
-@keyframes reveal-dark {
-  from {
-    clip-path: polygon(0% 0%, 100% 0%, 100% 0%, 0% 0%);
-  }
-  to {
-    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
-  }
-}
-
-@keyframes reveal-light {
-  from {
-    clip-path: polygon(0% 100%, 100% 100%, 100% 100%, 0% 100%);
-  }
-  to {
-    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
-  }
-}
-
 @theme {
-  --animate-hide: hide 150ms cubic-bezier(0.16, 1, 0.3, 1);
-  --animate-slide-down-and-fade: slideDownAndFade 150ms cubic-bezier(0.16, 1, 0.3, 1);
-  --animate-slide-left-and-fade: slideLeftAndFade 150ms cubic-bezier(0.16, 1, 0.3, 1);
-  --animate-slide-up-and-fade: slideUpAndFade 150ms cubic-bezier(0.16, 1, 0.3, 1);
-  --animate-slide-right-and-fade: slideRightAndFade 150ms cubic-bezier(0.16, 1, 0.3, 1);
   --animate-collapsible-down: collapsibleDown 220ms cubic-bezier(0.16, 1, 0.3, 1);
   --animate-collapsible-up: collapsibleUp 180ms cubic-bezier(0.16, 1, 0.3, 1);
   --animate-shimmer: shimmer 1.6s linear infinite;
@@ -287,72 +420,12 @@
     }
   }
 
-  @keyframes fade-up {
-    0% {
-      opacity: 0;
-      transform: translateY(var(--offset, 2px));
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
   @keyframes fade-in {
     0% {
       opacity: 0;
     }
     100% {
       opacity: 1;
-    }
-  }
-
-  @keyframes hide {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0;
-    }
-  }
-  @keyframes slideDownAndFade {
-    from {
-      opacity: 0;
-      transform: translateY(-6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  @keyframes slideLeftAndFade {
-    from {
-      opacity: 0;
-      transform: translateX(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-  @keyframes slideUpAndFade {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  @keyframes slideRightAndFade {
-    from {
-      opacity: 0;
-      transform: translateX(-6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
     }
   }
 }

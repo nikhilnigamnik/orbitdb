@@ -29,63 +29,79 @@ interface SqlEditorProps {
 
 /**
  * Colours come from the app's CSS variables rather than a packaged CodeMirror
- * theme, so the editor cannot drift from the rest of the UI when a token changes.
+ * theme, so the editor cannot drift from the rest of the UI when a token changes -
+ * and follows the light and dark themes without knowing there are two.
  */
 const highlightStyle = HighlightStyle.define([
-  { tag: tags.keyword, color: 'var(--color-accent-text)' },
+  { tag: tags.keyword, color: 'var(--color-accent-text)', fontWeight: '500' },
   { tag: [tags.string, tags.special(tags.string)], color: 'var(--color-success)' },
   { tag: [tags.number, tags.bool, tags.null], color: 'var(--color-orange)' },
   { tag: [tags.comment, tags.lineComment, tags.blockComment], color: 'var(--color-text-subtle)' },
   { tag: [tags.operator, tags.punctuation], color: 'var(--color-text-muted)' },
-  { tag: [tags.typeName, tags.standard(tags.name)], color: 'var(--color-info)' },
+  { tag: [tags.typeName, tags.standard(tags.name)], color: 'var(--color-tag-violet)' },
   { tag: tags.variableName, color: 'var(--color-text)' }
 ])
 
 const editorTheme = EditorView.theme(
   {
-    '&': { height: '100%', fontSize: '12px', backgroundColor: 'var(--color-input)' },
+    '&': {
+      height: '100%',
+      fontSize: '13px',
+      color: 'var(--color-text)',
+      backgroundColor: 'var(--color-surface)'
+    },
     '&.cm-focused': { outline: 'none' },
     '.cm-scroller': {
       fontFamily: 'var(--font-mono, ui-monospace, monospace)',
       lineHeight: '1.6',
       overflow: 'auto'
     },
-    '.cm-content': { padding: '12px 0', caretColor: 'var(--color-accent-text)' },
+    '.cm-content': { padding: '12px 0', caretColor: 'var(--color-accent)' },
+    '.cm-placeholder': { color: 'var(--color-text-subtle)' },
     '.cm-gutters': {
-      backgroundColor: 'var(--color-input)',
+      backgroundColor: 'var(--color-surface)',
       color: 'var(--color-text-subtle)',
       border: 'none',
       paddingLeft: '8px'
     },
-    '.cm-activeLine': { backgroundColor: 'var(--color-surface-elevated)' },
+    '.cm-lineNumbers .cm-gutterElement': { padding: '0 12px 0 4px' },
+    '.cm-activeLine': {
+      backgroundColor: 'color-mix(in oklab, var(--color-surface-elevated) 70%, transparent)'
+    },
     '.cm-activeLineGutter': {
       backgroundColor: 'transparent',
       color: 'var(--color-text-muted)'
     },
     '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection': {
-      backgroundColor: 'color-mix(in oklab, var(--color-accent) 30%, transparent)'
+      backgroundColor: 'color-mix(in oklab, var(--color-accent) 16%, transparent)'
     },
-    '.cm-cursor': { borderLeftColor: 'var(--color-accent-text)' },
+    '.cm-cursor': { borderLeftColor: 'var(--color-accent)', borderLeftWidth: '1.5px' },
     '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': {
-      backgroundColor: 'color-mix(in oklab, var(--color-accent) 25%, transparent)',
+      backgroundColor: 'color-mix(in oklab, var(--color-accent) 14%, transparent)',
       outline: 'none'
     },
+    '.cm-tooltip': { border: 'none', backgroundColor: 'var(--color-popover)' },
     '.cm-tooltip-autocomplete': {
-      backgroundColor: 'var(--color-surface)',
-      border: '1px solid var(--color-border-strong)',
-      borderRadius: '8px',
+      borderRadius: '10px',
       overflow: 'hidden',
-      boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+      padding: '4px',
+      boxShadow: 'var(--shadow-pop)'
     },
-    '.cm-tooltip-autocomplete ul li': { padding: '3px 8px', color: 'var(--color-text-muted)' },
+    '.cm-tooltip-autocomplete ul': { fontFamily: 'var(--font-mono, ui-monospace, monospace)' },
+    '.cm-tooltip-autocomplete ul li': {
+      padding: '4px 8px',
+      borderRadius: '6px',
+      color: 'var(--color-text)'
+    },
     '.cm-tooltip-autocomplete ul li[aria-selected]': {
       backgroundColor: 'var(--color-surface-elevated)',
       color: 'var(--color-text)'
     },
     '.cm-completionIcon': { display: 'none' },
+    '.cm-completionMatchedText': { textDecoration: 'none', color: 'var(--color-accent-text)' },
     '.cm-completionDetail': { color: 'var(--color-text-subtle)', fontStyle: 'normal' }
   },
-  { dark: true }
+  { dark: false }
 )
 
 export function SqlEditor({
@@ -197,7 +213,11 @@ export function SqlEditor({
     <div
       ref={hostRef}
       data-testid="sql-editor"
-      className={cn('h-full min-h-0 overflow-hidden bg-input', disabled && 'opacity-60', className)}
+      className={cn(
+        'h-full min-h-0 overflow-hidden bg-surface',
+        disabled && 'opacity-60',
+        className
+      )}
     />
   )
 }

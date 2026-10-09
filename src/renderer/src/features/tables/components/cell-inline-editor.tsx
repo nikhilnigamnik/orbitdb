@@ -26,7 +26,7 @@ function ErrorBubble({ children }: { children: React.ReactNode }) {
         align="start"
         sideOffset={6}
         onOpenAutoFocus={(e) => e.preventDefault()}
-        className="animate-slide-up-fade z-50 max-w-72 rounded-md border border-danger/20 bg-surface px-2 py-1.5 text-xs leading-snug text-danger shadow-lg shadow-black/40"
+        className="animate-slide-up-fade z-50 max-w-72 rounded-lg bg-popover px-2.5 py-1.5 text-xs leading-snug text-danger shadow-pop"
       >
         {children}
       </PopoverPrimitive.Content>
@@ -218,10 +218,10 @@ export function CellInlineEditor({
             >
               <SelectPrimitive.Trigger
                 aria-label={column.name}
-                className="flex w-full cursor-pointer items-center justify-between gap-1 bg-transparent font-mono text-xs text-text outline-none data-placeholder:italic data-placeholder:text-text-subtle"
+                className="flex w-full cursor-pointer items-center justify-between gap-1 bg-transparent text-sm text-text outline-none data-placeholder:italic data-placeholder:text-text-subtle"
               >
                 <SelectPrimitive.Value placeholder="NULL" />
-                <IconChevronDown size={11} className="shrink-0 text-text-subtle" />
+                <IconChevronDown size={14} className="shrink-0 text-text-subtle" />
               </SelectPrimitive.Trigger>
               <SelectPrimitive.Portal>
                 <SelectPrimitive.Content
@@ -229,18 +229,18 @@ export function CellInlineEditor({
                   side="bottom"
                   align="start"
                   sideOffset={6}
-                  className="animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-none border border-border-strong bg-surface text-text shadow-2xl shadow-black/70"
+                  className="animate-slide-up-fade z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) overflow-hidden rounded-xl bg-popover text-text shadow-pop"
                 >
                   <SelectPrimitive.Viewport className="p-1">
                     {selectOptions.map((option) => (
                       <SelectPrimitive.Item
                         key={option}
                         value={option}
-                        className="relative flex cursor-pointer items-center gap-2 rounded-none py-1.5 pr-7 pl-2 font-mono text-xs text-text-muted outline-none transition-colors select-none focus:bg-surface-elevated focus:text-text data-[state=checked]:text-text"
+                        className="relative flex h-8 cursor-pointer items-center gap-2 rounded-md pr-7 pl-2 text-xs text-text outline-none transition-colors select-none focus:bg-surface-elevated data-[state=checked]:font-medium"
                       >
                         <SelectPrimitive.ItemText>{option}</SelectPrimitive.ItemText>
                         <SelectPrimitive.ItemIndicator className="absolute right-2 flex items-center">
-                          <IconCheck size={12} className="text-text" />
+                          <IconCheck size={14} className="text-accent-text" />
                         </SelectPrimitive.ItemIndicator>
                       </SelectPrimitive.Item>
                     ))}
@@ -248,7 +248,7 @@ export function CellInlineEditor({
                       <button
                         type="button"
                         onClick={() => void commit('close', { toNull: true })}
-                        className="flex w-full cursor-pointer items-center rounded-none border-t border-border/60 py-1.5 pl-2 font-mono text-xs text-text-subtle italic transition-colors hover:bg-surface-elevated hover:text-text"
+                        className="mt-1 flex h-8 w-full cursor-pointer items-center rounded-md pl-2 text-xs text-text-subtle italic transition-colors hover:bg-surface-elevated hover:text-text"
                       >
                         NULL
                       </button>
@@ -282,10 +282,11 @@ export function CellInlineEditor({
             align="start"
             sideOffset={4}
             collisionPadding={12}
-            className="animate-slide-up-fade z-50 w-96 overflow-hidden rounded-none border border-border-strong bg-surface shadow-2xl shadow-black/70"
+            className="animate-slide-up-fade z-50 w-96 overflow-hidden rounded-xl bg-popover shadow-pop"
           >
             <textarea
               ref={textareaRef}
+              aria-label={column.name}
               value={raw}
               onChange={(e) => setRaw(e.target.value)}
               onKeyDown={(e) => handleEditorKeyDown(e, true)}
@@ -302,7 +303,7 @@ export function CellInlineEditor({
                 {activeError}
               </p>
             )}
-            <div className="flex items-center justify-between gap-2 border-t border-border/60 px-3 py-1.5 text-xs text-text-subtle">
+            <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2 text-[12px] text-text-subtle">
               <span className="flex items-center gap-2.5">
                 <span className="flex items-center gap-1">
                   <Kbd>⌘ ↵</Kbd>
@@ -319,7 +320,7 @@ export function CellInlineEditor({
                     type="button"
                     disabled={jsonError != null}
                     onClick={() => setRaw(JSON.stringify(JSON.parse(raw), null, 2))}
-                    className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-surface-elevated hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+                    className="cursor-pointer rounded-md px-1.5 py-0.5 font-medium transition-colors hover:bg-surface-elevated hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Format
                   </button>
@@ -328,13 +329,13 @@ export function CellInlineEditor({
                   <button
                     type="button"
                     onClick={() => void commit('close', { toNull: true })}
-                    className="cursor-pointer rounded px-1 py-0.5 font-mono italic transition-colors hover:bg-surface-elevated hover:text-text"
+                    className="cursor-pointer rounded-md px-1.5 py-0.5 italic transition-colors hover:bg-surface-elevated hover:text-text"
                   >
                     NULL
                   </button>
                 )}
                 {charLimit != null && (
-                  <span className={cn('font-mono', isOverLimit && 'text-danger')}>
+                  <span className={cn('tabular-nums', isOverLimit && 'text-danger')}>
                     {raw.length}/{charLimit}
                   </span>
                 )}
@@ -352,6 +353,7 @@ export function CellInlineEditor({
         <div className="flex w-full items-center">
           <input
             ref={inputRef}
+            aria-label={column.name}
             type={useDateInput ? 'date' : 'text'}
             inputMode={isNumericType(column.udtName) ? 'decimal' : undefined}
             value={raw}
@@ -362,7 +364,7 @@ export function CellInlineEditor({
             spellCheck={false}
             disabled={isSaving}
             className={cn(
-              'w-full bg-transparent p-0 font-mono text-xs text-text outline-none placeholder:italic placeholder:text-text-subtle disabled:opacity-60',
+              'w-full bg-transparent p-0 text-sm text-text outline-none placeholder:italic placeholder:text-text-subtle disabled:opacity-60',
               isOverLimit && 'text-danger'
             )}
           />

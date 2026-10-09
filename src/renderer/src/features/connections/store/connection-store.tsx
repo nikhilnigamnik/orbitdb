@@ -13,6 +13,11 @@ interface ConnectionContextValue {
   disconnect: () => Promise<void>
   isConnecting: boolean
   connectError: string | null
+  disconnectError: string | null
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
 }
 
 const ConnectionContext = React.createContext<ConnectionContextValue | null>(null)
@@ -24,6 +29,12 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
   const [active, setActive] = React.useState<ActiveConnectionMeta | null>(null)
   const [isConnecting, setIsConnecting] = React.useState(false)
   const [connectError, setConnectError] = React.useState<string | null>(null)
+  const [disconnectError, setDisconnectError] = React.useState<string | null>(null)
+  // Read inside connect() without making it change identity on every switch.
+  const activeRef = React.useRef<ActiveConnectionMeta | null>(null)
+  React.useEffect(() => {
+    activeRef.current = active
+  }, [active])
 
   const refresh = React.useCallback(async () => {
     setIsLoading(true)
@@ -33,23 +44,9 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
       const data = await unwrap(window.api.connections.list())
       setConnections(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(errorMessage(err))
     } finally {
       setIsLoading(false)
-    }
-  }, [])
-
-  /**
-   * Re-read the list without touching loading or error state - for refreshes
-   * the user did not ask for, where a spinner or a cleared error would be
-   * noise. `refresh` is still the one bound to the Refresh button.
-   */
-  const reloadQuietly = React.useCallback(async () => {
-    try {
-      setConnections(await unwrap(window.api.connections.list()))
-    } catch {
-      // The visible list is still the last good one; a background re-read that
-      // fails is not worth an error state over.
     }
   }, [])
 
@@ -57,33 +54,40 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
     void refresh()
   }, [refresh])
 
-  const connect = React.useCallback(
-    async (id: string) => {
-      setIsConnecting(true)
-      setConnectError(null)
-      try {
-        const meta = await unwrap(window.api.db.connect(id))
-        setActive(meta)
-        // Connecting can write back to the saved connection - an SSH tunnel
-        // pins the bastion's host key on its first success. Without this the
-        // list stays as it loaded at mount, and editing any field later would
-        // save that stale copy over the pin and silently unpin it.
-        void reloadQuietly()
-      } catch (err) {
-        setActive(null)
-        setConnectError(err instanceof Error ? err.message : String(err))
-        throw err
-      } finally {
-        setIsConnecting(false)
+  /**
+   * Replaces the active connection only once the new one answers. A failed
+   * switch used to clear it, which left the user on nothing while the old
+   * pool stayed open in main with no way back to it.
+   */
+  const connect = React.useCallback(async (id: string) => {
+    setIsConnecting(true)
+    setConnectError(null)
+    try {
+      const meta = await unwrap(window.api.db.connect(id))
+      const previous = activeRef.current?.connectionId
+      setActive(meta)
+      if (previous && previous !== id) {
+        void unwrap(window.api.db.disconnect(previous)).catch((err) =>
+          console.warn('[connections] could not close the previous connection', err)
+        )
       }
-    },
-    [reloadQuietly]
-  )
+    } catch (err) {
+      setConnectError(errorMessage(err))
+      throw err
+    } finally {
+      setIsConnecting(false)
+    }
+  }, [])
 
+  // Never rejects: callers fire it with `void`, so a failed IPC call would
+  // otherwise surface as an unhandled rejection rather than a message.
   const disconnect = React.useCallback(async () => {
     if (!active) return
+    setDisconnectError(null)
     try {
       await unwrap(window.api.db.disconnect(active.connectionId))
+    } catch (err) {
+      setDisconnectError(errorMessage(err))
     } finally {
       setActive(null)
     }
@@ -105,7 +109,8 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
       connect,
       disconnect,
       isConnecting,
-      connectError
+      connectError,
+      disconnectError
     }),
     [
       connections,
@@ -117,7 +122,8 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
       connect,
       disconnect,
       isConnecting,
-      connectError
+      connectError,
+      disconnectError
     ]
   )
 

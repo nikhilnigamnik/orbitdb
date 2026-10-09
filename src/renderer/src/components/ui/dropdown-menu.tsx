@@ -1,5 +1,3 @@
-'use client'
-
 import * as React from 'react'
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
 import { IconChevronRight } from '@tabler/icons-react'
@@ -11,7 +9,7 @@ const DropdownMenuGroup = DropdownMenuPrimitive.Group
 const DropdownMenuSub = DropdownMenuPrimitive.Sub
 
 const MENU_PANEL =
-  'z-50 min-w-[10rem] overflow-hidden rounded-lg border border-border-strong bg-surface p-1 shadow-2xl shadow-black/70'
+  'z-50 min-w-[12rem] overflow-hidden rounded-xl bg-popover p-1 text-text shadow-pop'
 
 function DropdownMenuContent({
   className,
@@ -32,7 +30,7 @@ function DropdownMenuContent({
 }
 
 const ITEM_BASE =
-  'flex w-full cursor-pointer select-none items-center gap-2 rounded-[5px] px-2 py-1.5 text-xs outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-40'
+  'flex h-8 w-full cursor-pointer select-none items-center gap-2 rounded-md px-2 text-xs outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-40 [&_svg]:text-text-subtle'
 
 function DropdownMenuItem({
   className,
@@ -46,8 +44,8 @@ function DropdownMenuItem({
       className={cn(
         ITEM_BASE,
         variant === 'danger'
-          ? 'text-danger data-highlighted:bg-danger/10 data-highlighted:text-danger'
-          : 'text-text-muted data-highlighted:bg-surface-elevated data-highlighted:text-text',
+          ? 'text-danger-text data-highlighted:bg-danger/8 data-highlighted:text-danger-text [&_svg]:!text-danger-text'
+          : 'text-text data-highlighted:bg-surface-elevated',
         className
       )}
       {...props}
@@ -64,7 +62,7 @@ function DropdownMenuSubTrigger({
     <DropdownMenuPrimitive.SubTrigger
       className={cn(
         ITEM_BASE,
-        'text-text-muted data-highlighted:bg-surface-elevated data-highlighted:text-text data-[state=open]:bg-surface-elevated data-[state=open]:text-text',
+        'text-text data-highlighted:bg-surface-elevated data-[state=open]:bg-surface-elevated',
         className
       )}
       {...props}

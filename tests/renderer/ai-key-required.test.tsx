@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AiKeyRequired, isMissingAiKeyError } from '@renderer/components/common/ai-key-required'
 import { QueryResults } from '@renderer/features/query/components/query-results'
-import { MISSING_AI_KEY_MESSAGE } from '@renderer/config/site'
+import { INCOMPLETE_GATEWAY_MESSAGE, MISSING_AI_KEY_MESSAGE } from '../../src/shared/ai-models'
 import { ROUTES } from '@renderer/config/routes'
 import type { QueryResult } from '@renderer/types'
 
@@ -29,6 +29,10 @@ describe('telling "not set up" apart from "broken"', () => {
     expect(isMissingAiKeyError(MISSING_AI_KEY_MESSAGE)).toBe(true)
   })
 
+  it('treats a half-configured gateway as set-up, not as broken', () => {
+    expect(isMissingAiKeyError(INCOMPLETE_GATEWAY_MESSAGE)).toBe(true)
+  })
+
   it('does not swallow a real failure that mentions a key', () => {
     expect(isMissingAiKeyError('invalid x-api-key')).toBe(false)
     expect(isMissingAiKeyError(null)).toBe(false)
@@ -43,7 +47,7 @@ describe('the query pane', () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByText('Add an Anthropic API key')).toBeTruthy()
+    expect(screen.getByText('Set up an AI provider')).toBeTruthy()
     expect(screen.queryByText('Error'), 'nothing is broken, so nothing says so').toBeNull()
   })
 

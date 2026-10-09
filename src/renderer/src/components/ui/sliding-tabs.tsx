@@ -36,17 +36,14 @@ export function SlidingTabs<T extends string = string>({
   return (
     <div
       ref={ref}
-      className={cn(
-        'relative inline-flex gap-1 rounded-lg border border-border bg-surface p-1',
-        className
-      )}
+      className={cn('relative inline-flex gap-0.5 rounded-lg bg-track p-0.5', className)}
     >
       <div
         aria-hidden
         style={style}
         className={cn(
-          'pointer-events-none absolute top-1 bottom-1 rounded-md transition-[left,width,background-color] duration-120 ease-out',
-          activeTab?.indicatorClassName ?? 'bg-surface-elevated'
+          'pointer-events-none absolute top-0.5 bottom-0.5 rounded-md bg-control shadow-control transition-[left,width,background-color] duration-120 ease-out',
+          activeTab?.indicatorClassName
         )}
       />
       {tabs.map((tab) => {
@@ -56,9 +53,10 @@ export function SlidingTabs<T extends string = string>({
             key={tab.id}
             data-id={tab.id}
             type="button"
+            aria-pressed={isActive}
             onClick={() => onChange(tab.id)}
             className={cn(
-              'relative z-10 flex h-6 cursor-pointer items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors',
+              'relative z-10 flex h-6 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
               isActive ? (tab.activeClassName ?? 'text-text') : 'text-text-muted hover:text-text'
             )}
           >
@@ -68,9 +66,7 @@ export function SlidingTabs<T extends string = string>({
               <span
                 className={cn(
                   'rounded-full px-1.5 py-px text-xs tabular-nums',
-                  isActive
-                    ? 'bg-surface text-text-muted'
-                    : 'bg-surface-elevated/60 text-text-subtle'
+                  isActive ? 'bg-surface-elevated text-text-muted' : 'text-text-subtle'
                 )}
               >
                 {tab.count}

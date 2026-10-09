@@ -1,15 +1,17 @@
 import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  IconGripHorizontal,
   IconHistory,
   IconPlayerPlay,
   IconPlayerStop,
   IconPlug,
   IconTrash,
-  IconSparkles
+  IconSparkles,
+  IconTerminal2,
+  IconBulb
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { PageHeader } from '@renderer/components/layout/page-header'
 import { Kbd } from '@renderer/components/ui/kbd'
 import { Sheet } from '@renderer/components/ui/sheet'
 import { EmptyState } from '@renderer/components/common/empty-state'
@@ -21,14 +23,16 @@ import { ROUTES } from '@renderer/config/routes'
 import { DEFAULT_QUERY } from '@renderer/config/site'
 import { ConfirmDialog } from '@renderer/components/common/confirm-dialog'
 import { findDestructiveStatements } from '@renderer/lib/sql-danger'
-import { CmdKHint } from '@renderer/features/command-palette/components/cmdk-hint'
 import { errorMessage } from '@renderer/lib/errors'
 import type { QueryResult, SavedQuery, SavedQueryPatch } from '@renderer/types'
 import { SqlEditor } from './sql-editor'
 import { QueryResults } from './query-results'
 import { AiPrompt } from './ai-prompt'
 import { QueryLibrarySheet } from './query-library-sheet'
+import { ExplainQuerySheet } from './explain-query-sheet'
 import { useSqlSchema } from '../hooks/use-sql-schema'
+import { useQueryAi, type FailedRun } from '../hooks/use-query-ai'
+import { hasSqlBody } from '../lib/sql-text'
 
 const MIN_PANEL_PCT = 15
 const MAX_PANEL_PCT = 85
@@ -69,7 +73,18 @@ export function QueryPage() {
   const [pendingRun, setPendingRun] = React.useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [isAiOpen, setIsAiOpen] = React.useState(false)
-  const [isAiGenerating, setIsAiGenerating] = React.useState(false)
+  // Only a run the database rejected; an AI failure shown in the same pane is
+  // not something "Fix with AI" could act on.
+  const [failedRun, setFailedRun] = React.useState<FailedRun | null>(null)
+  const ai = useQueryAi({
+    connectionId,
+    sql,
+    setSql,
+    setResult: (next) => {
+      setFailedRun(null)
+      setResult(next)
+    }
+  })
   const [editorPct, setEditorPct] = React.useState(50)
   const [isDragging, setIsDragging] = React.useState(false)
   const splitRef = React.useRef<HTMLDivElement>(null)
@@ -92,9 +107,9 @@ export function QueryPage() {
     try {
       setQueries(await unwrap(window.api.queries.list(connectionId)))
     } catch (err) {
-      console.error('Failed to read saved queries', err)
+      toast.error('Could not load saved queries', { description: errorMessage(err) })
     }
-  }, [connectionId])
+  }, [connectionId, toast])
 
   React.useEffect(() => {
     void loadQueries()
@@ -122,17 +137,20 @@ export function QueryPage() {
 
   if (!active) {
     return (
-      <div className="flex h-full items-center justify-center p-6">
-        <EmptyState
-          icon={<IconPlug size={24} />}
-          title="No active connection"
-          description="Connect to a database first to run queries."
-          action={
-            <Button size="sm" onClick={() => navigate(ROUTES.connections)}>
-              Go to connections
-            </Button>
-          }
-        />
+      <div className="flex h-full flex-col">
+        <PageHeader breadcrumbs={[{ label: 'SQL editor', icon: <IconTerminal2 /> }]} />
+        <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+          <EmptyState
+            icon={<IconPlug size={20} />}
+            title="No active connection"
+            description="Connect to a database first to run queries."
+            action={
+              <Button size="sm" variant="outline" onClick={() => navigate(ROUTES.connections)}>
+                Go to connections
+              </Button>
+            }
+          />
+        </div>
       </div>
     )
   }
@@ -145,14 +163,19 @@ export function QueryPage() {
     setIsRunning(true)
     try {
       const queryResult = await unwrap(
-        window.api.db.runQuery({ connectionId: active!.connectionId, sql: trimmed, queryId })
+        window.api.db.runQuery({ connectionId, sql: trimmed, queryId })
       )
       setResult(queryResult)
+      setFailedRun(
+        queryResult.success ? null : { sql: trimmed, error: queryResult.error ?? 'Query failed' }
+      )
       await recordRun(trimmed, queryResult.durationMs, queryResult.success)
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setFailedRun({ sql: trimmed, error: message })
       setResult({
         success: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: message,
         rows: [],
         fields: [],
         rowCount: null,
@@ -169,9 +192,7 @@ export function QueryPage() {
   /** Bookkeeping must never cost the user their result, so a failed write is logged and dropped. */
   async function recordRun(sql: string, durationMs: number, success: boolean) {
     try {
-      await unwrap(
-        window.api.queries.record({ connectionId: active!.connectionId, sql, durationMs, success })
-      )
+      await unwrap(window.api.queries.record({ connectionId, sql, durationMs, success }))
       await loadQueries()
     } catch (err) {
       console.error('Failed to record query', err)
@@ -198,7 +219,7 @@ export function QueryPage() {
 
   async function clearHistory() {
     try {
-      await unwrap(window.api.queries.clearHistory(active!.connectionId))
+      await unwrap(window.api.queries.clearHistory(connectionId))
       await loadQueries()
     } catch (err) {
       toast.error('Could not clear history', { description: errorMessage(err) })
@@ -232,138 +253,107 @@ export function QueryPage() {
     }
   }
 
-  async function handleAiGenerate(prompt: string) {
-    if (!active || isAiGenerating) return
-    setIsAiGenerating(true)
-    try {
-      const { sql: generated } = await unwrap(
-        window.api.ai.generateSql({ connectionId: active.connectionId, prompt })
-      )
-      // Put it in the editor rather than running it. The model is told to
-      // prefer SELECT, but that is a preference in a prompt - a misread request
-      // used to reach the database with nothing in between.
-      const replaced = sql
-      setSql(generated)
-      setIsAiOpen(false)
-      // The draft is persisted on every keystroke, so overwriting it puts the
-      // old text beyond reach - history only holds queries that were run.
-      if (replaced.trim()) {
-        toast.info('Replaced the editor contents', {
-          action: { label: 'Undo', onClick: () => setSql(replaced) }
-        })
-      }
-    } catch (err) {
-      setIsAiOpen(false)
-      setResult({
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-        rows: [],
-        fields: [],
-        rowCount: null,
-        command: null,
-        durationMs: 0,
-        truncated: false
-      })
-    } finally {
-      setIsAiGenerating(false)
-    }
+  async function handleAiGenerate(prompt: string, isRevision: boolean) {
+    // Closed either way: on success the editor holds the answer, on failure the
+    // results pane holds the error.
+    await ai.generate(prompt, isRevision)
+    setIsAiOpen(false)
   }
 
+  const connectionLabel = current?.name ?? active.currentDatabase
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface/40 px-5 py-2.5">
-        <div className="flex min-w-0 flex-col leading-tight">
-          <h1 className="text-xs font-semibold text-text">SQL editor</h1>
-          <p className="truncate text-xs text-text-subtle">
-            <span className="font-mono text-text-muted">{active.currentDatabase}</span>
+    <div className="flex h-full flex-col bg-surface">
+      <PageHeader
+        breadcrumbs={[{ label: connectionLabel }, { label: 'SQL editor', icon: <IconTerminal2 /> }]}
+        titleAdornment={
+          <span className="truncate text-[12px] text-text-subtle">
+            <span>{active.currentDatabase}</span>
             <span className="text-text-subtle/60"> · </span>
             <span>{active.currentUser}</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <CmdKHint variant="input" label="Search tables, connections, actions" />
-          <Button
-            size="sm"
-            variant="ghost"
-            className={cn(
-              'text-text-muted hover:bg-surface-elevated hover:text-text',
-              isAiOpen && 'bg-surface-elevated text-text'
+          </span>
+        }
+        actions={
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className={cn(isAiOpen && 'bg-surface-elevated')}
+              onClick={() => setIsAiOpen((open) => !open)}
+            >
+              <IconSparkles size={14} className="text-accent-text" />
+              Ask AI
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void ai.explain()}
+              disabled={!hasSqlBody(sql)}
+              title="Explain the query in the editor"
+            >
+              <IconBulb size={14} className="text-text-subtle" />
+              Explain
+            </Button>
+            <Sheet
+              openSheet={historyOpen}
+              setOpenSheet={setHistoryOpen}
+              side="right"
+              title="Queries"
+              description="Saved queries and recent runs for this connection"
+              sheetContentClassName="bg-surface"
+              content={
+                <QueryLibrarySheet
+                  queries={queries}
+                  onPick={(picked) => {
+                    setSql(picked)
+                    setHistoryOpen(false)
+                  }}
+                  onToggleStar={(query) => void patchQuery(query, { isStarred: !query.isStarred })}
+                  onRename={(query, name) => void patchQuery(query, { name })}
+                  onDelete={(query) => void removeQuery(query)}
+                  onClearHistory={() => void clearHistory()}
+                />
+              }
+            >
+              <Button
+                size="sm"
+                variant="outline"
+                className={cn(historyOpen && 'bg-surface-elevated')}
+              >
+                <IconHistory size={14} className="text-text-subtle" />
+                Queries
+                {queries.length > 0 && (
+                  <span className="ml-0.5 text-[12px] text-text-subtle tabular-nums">
+                    {queries.length}
+                  </span>
+                )}
+              </Button>
+            </Sheet>
+            <Button size="sm" variant="subtle" onClick={() => setSql('')} disabled={!sql}>
+              <IconTrash size={14} />
+              Clear
+            </Button>
+            {isRunning ? (
+              <Button size="sm" variant="destructive" onClick={cancelRunningQuery}>
+                <IconPlayerStop size={14} />
+                Cancel
+              </Button>
+            ) : (
+              <Button size="sm" onClick={runQuery} disabled={sql.trim() === ''}>
+                <IconPlayerPlay size={14} />
+                Run
+                <Kbd tone="accent" className="ml-0.5">
+                  ⌘↵
+                </Kbd>
+              </Button>
             )}
-            onClick={() => setIsAiOpen((open) => !open)}
-          >
-            <IconSparkles size={12} className="text-accent-text" />
-            Ask AI
-          </Button>
-          <Sheet
-            openSheet={historyOpen}
-            setOpenSheet={setHistoryOpen}
-            side="right"
-            sheetContentClassName="bg-surface"
-            content={
-              <QueryLibrarySheet
-                queries={queries}
-                onPick={(picked) => {
-                  setSql(picked)
-                  setHistoryOpen(false)
-                }}
-                onToggleStar={(query) => void patchQuery(query, { isStarred: !query.isStarred })}
-                onRename={(query, name) => void patchQuery(query, { name })}
-                onDelete={(query) => void removeQuery(query)}
-                onClearHistory={() => void clearHistory()}
-              />
-            }
-          >
-            <Button
-              size="sm"
-              variant="ghost"
-              className={cn(
-                'text-text-muted hover:bg-surface-elevated hover:text-text',
-                historyOpen && 'bg-surface-elevated text-text'
-              )}
-            >
-              <IconHistory size={12} />
-              Queries
-              {queries.length > 0 && (
-                <span className="ml-0.5 rounded bg-surface px-1 py-0 font-mono text-xs text-text-subtle">
-                  {queries.length}
-                </span>
-              )}
-            </Button>
-          </Sheet>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-text-muted hover:bg-surface-elevated hover:text-text"
-            onClick={() => setSql('')}
-            disabled={!sql}
-          >
-            <IconTrash size={12} />
-            Clear
-          </Button>
-          {isRunning ? (
-            <Button
-              size="sm"
-              className="bg-danger-fill text-white shadow-[inset_0_-2px_0_0_var(--color-danger-shade),0_1px_3px_0_rgba(0,0,0,0.4)] hover:bg-danger hover:shadow-none active:shadow-none"
-              onClick={cancelRunningQuery}
-            >
-              <IconPlayerStop size={12} />
-              Cancel
-            </Button>
-          ) : (
-            <Button size="sm" onClick={runQuery} disabled={sql.trim() === ''}>
-              <IconPlayerPlay size={12} />
-              Run
-              <Kbd tone="accent" className="ml-1">
-                ⌘↵
-              </Kbd>
-            </Button>
-          )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div ref={splitRef} className="flex min-w-0 flex-1 flex-col">
-          <div className="min-h-0 overflow-hidden" style={{ height: `${editorPct}%` }}>
+          <div className="min-h-0 overflow-hidden bg-surface" style={{ height: `${editorPct}%` }}>
             <SqlEditor
               value={sql}
               onChange={setSql}
@@ -374,6 +364,8 @@ export function QueryPage() {
             />
           </div>
 
+          {/* A hairline that is easier to grab than it looks: the ::before
+              widens the hit area to 9px without drawing anything. */}
           <div
             onMouseDown={(e) => {
               e.preventDefault()
@@ -395,22 +387,18 @@ export function QueryPage() {
               setEditorPct((pct) => Math.min(MAX_PANEL_PCT, Math.max(MIN_PANEL_PCT, pct + step)))
             }}
             className={cn(
-              'group/handle relative flex h-3 shrink-0 cursor-row-resize items-center justify-center border-y border-border bg-surface outline-none transition-colors focus-visible:bg-accent/20',
-              isDragging && 'hover:bg-surface-elevated'
+              "relative z-10 h-px shrink-0 cursor-row-resize bg-border outline-none transition-colors before:absolute before:inset-x-0 before:-top-1 before:-bottom-1 before:content-[''] hover:bg-accent/50 focus-visible:bg-accent",
+              isDragging && 'bg-accent'
             )}
-          >
-            <IconGripHorizontal
-              stroke={2}
-              size={14}
-              className={cn(
-                'pointer-events-none transition-colors',
-                isDragging ? 'text-text' : 'text-text-subtle group-hover/handle:text-text'
-              )}
-            />
-          </div>
+          />
 
           <div className="min-h-0 flex-1 overflow-hidden">
-            <QueryResults result={result} isRunning={isRunning} />
+            <QueryResults
+              result={result}
+              isRunning={isRunning}
+              onFixWithAi={failedRun ? () => void ai.fix(failedRun) : undefined}
+              isFixing={ai.isFixing}
+            />
           </div>
         </div>
       </div>
@@ -418,9 +406,12 @@ export function QueryPage() {
       <AiPrompt
         open={isAiOpen}
         onOpenChange={setIsAiOpen}
-        onSubmit={handleAiGenerate}
-        isGenerating={isAiGenerating}
+        onSubmit={(prompt, isRevision) => void handleAiGenerate(prompt, isRevision)}
+        isGenerating={ai.isGenerating}
+        canRevise={hasSqlBody(sql)}
       />
+
+      <ExplainQuerySheet explanation={ai.explanation} onClose={ai.closeExplanation} />
 
       <ConfirmDialog
         isOpen={pendingRun != null}

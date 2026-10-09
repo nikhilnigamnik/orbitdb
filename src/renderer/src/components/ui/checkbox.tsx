@@ -1,17 +1,17 @@
-'use client'
-
 import * as React from 'react'
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@renderer/lib/utils'
 
+import { FOCUS_RING } from './focus-ring'
+
 const checkboxVariants = cva(
-  'group relative flex cursor-pointer items-center justify-center rounded-md border border-border-strong bg-input outline-none transition-colors data-[state=checked]:border-0 data-[state=checked]:bg-accent focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50',
+  `group relative flex cursor-pointer items-center justify-center rounded-[4px] border border-border-control bg-surface shadow-[0_1px_1px_0_rgba(0,0,0,0.04)] outline-none transition-colors hover:border-text-subtle data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=indeterminate]:border-accent data-[state=indeterminate]:bg-accent ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-50`,
   {
     variants: {
       size: {
-        xs: 'size-4 p-[1.5px]',
-        sm: 'size-5 p-[2px]',
+        xs: 'size-3.5 p-[1.5px]',
+        sm: 'size-4 p-[2px]',
         default: 'size-4 p-[2px]',
         lg: 'size-7 p-[4px]'
       },
@@ -66,7 +66,7 @@ function CheckboxIndicator({ className, children, ref, ...props }: CheckboxIndic
           viewBox="0 0 24 24"
           strokeWidth="3.5"
           stroke="currentColor"
-          className="size-3.5"
+          className="size-3"
         >
           <path
             strokeLinecap="round"

@@ -1,19 +1,20 @@
-import { ipcMain, app, dialog, shell } from 'electron'
-import { readFile } from 'fs/promises'
-import { homedir } from 'os'
-import { basename, join } from 'path'
+import { ipcMain, app, shell } from 'electron'
 import { safeExternalUrl } from '../app/open-external'
 import { checkForUpdate } from '../app/update-check'
+import { describeError } from '../db/describe-error'
+import { changeTheme } from '../app/theme'
+import { getThemePreference } from '../store/appearance-store'
 import type {
   AiGatewayIds,
   AiSettingsView,
   UsageSummary,
   CascadeDeleteOptions,
-  ConnectionInput,
   CountRowsOptions,
   DdlRequest,
   DistinctValuesOptions,
   ExplainTableOptions,
+  ExplainSqlOptions,
+  FixSqlOptions,
   FilterTableOptions,
   GenerateSeedOptions,
   GenerateSqlOptions,
@@ -27,9 +28,11 @@ import type {
   SuggestIndexesOptions,
   ValueSearchOptions,
   CheckReferencesOptions,
-  SshKeyPick
+  ThemePreference
 } from '../../shared/types'
 import { generateSql } from '../ai/generate-sql'
+import { fixSql } from '../ai/fix-sql'
+import { explainSql } from '../ai/explain-sql'
 import { explainTable } from '../ai/explain-table'
 import { filterTable } from '../ai/filter-table'
 import { suggestIndexes } from '../ai/suggest-indexes'
@@ -57,13 +60,14 @@ import {
   setAiProvider,
   setGatewaySettings
 } from '../store/settings-store'
+import { requireConnection } from '../store/connections-store'
 import {
-  createConnection,
-  deleteConnection,
-  listConnections,
-  requireConnection,
-  updateConnection
-} from '../store/connections-store'
+  createConnectionForRenderer,
+  deleteConnectionForRenderer,
+  listConnectionsForRenderer,
+  testConnectionForRenderer,
+  updateConnectionForRenderer
+} from './connections'
 import {
   cancelQuery,
   cascadeDelete,
@@ -87,7 +91,6 @@ import {
   runQuery,
   searchValue,
   tableDetails,
-  testConnection,
   updateRow
 } from '../db/manager'
 import { clearQueryLogs, listQueryLogs } from '../db/query-log'
@@ -100,7 +103,7 @@ function wrap<TArgs extends unknown[], TResult>(
       const data = await handler(...args)
       return { success: true as const, data }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      const message = describeError(err)
       console.error('[ipc]', message)
       return { success: false as const, error: message }
     }
@@ -108,56 +111,30 @@ function wrap<TArgs extends unknown[], TResult>(
 }
 
 export function registerIpcHandlers(): void {
+  // Secrets never cross back to the renderer: each of these returns the
+  // redacted view, with `hasPassword`/`hasApiToken` in place of the values.
   ipcMain.handle(
     'connections:list',
-    wrap(async () => listConnections())
+    wrap(async () => listConnectionsForRenderer())
   )
   ipcMain.handle(
     'connections:create',
-    wrap(async (input: ConnectionInput) => createConnection(input))
+    wrap(async (input: unknown) => createConnectionForRenderer(input))
   )
   ipcMain.handle(
     'connections:update',
-    wrap(async (id: string, input: ConnectionInput) => {
-      await disconnectPool(id)
-      return updateConnection(id, input)
-    })
+    wrap(async (id: string, input: unknown) => updateConnectionForRenderer(id, input))
   )
   ipcMain.handle(
     'connections:delete',
-    wrap(async (id: string) => {
-      await disconnectPool(id)
-      deleteConnection(id)
-    })
+    wrap(async (id: string) => deleteConnectionForRenderer(id))
   )
   ipcMain.handle(
     'connections:test',
-    wrap(async (input: ConnectionInput) => testConnection(input))
+    wrap(async (input: unknown, connectionId?: string) =>
+      testConnectionForRenderer(input, connectionId)
+    )
   )
-  ipcMain.handle(
-    'connections:pick-ssh-key',
-    wrap(async (): Promise<SshKeyPick | null> => {
-      const result = await dialog.showOpenDialog({
-        title: 'Select an SSH private key',
-        properties: ['openFile', 'showHiddenFiles'],
-        // ~/.ssh is hidden on every platform, so it is not reachable without it.
-        defaultPath: join(homedir(), '.ssh')
-      })
-      const path = result.filePaths[0]
-      if (result.canceled || !path) return null
-      const contents = await readFile(path, 'utf8')
-      if (!contents.includes('PRIVATE KEY')) {
-        throw new Error(
-          `${basename(path)} does not look like a private key. Pick the key itself, not the ` +
-            `matching .pub file.`
-        )
-      }
-      // The contents travel to the renderer so the form can hand them back to be
-      // sealed; the path comes along only as a label of what was picked.
-      return { path, contents }
-    })
-  )
-
   ipcMain.handle(
     'db:connect',
     wrap(async (connectionId: string) => {
@@ -288,6 +265,14 @@ export function registerIpcHandlers(): void {
     wrap(async (opts: GenerateSqlOptions) => generateSql(opts))
   )
   ipcMain.handle(
+    'ai:fix-sql',
+    wrap(async (opts: FixSqlOptions) => fixSql(opts))
+  )
+  ipcMain.handle(
+    'ai:explain-sql',
+    wrap(async (opts: ExplainSqlOptions) => explainSql(opts))
+  )
+  ipcMain.handle(
     'ai:filter-table',
     wrap(async (opts: FilterTableOptions) => filterTable(opts))
   )
@@ -404,6 +389,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'app:check-update',
     wrap(async () => checkForUpdate())
+  )
+  ipcMain.handle(
+    'app:get-theme',
+    wrap((): ThemePreference => getThemePreference())
+  )
+  ipcMain.handle(
+    'app:set-theme',
+    wrap((theme: ThemePreference) => changeTheme(theme))
   )
   ipcMain.handle(
     'app:open-external',

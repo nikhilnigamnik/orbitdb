@@ -8,7 +8,8 @@ import {
   type RunQueryOptions
 } from '../../../../shared/types'
 import { detectCommand, isSchemaChanging } from '../../sql-command'
-import { callD1, invalidateTableDetailsForConnection, loadSaved } from './client'
+import { invalidateIntrospection } from '../../introspection-cache'
+import { callD1, loadSaved } from './client'
 
 const d1Inflight = new Map<string, { controller: AbortController; connectionId: string }>()
 export async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
@@ -23,7 +24,7 @@ export async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
     const fieldNames = entry.results[0] ? Object.keys(entry.results[0]) : []
     const truncated = entry.results.length > MAX_QUERY_RESULT_ROWS
     const rows = truncated ? entry.results.slice(0, MAX_QUERY_RESULT_ROWS) : entry.results
-    if (isSchemaChanging(opts.sql)) invalidateTableDetailsForConnection(opts.connectionId)
+    if (isSchemaChanging(opts.sql)) invalidateIntrospection(opts.connectionId)
     return {
       success: true,
       rows,
@@ -35,7 +36,7 @@ export async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
     }
   } catch (err) {
     // A partially-applied DDL batch can still have changed the schema.
-    if (isSchemaChanging(opts.sql)) invalidateTableDetailsForConnection(opts.connectionId)
+    if (isSchemaChanging(opts.sql)) invalidateIntrospection(opts.connectionId)
     return {
       success: false,
       error: err instanceof Error ? err.message : String(err),

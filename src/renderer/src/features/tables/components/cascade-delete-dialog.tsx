@@ -20,11 +20,11 @@ import { planNeedsWarning, planTableCount, planTotalRows, stepLabel } from '../l
  */
 const DEPTH_INDENT = [
   'pl-[12px]',
-  'pl-[26px]',
-  'pl-[40px]',
-  'pl-[54px]',
-  'pl-[68px]',
-  'pl-[82px]'
+  'pl-[28px]',
+  'pl-[44px]',
+  'pl-[60px]',
+  'pl-[76px]',
+  'pl-[92px]'
 ] as const
 
 /** Ragged widths so the placeholder rows read as a list, not a block. */
@@ -104,74 +104,78 @@ export function CascadeDeleteDialog({
 
   return (
     <Dialog
+      title="Delete with dependents"
       open={isOpen}
       setOpen={(next) => {
         if (!next && !isDeleting) onClose()
       }}
+      className="w-[min(560px,calc(100vw-2rem))]"
       content={
         <div className="flex max-h-[70vh] flex-col">
-          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
-            <IconTrash size={14} className="shrink-0 text-danger" />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-xs font-medium text-text">Delete with dependents</span>
-              <span className="truncate font-mono text-[11px] text-text-subtle">
-                {formatNumber(pks.length)} row{pks.length === 1 ? '' : 's'} in {targetLabel}
-              </span>
-            </div>
+          <div className="flex shrink-0 flex-col gap-0.5 px-5 pt-5 pb-3">
+            <h2 className="text-[15px] font-semibold text-text">Delete with dependents</h2>
+            <span className="truncate text-xs text-text-muted">
+              {formatNumber(pks.length)} row{pks.length === 1 ? '' : 's'} in {targetLabel}
+            </span>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-5 pt-1 pb-5">
             {isPlanning && (
-              <>
-                <div className="flex items-center gap-2 px-3 py-2 text-xs text-text-muted">
+              <div className="shrink-0 overflow-hidden rounded-xl border border-border">
+                <div className="flex h-9 items-center gap-2 border-b border-border px-3 text-xs text-text-muted">
                   <Spinner size={12} />
                   Following foreign keys and counting what goes with it
                 </div>
-                <ul className="divide-y divide-border/60" aria-hidden>
+                <ul className="divide-y divide-border" aria-hidden>
                   {SKELETON_WIDTHS.map((width, i) => (
-                    <li key={i} className="flex items-center gap-3 px-3 py-2.5">
+                    <li key={i} className="flex h-11 items-center gap-3 px-3">
                       <Skeleton className={cn('h-3', width)} />
                       <Skeleton className="ml-auto h-3 w-8 shrink-0" />
                     </li>
                   ))}
                 </ul>
-              </>
+              </div>
             )}
 
             {!isPlanning && error && (
-              <div className="flex items-start gap-2 px-3 py-4 text-xs text-danger">
-                <IconAlertTriangle size={13} className="mt-px shrink-0" />
-                {error}
+              <div className="flex shrink-0 items-start gap-2 rounded-lg border border-danger/15 bg-danger/5 px-3 py-2.5 text-xs text-danger">
+                <IconAlertTriangle size={16} className="shrink-0" />
+                <span className="min-w-0 wrap-break-word">{error}</span>
               </div>
             )}
 
             {/* Detached children count as something depending on the row: they are
                 listed just below, and claiming nothing does would contradict it. */}
             {!isPlanning && plan && plan.steps.length === 0 && plan.detached.length === 0 && (
-              <p className="px-3 py-6 text-center text-xs text-text-muted">
-                Nothing depends on {plan.targetRows === 1 ? 'this row' : 'these rows'}. Deleting is
-                just the delete.
-              </p>
+              <div className="flex flex-col items-center gap-3 py-6 text-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-elevated text-text-subtle">
+                  <IconTrash size={20} />
+                </div>
+                <p className="max-w-sm text-xs text-text-muted">
+                  Nothing depends on {plan.targetRows === 1 ? 'this row' : 'these rows'}. Deleting
+                  is just the delete.
+                </p>
+              </div>
             )}
 
             {!isPlanning && plan && plan.steps.length > 0 && (
-              <ul className="divide-y divide-border/60">
+              <PlanGroup icon={<IconTrash size={14} />} label="Deleted with it">
                 {plan.steps.map((step) => (
                   <li
                     key={`${step.schema}.${step.table}.${step.constraintName}.${step.depth}`}
                     // Indented by hop, so a grandchild reads as one - the delete
                     // order is bottom-up and the nesting is what explains why.
                     className={cn(
-                      'flex items-center gap-2 py-2 pr-3',
+                      'flex min-h-11 items-center gap-2 py-1.5 pr-3',
                       DEPTH_INDENT[Math.min(step.depth, DEPTH_INDENT.length) - 1]
                     )}
                   >
                     {step.depth > 1 && (
-                      <IconCornerDownRight size={11} className="shrink-0 text-text-subtle/60" />
+                      <IconCornerDownRight size={14} className="shrink-0 text-text-subtle" />
                     )}
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex min-w-0 flex-1 flex-col">
                       <div className="flex items-center gap-2">
-                        <span className="truncate font-mono text-xs text-text">
+                        <span className="truncate text-sm font-medium text-text">
                           {stepLabel(step, schema)}
                         </span>
                         {/* Already the schema's own rule - these were going anyway. */}
@@ -179,52 +183,44 @@ export function CascadeDeleteDialog({
                           <Chip tone="neutral">cascade</Chip>
                         )}
                       </div>
-                      <span className="truncate font-mono text-[10px] text-text-subtle">
+                      <span className="truncate text-[12px] text-text-subtle">
                         {step.columns.join(', ')} → {step.parentTable}
                       </span>
                     </div>
-                    <span className="shrink-0 font-mono text-xs tabular-nums text-danger">
+                    <span className="shrink-0 text-sm font-medium tabular-nums text-danger">
                       {formatNumber(step.rowCount)}
                     </span>
                   </li>
                 ))}
-              </ul>
+              </PlanGroup>
             )}
 
             {!isPlanning && plan && plan.detached.length > 0 && (
-              <div className="border-t border-border">
-                <div className="flex items-center gap-1.5 px-3 py-1.5">
-                  <IconEraser size={11} className="text-text-subtle" />
-                  <span className="text-[10px] font-semibold tracking-wide text-text-muted uppercase">
-                    Kept, reference cleared
-                  </span>
-                </div>
-                <ul className="divide-y divide-border/60">
-                  {plan.detached.map((step) => (
-                    <li
-                      key={`${step.schema}.${step.table}.${step.constraintName}`}
-                      className="flex items-center gap-2 px-3 py-2"
-                    >
-                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate font-mono text-xs text-text">
-                          {stepLabel(step, schema)}
-                        </span>
-                        <span className="truncate font-mono text-[10px] text-text-subtle">
-                          {step.columns.join(', ')} · {step.onDelete.toLowerCase()}
-                        </span>
-                      </div>
-                      <span className="shrink-0 font-mono text-xs tabular-nums text-text-muted">
-                        {formatNumber(step.rowCount)}
+              <PlanGroup icon={<IconEraser size={14} />} label="Kept, reference cleared">
+                {plan.detached.map((step) => (
+                  <li
+                    key={`${step.schema}.${step.table}.${step.constraintName}`}
+                    className="flex min-h-11 items-center gap-2 px-3 py-1.5"
+                  >
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm font-medium text-text">
+                        {stepLabel(step, schema)}
                       </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                      <span className="truncate text-[12px] text-text-subtle">
+                        {step.columns.join(', ')} · {step.onDelete.toLowerCase()}
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-sm tabular-nums text-text-muted">
+                      {formatNumber(step.rowCount)}
+                    </span>
+                  </li>
+                ))}
+              </PlanGroup>
             )}
 
             {!isPlanning && plan && planNeedsWarning(plan) && (
-              <div className="flex items-start gap-2 border-t border-border bg-warning/8 px-3 py-2 text-[11px] text-warning">
-                <IconAlertTriangle size={12} className="mt-px shrink-0" />
+              <div className="flex shrink-0 items-start gap-2 rounded-lg border border-warning/20 bg-warning/5 px-3 py-2.5 text-xs text-warning">
+                <IconAlertTriangle size={16} className="shrink-0" />
                 <span>
                   {plan.isTruncated &&
                     'The chain goes deeper than this walk follows, so the counts are a lower bound and the delete may still be refused. '}
@@ -235,13 +231,13 @@ export function CascadeDeleteDialog({
             )}
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-2">
-            <span className="flex-1 text-[11px] text-text-subtle">
+          <div className="flex shrink-0 items-center gap-2 border-t border-border px-5 py-4">
+            <span className="flex-1 text-xs text-text-muted tabular-nums">
               {plan
                 ? `${formatNumber(planTotalRows(plan))} row${planTotalRows(plan) === 1 ? '' : 's'} across ${planTableCount(plan)} table${planTableCount(plan) === 1 ? '' : 's'}`
                 : 'Reading the foreign key graph'}
             </span>
-            <Button size="sm" variant="ghost" onClick={onClose} disabled={isDeleting}>
+            <Button size="sm" variant="outline" onClick={onClose} disabled={isDeleting}>
               Cancel
             </Button>
             <Button
@@ -261,5 +257,28 @@ export function CascadeDeleteDialog({
         </div>
       }
     />
+  )
+}
+
+/** One hairline card per kind of consequence, headed the way Attio labels a group. */
+function PlanGroup({
+  icon,
+  label,
+  children
+}: {
+  icon: React.ReactNode
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex shrink-0 flex-col gap-1.5">
+      <div className="flex items-center gap-1.5 px-0.5 text-text-subtle">
+        {icon}
+        <span className="text-[12px] font-medium">{label}</span>
+      </div>
+      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+        {children}
+      </ul>
+    </div>
   )
 }

@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import {
   AI_PROVIDERS,
   currentAiModelId,
@@ -12,6 +12,7 @@ import {
   type AiProviderId
 } from '../../shared/ai-models'
 import { decryptString, encryptString, isEncrypted, isEncryptionAvailable } from './crypto'
+import { quarantineJsonFile, readJsonFile, writeJsonFileAtomic } from './json-file'
 
 const FILE_NAME = 'settings.json'
 
@@ -98,17 +99,16 @@ function parseGateway(value: unknown): GatewaySettings {
 
 function parseFile(): StoreShape {
   const path = storePath()
-  if (!existsSync(path)) return emptyState()
-
-  let parsed: { ai?: Record<string, unknown>; gateway?: unknown }
-  try {
-    parsed = JSON.parse(readFileSync(path, 'utf8'))
-  } catch {
-    return emptyState()
-  }
+  const parsed = readJsonFile(path) as
+    | { ai?: Record<string, unknown>; gateway?: unknown }
+    | undefined
+  if (parsed === undefined) return emptyState()
 
   const ai = parsed?.ai
-  if (!ai || typeof ai !== 'object') return emptyState()
+  if (!ai || typeof ai !== 'object') {
+    quarantineJsonFile(path, 'no ai block')
+    return emptyState()
+  }
 
   const state = emptyState()
   state.gateway = parseGateway(parsed.gateway)
@@ -145,7 +145,7 @@ function readRaw(): StoreShape {
 }
 
 function writeRaw(state: StoreShape): void {
-  writeFileSync(storePath(), JSON.stringify(state, null, 2), 'utf8')
+  writeJsonFileAtomic(storePath(), state, 2)
   rawCache = state
   decryptedCache = null
 }

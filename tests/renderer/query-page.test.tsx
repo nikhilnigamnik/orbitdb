@@ -10,6 +10,8 @@ import type { SavedQuery } from '@renderer/types'
 
 const runQuery = vi.fn()
 const generateSql = vi.fn()
+const fixSql = vi.fn()
+const explainSql = vi.fn()
 const listQueries = vi.fn()
 const recordQuery = vi.fn()
 const updateQuery = vi.fn()
@@ -80,6 +82,8 @@ function savedQuery(overrides: Partial<SavedQuery> = {}): SavedQuery {
 beforeEach(() => {
   runQuery.mockReset().mockResolvedValue({ success: true, data: OK })
   generateSql.mockReset()
+  fixSql.mockReset()
+  explainSql.mockReset()
   listQueries.mockReset().mockResolvedValue({ success: true, data: [] })
   recordQuery.mockReset().mockResolvedValue({ success: true, data: savedQuery() })
   updateQuery.mockReset().mockResolvedValue({ success: true, data: savedQuery() })
@@ -92,7 +96,7 @@ beforeEach(() => {
         runQuery,
         cancelQuery: vi.fn().mockResolvedValue({ success: true, data: undefined })
       },
-      ai: { generateSql },
+      ai: { generateSql, fixSql, explainSql },
       queries: {
         list: listQueries,
         record: recordQuery,
@@ -192,7 +196,7 @@ describe('generated SQL', () => {
     await setup()
 
     fireEvent.click(await screen.findByRole('button', { name: /ask ai/i }))
-    const prompt = await screen.findByPlaceholderText(/Describe the query/)
+    const prompt = await screen.findByPlaceholderText(/Describe the/)
     fireEvent.change(prompt, { target: { value: 'remove the test users' } })
     fireEvent.keyDown(prompt, { key: 'Enter' })
 
@@ -315,14 +319,63 @@ describe('the query library', () => {
     expect(button.disabled).toBe(true)
   })
 
-  it('clears the history for this connection alone', async () => {
+  it('clears the history for this connection alone, once confirmed', async () => {
     listQueries.mockResolvedValue({ success: true, data: [savedQuery()] })
     await setup()
     await openLibrary()
 
     fireEvent.click(await screen.findByLabelText('Clear history'))
+    expect(await screen.findByText('Clear query history?')).toBeTruthy()
+    expect(clearHistory, 'nothing is cleared before the confirm').not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /^clear history$/i }))
 
     await waitFor(() => expect(clearHistory).toHaveBeenCalledWith('c1'))
+  })
+
+  it('asks before deleting a saved query', async () => {
+    listQueries.mockResolvedValue({
+      success: true,
+      data: [savedQuery({ id: 'a', isStarred: true, name: 'Daily count' })]
+    })
+    await setup()
+    await openLibrary()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete query' }))
+    expect(await screen.findByText('Delete this saved query?')).toBeTruthy()
+    expect(deleteQuery).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    await waitFor(() => expect(deleteQuery).toHaveBeenCalledWith('a'))
+  })
+
+  it('deletes a history entry at once, since a re-run recreates it', async () => {
+    listQueries.mockResolvedValue({ success: true, data: [savedQuery({ id: 'b' })] })
+    await setup()
+    await openLibrary()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete query' }))
+    await waitFor(() => expect(deleteQuery).toHaveBeenCalledWith('b'))
+  })
+
+  it('keeps the name field out of the button that loads the query', async () => {
+    listQueries.mockResolvedValue({
+      success: true,
+      data: [savedQuery({ id: 'a', sql: 'select kept', isStarred: true })]
+    })
+    await setup()
+    await openLibrary()
+
+    const nameField = await screen.findByLabelText('Query name')
+    expect(nameField.closest('button')).toBeNull()
+    fireEvent.click(nameField)
+    expect(editorText()).not.toBe('select kept')
+  })
+
+  it('says so when the saved queries cannot be read', async () => {
+    listQueries.mockResolvedValue({ success: false, error: 'queries.json is unreadable' })
+    await setup()
+    expect(await screen.findByText('Could not load saved queries')).toBeTruthy()
   })
 })
 
@@ -333,7 +386,7 @@ describe('generated SQL over an unsaved draft', () => {
     typeSql(draft)
 
     fireEvent.click(await screen.findByRole('button', { name: /ask ai/i }))
-    const prompt = await screen.findByPlaceholderText(/Describe the query/)
+    const prompt = await screen.findByPlaceholderText(/Describe the/)
     fireEvent.change(prompt, { target: { value: 'all users' } })
     fireEvent.keyDown(prompt, { key: 'Enter' })
 
@@ -351,5 +404,154 @@ describe('generated SQL over an unsaved draft', () => {
   it('says nothing when there was nothing to lose', async () => {
     await generateOver('   ')
     expect(screen.queryByText('Replaced the editor contents')).toBeNull()
+  })
+})
+
+describe('asking AI about the query in the editor', () => {
+  async function ask(text: string, mode?: 'New query') {
+    fireEvent.click(await screen.findByRole('button', { name: /ask ai/i }))
+    if (mode) fireEvent.click(await screen.findByRole('button', { name: mode }))
+    const prompt = await screen.findByPlaceholderText(/Describe the/)
+    fireEvent.change(prompt, { target: { value: text } })
+    fireEvent.keyDown(prompt, { key: 'Enter' })
+  }
+
+  it('edits the existing query by default, sending it along', async () => {
+    generateSql.mockResolvedValue({ success: true, data: { sql: 'select * from users limit 5' } })
+    await setup()
+    typeSql('select * from users')
+
+    await ask('only five')
+
+    await waitFor(() =>
+      expect(generateSql).toHaveBeenCalledWith({
+        connectionId: 'c1',
+        prompt: 'only five',
+        currentSql: 'select * from users'
+      })
+    )
+    await waitFor(() => expect(editorText()).toBe('select * from users limit 5'))
+  })
+
+  it('writes from scratch when asked for a new query', async () => {
+    generateSql.mockResolvedValue({ success: true, data: { sql: 'select 2' } })
+    await setup()
+    typeSql('select * from users')
+
+    await ask('something else', 'New query')
+
+    await waitFor(() => expect(generateSql).toHaveBeenCalled())
+    expect(generateSql.mock.calls[0][0].currentSql).toBeUndefined()
+  })
+
+  it('does not offer editing when the editor holds only comments', async () => {
+    generateSql.mockResolvedValue({ success: true, data: { sql: 'select 3' } })
+    await setup()
+    typeSql('-- Write SQL here')
+
+    fireEvent.click(await screen.findByRole('button', { name: /ask ai/i }))
+    await screen.findByPlaceholderText(/Describe the query/)
+    expect(screen.queryByRole('button', { name: 'Edit current query' })).toBeNull()
+  })
+})
+
+describe('fixing a failed query', () => {
+  const FAILED = {
+    success: false,
+    error: 'column "emial" does not exist',
+    rows: [],
+    fields: [],
+    rowCount: null,
+    command: null,
+    durationMs: 2,
+    truncated: false
+  }
+
+  it('sends the failed SQL and the database error, and puts the fix in the editor', async () => {
+    runQuery.mockResolvedValue({ success: true, data: FAILED })
+    fixSql.mockResolvedValue({
+      success: true,
+      data: {
+        sql: 'select email from users',
+        explanation: 'The column is "email".',
+        isChanged: true
+      }
+    })
+    await setup()
+    typeSql('select emial from users')
+    pressRun()
+
+    fireEvent.click(await screen.findByRole('button', { name: /fix with ai/i }))
+
+    await waitFor(() =>
+      expect(fixSql).toHaveBeenCalledWith({
+        connectionId: 'c1',
+        sql: 'select emial from users',
+        error: 'column "emial" does not exist'
+      })
+    )
+    await waitFor(() => expect(editorText()).toBe('select email from users'))
+    expect(runQuery, 'a fix is reviewed, not run').toHaveBeenCalledTimes(1)
+    await screen.findByText('The column is "email".')
+
+    fireEvent.click(await screen.findByText('Undo'))
+    expect(editorText()).toBe('select emial from users')
+  })
+
+  it('leaves the editor alone when the error is not the query', async () => {
+    runQuery.mockResolvedValue({ success: true, data: { ...FAILED, error: 'permission denied' } })
+    fixSql.mockResolvedValue({
+      success: true,
+      data: {
+        sql: 'select 1',
+        explanation: 'Ask an admin for SELECT on users.',
+        isChanged: false
+      }
+    })
+    await setup()
+    typeSql('select 1')
+    pressRun()
+
+    fireEvent.click(await screen.findByRole('button', { name: /fix with ai/i }))
+
+    await screen.findByText('The query itself looks right')
+    expect(editorText()).toBe('select 1')
+  })
+
+  it('is not offered after a query that worked', async () => {
+    await setup()
+    typeSql('select 1')
+    pressRun()
+    await waitFor(() => expect(runQuery).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: /fix with ai/i })).toBeNull()
+  })
+})
+
+describe('explaining the query', () => {
+  it('explains the SQL in the editor in a side sheet', async () => {
+    explainSql.mockResolvedValue({
+      success: true,
+      data: { explanation: 'Returns every **user**.' }
+    })
+    await setup()
+    typeSql('select * from users')
+
+    fireEvent.click(await screen.findByRole('button', { name: /^explain$/i }))
+
+    await waitFor(() =>
+      expect(explainSql).toHaveBeenCalledWith({ connectionId: 'c1', sql: 'select * from users' })
+    )
+    await screen.findByText('user')
+    expect(screen.getByRole('dialog', { name: 'Explain query' })).toBeTruthy()
+  })
+
+  it('cannot be asked about an empty editor', async () => {
+    await setup()
+    typeSql('  ')
+    await waitFor(() =>
+      expect(
+        (screen.getByRole('button', { name: /^explain$/i }) as HTMLButtonElement).disabled
+      ).toBe(true)
+    )
   })
 })

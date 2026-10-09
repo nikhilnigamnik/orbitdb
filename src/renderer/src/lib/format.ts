@@ -63,10 +63,6 @@ export function formatNumber(value: number | null | undefined): string {
   return new Intl.NumberFormat().format(value)
 }
 
-export function shortPostgresVersion(version: string): string {
-  return shortServerVersion(version)
-}
-
 export function shortServerVersion(version: string): string {
   if (!version) return ''
   const pg = version.match(/PostgreSQL\s+([\d.]+)/i)

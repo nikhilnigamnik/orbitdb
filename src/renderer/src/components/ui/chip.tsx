@@ -2,20 +2,21 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@renderer/lib/utils'
 
-// No ring: the tinted fill already separates a chip from the surface, and the
-// edge on top of it read as a second border wherever chips sit inside a card.
+// Attio's tag: a mixed-case pill on a soft tint of its own colour, no ring. The
+// ink is the darker *-text shade, since the bright fill colour as 12px text on
+// its own tint stays under 4.5:1.
 const chipVariants = cva(
-  'inline-flex shrink-0 items-center gap-1 rounded-sm px-2 h-4 text-[10px] font-semibold uppercase leading-none tracking-[0.08em]',
+  'inline-flex h-5 shrink-0 items-center gap-1 rounded-md px-1.5 text-[12px] font-medium leading-none tracking-normal',
   {
     variants: {
       tone: {
-        emerald: 'bg-success/12 text-success',
-        amber: 'bg-warning/12 text-warning',
-        rose: 'bg-danger/12 text-danger',
-        sky: 'bg-info/12 text-info',
-        accent: 'bg-accent-text/12 text-accent-text',
-        orange: 'bg-orange/12 text-orange',
-        neutral: 'bg-text-muted/12 text-text-muted'
+        emerald: 'bg-success/10 text-success-text',
+        amber: 'bg-warning/12 text-warning-text',
+        rose: 'bg-danger/10 text-danger-text',
+        sky: 'bg-info/10 text-info-text',
+        accent: 'bg-accent/10 text-info-text',
+        orange: 'bg-orange/10 text-orange-text',
+        neutral: 'bg-surface-active text-text-muted'
       }
     },
     defaultVariants: { tone: 'neutral' }

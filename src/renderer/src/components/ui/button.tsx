@@ -3,52 +3,50 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { Slot } from 'radix-ui'
 import { cn } from '@renderer/lib/utils'
 
+import { FOCUS_RING } from './focus-ring'
+
 const buttonVariants = cva(
-  "group/button inline-flex  cursor-pointer shrink-0 rounded-lg items-center justify-center border border-transparent bg-clip-padding text-xs font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-accent-text focus-visible:ring-3 focus-visible:ring-accent-text/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-danger aria-invalid:ring-3 aria-invalid:ring-danger/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  `group/button inline-flex cursor-pointer shrink-0 items-center justify-center rounded-lg border border-transparent text-xs font-medium whitespace-nowrap transition-[background-color,box-shadow,color] outline-none select-none ${FOCUS_RING} disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-danger aria-invalid:ring-[3px] aria-invalid:ring-danger/15 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4`,
   {
     variants: {
       variant: {
+        // Attio's primary: a flat blue fill with a blue-tinted drop rather than a bevel.
         default:
-          'bg-accent text-accent-fg shadow-[inset_0_-2px_0_0_var(--color-accent-shade),0_1px_3px_0_rgba(0,0,0,0.4)] hover:bg-accent-hover hover:shadow-none active:shadow-none active:not-aria-[haspopup]:scale-[.99]',
+          'bg-accent text-accent-fg shadow-primary hover:bg-accent-hover active:bg-accent-shade',
+        // The secondary family has no border at all - the hairline halo in
+        // shadow-control draws the edge, which is what keeps Attio's controls light.
         outline:
-          'border-border-strong bg-transparent text-text hover:border-text-muted/35 hover:bg-surface-elevated aria-expanded:bg-surface-elevated',
+          'bg-control text-text shadow-control hover:bg-control-hover aria-expanded:bg-control-hover',
         secondary:
-          'border border-border-strong bg-surface-elevated text-text hover:border-text-muted/35 hover:bg-surface-elevated/70 aria-expanded:bg-surface-elevated',
+          'bg-control text-text shadow-control hover:bg-control-hover aria-expanded:bg-control-hover',
         ghost:
-          'rounded-md border border-border-strong bg-surface-elevated/40 px-3 text-text-muted hover:border-text-muted/35 hover:bg-surface-elevated hover:text-text aria-expanded:bg-surface-elevated',
-        // Kbd's hairline over a whisper - for controls that should sit quietly
-        // beside a field. Keep these two tokens in step with kbd.tsx.
+          'bg-control text-text shadow-control hover:bg-control-hover aria-expanded:bg-control-hover',
         subtle:
-          'rounded-md border-text-muted/15 bg-text-muted/8 text-text-muted hover:bg-text-muted/15 hover:text-text aria-expanded:bg-text-muted/15',
+          'bg-transparent text-text-muted hover:bg-surface-elevated hover:text-text aria-expanded:bg-surface-elevated aria-expanded:text-text',
         destructive:
-          'bg-danger/10 text-danger hover:bg-danger/20 focus-visible:border-danger/40 focus-visible:ring-danger/20',
+          'bg-danger-fill text-white shadow-[0_1px_2px_-1px_rgba(224,56,62,0.45)] hover:bg-danger-shade focus-visible:outline-danger',
         link: 'text-accent-text underline-offset-4 hover:underline'
       },
       size: {
         default:
-          "h-7 gap-1 px-3.5 rounded-[min(var(--radius-md),12px)]  text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        xs: "h-6 gap-1 px-3.5 rounded-[min(var(--radius-md),10px)] text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 px-3.5 rounded-[min(var(--radius-md),12px)] text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: 'h-9 gap-1.5 px-4.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
+          "h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3.5",
+        xs: "h-6 gap-1 rounded-md px-2 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-7 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3.5",
+        lg: 'h-8 gap-1.5 px-3 text-sm has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5',
         icon: 'size-8',
-        'icon-xs':
-          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-        'icon-sm':
-          'size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg',
+        'icon-xs': "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3.5",
+        'icon-sm': "size-7 [&_svg:not([class*='size-'])]:size-4",
         'icon-lg': 'size-9'
       },
       tone: {
         default: '',
-        emerald:
-          'border-transparent bg-success/12 text-success ring-1 ring-inset ring-success/30 hover:bg-success/20 hover:brightness-110',
-        amber:
-          'border-transparent bg-warning/12 text-warning ring-1 ring-inset ring-warning/30 hover:bg-warning/20 hover:brightness-110',
-        rose: 'border-transparent bg-danger/12 text-danger ring-1 ring-inset ring-danger/30 hover:bg-danger/20 hover:brightness-110',
-        sky: 'border-transparent bg-info/12 text-info ring-1 ring-inset ring-info/30 hover:bg-info/20 hover:brightness-110',
-        orange:
-          'border-transparent bg-orange/12 text-orange ring-1 ring-inset ring-orange/30 hover:bg-orange/20 hover:brightness-110',
+        emerald: 'bg-success/10 text-success-text shadow-none hover:bg-success/15',
+        amber: 'bg-warning/10 text-warning-text shadow-none hover:bg-warning/15',
+        rose: 'bg-danger/10 text-danger-text shadow-none hover:bg-danger/15',
+        sky: 'bg-info/10 text-info-text shadow-none hover:bg-info/15',
+        orange: 'bg-orange/10 text-orange-text shadow-none hover:bg-orange/15',
         neutral:
-          'border-transparent bg-text-muted/12 text-text-muted ring-1 ring-inset ring-text-muted/25 hover:bg-text-muted/20 hover:text-text'
+          'bg-surface-elevated text-text-muted shadow-none hover:bg-surface-active hover:text-text'
       }
     },
     defaultVariants: {

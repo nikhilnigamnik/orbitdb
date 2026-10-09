@@ -8,10 +8,10 @@ import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { TableDataView } from '@renderer/features/tables/components/table-data-view'
 import { ROUTES, tableRoute } from '@renderer/config/routes'
-import { pushRecent } from '@renderer/features/database/lib/table-prefs'
+import { pushRecent, renameTableRef } from '@renderer/features/database/lib/table-prefs'
+import { moveViewPrefs } from '@renderer/features/tables/lib/view-prefs'
+import { emitSchemaTablesChanged } from '@renderer/features/database/lib/schema-events'
 import type { DdlOperation, DdlFormKind, TableDetails } from '@renderer/types'
-import { SchemaTree } from './schema-tree'
-import { ValueSearchDialog } from './value-search-dialog'
 import { TableHeader } from './table-header'
 import { TableStructure } from './table-structure'
 import { StructureAi } from './structure-ai'
@@ -39,20 +39,6 @@ export function DatabasePage() {
   const schema = searchParams.get('schema') ?? ''
   const table = searchParams.get('table') ?? ''
   const view = searchParams.get('view')
-  const [isSearchOpen, setIsSearchOpen] = React.useState(false)
-
-  // Mod+Shift+F rather than Mod+F: plain Mod+F is the filter people expect
-  // inside the current table, and a whole-database sweep is not that.
-  React.useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        setIsSearchOpen(true)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
   const [activeTab, setActiveTab] = React.useState<'data' | 'structure'>(
     view === 'structure' ? 'structure' : 'data'
   )
@@ -92,64 +78,30 @@ export function DatabasePage() {
 
   if (!active) {
     return (
-      <main className="flex flex-1 overflow-hidden rounded-xl border border-border bg-surface shadow-lg shadow-black/20">
+      <main className="flex min-w-0 flex-1 overflow-hidden bg-surface">
         <ConnectionPicker />
       </main>
     )
   }
 
   return (
-    <>
-      <ValueSearchDialog
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        connectionId={active.connectionId}
-        schema={schema}
-      />
-      <aside className="flex h-full w-56 shrink-0 flex-col overflow-hidden rounded-xl bg-surface shadow-lg shadow-black/20">
-        <SchemaTreeContainer connectionId={active.connectionId} />
-      </aside>
-      <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-surface shadow-lg shadow-black/20">
-        {schema && table ? (
-          <TableViewContainer
-            // The connection belongs in the key: two connections can both
-            // have public.users, and without it switching between them keeps the
-            // same mounted view - saved views, filters and prefs included.
-            key={`${active.connectionId}:${schema}.${table}`}
-            connectionId={active.connectionId}
-            schema={schema}
-            table={table}
-            activeTab={activeTab}
-            onChangeTab={setActiveTab}
-          />
-        ) : (
-          <ConnectionOverview connectionId={active.connectionId} schema={schema} />
-        )}
-      </main>
-    </>
-  )
-}
-
-function SchemaTreeContainer({ connectionId }: { connectionId: string }) {
-  const { data, error, isLoading, refresh } = useAsync(
-    async () => unwrap(window.api.db.listSchemas(connectionId)),
-    [connectionId]
-  )
-  const schemas = (data ?? []).map((s) => s.name)
-  if (error) {
-    return (
-      <div className="p-3">
-        <ErrorState message={error} onRetry={refresh} />
-      </div>
-    )
-  }
-  return (
-    <SchemaTree
-      connectionId={connectionId}
-      schemas={schemas}
-      onRefresh={refresh}
-      isLoading={isLoading}
-    />
+    <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-surface">
+      {schema && table ? (
+        <TableViewContainer
+          // The connection belongs in the key: two connections can both
+          // have public.users, and without it switching between them keeps the
+          // same mounted view - saved views, filters and prefs included.
+          key={`${active.connectionId}:${schema}.${table}`}
+          connectionId={active.connectionId}
+          schema={schema}
+          table={table}
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
+        />
+      ) : (
+        <ConnectionOverview connectionId={active.connectionId} schema={schema} />
+      )}
+    </main>
   )
 }
 
@@ -179,7 +131,8 @@ function TableViewContainer({
   // The header reports the table's own size, unfiltered - the pagination bar
   // answers the different question of how many rows the current filters match.
   // Null while it loads, and for tables too large to count, where the header
-  // falls back to the estimate.
+  // falls back to the estimate. The data view borrows it while no filter is set
+  // rather than running the same count a second time.
   const [totalRows, setTotalRows] = React.useState<number | null>(null)
   React.useEffect(() => {
     let cancelled = false
@@ -216,6 +169,14 @@ function TableViewContainer({
 
   function handleDdlSuccess(operation: DdlOperation) {
     if (operation.kind === 'rename-table' && data) {
+      renameTableRef(
+        connectionId,
+        { schema: data.schema, table: data.name },
+        { schema: data.schema, table: operation.to }
+      )
+      moveViewPrefs(connectionId, data.schema, data.name, operation.to)
+      // The sidebar lists tables by name, and only re-reads them when told.
+      emitSchemaTablesChanged(connectionId, data.schema)
       navigate(tableRoute(data.schema, operation.to), { replace: true })
       return
     }
@@ -243,6 +204,7 @@ function TableViewContainer({
           activeTab={activeTab}
           onChangeTab={onChangeTab}
           totalRows={totalRows}
+          onOpenSchema={() => navigate(ROUTES.database)}
         />
       )}
       {activeTab === 'data' ? (
@@ -252,6 +214,7 @@ function TableViewContainer({
           engine={engine}
           onRenameTable={canEdit ? () => openDdl('rename-table') : undefined}
           onReady={() => setHeaderShown(true)}
+          unfilteredTotal={totalRows}
         />
       ) : (
         <TableStructure

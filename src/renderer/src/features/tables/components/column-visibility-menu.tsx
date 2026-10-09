@@ -12,6 +12,7 @@ import { Button } from '@renderer/components/ui/button'
 import { SlidingHoverList } from '@renderer/components/ui/sliding-hover-list'
 import { cn } from '@renderer/lib/utils'
 import type { ColumnInfo } from '@renderer/types'
+import { ColumnTypeIcon } from './column-type-icon'
 
 interface ColumnVisibilityMenuProps {
   columns: ColumnInfo[]
@@ -70,8 +71,8 @@ export function ColumnVisibilityMenu({
           <div className="border-b border-border px-2 py-1">
             <div className="relative">
               <IconSearch
-                size={12}
-                className="absolute top-1/2 left-2.5 -translate-y-1/2 text-text-subtle"
+                size={14}
+                className="absolute top-1/2 left-2 -translate-y-1/2 text-text-subtle"
               />
               <input
                 autoFocus
@@ -106,15 +107,11 @@ export function ColumnVisibilityMenu({
                           onClick={() => onToggle(column.name)}
                           title={isHidden ? 'Show this column' : 'Hide this column'}
                           className={cn(
-                            'flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left',
+                            'flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 text-left',
                             isLastVisible && 'cursor-default'
                           )}
                         >
-                          {isHidden ? (
-                            <IconEyeOff size={14} className="shrink-0 text-text-subtle" />
-                          ) : (
-                            <IconEye size={14} className="shrink-0 text-text-muted" />
-                          )}
+                          <ColumnTypeIcon column={column} size={16} />
                           <span
                             className={cn(
                               'min-w-0 flex-1 truncate text-xs',
@@ -123,9 +120,11 @@ export function ColumnVisibilityMenu({
                           >
                             {column.name}
                           </span>
-                          <span className="shrink-0 font-mono text-xs text-text-subtle">
-                            {column.udtName || column.dataType}
-                          </span>
+                          {isHidden ? (
+                            <IconEyeOff size={16} className="shrink-0 text-text-subtle" />
+                          ) : (
+                            <IconEye size={16} className="shrink-0 text-text-subtle" />
+                          )}
                         </button>
                         <button
                           type="button"
@@ -142,12 +141,12 @@ export function ColumnVisibilityMenu({
                             isFrozen ? `Unpin ${column.name}` : `Pin ${column.name} to the left`
                           }
                           className={cn(
-                            'flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded transition-colors hover:bg-surface',
+                            'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-surface-active',
                             'disabled:cursor-default disabled:opacity-20 disabled:hover:bg-transparent',
                             isFrozen ? 'text-accent-text' : 'text-text-subtle hover:text-text'
                           )}
                         >
-                          {isFrozen ? <IconPinFilled size={12} /> : <IconPin size={12} />}
+                          {isFrozen ? <IconPinFilled size={14} /> : <IconPin size={14} />}
                         </button>
                       </div>
                     </SlidingHoverList.Item>
@@ -157,8 +156,8 @@ export function ColumnVisibilityMenu({
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-1.5">
-            <span className="text-xs text-text-subtle">
+          <div className="flex h-10 items-center justify-between gap-2 border-t border-border px-3">
+            <span className="text-[12px] text-text-subtle tabular-nums">
               {visibleCount} of {columns.length} shown
               {frozenColumns.length > 0 && ` · ${frozenColumns.length} pinned`}
             </span>
@@ -166,7 +165,7 @@ export function ColumnVisibilityMenu({
               type="button"
               onClick={onShowAll}
               disabled={hiddenCount === 0}
-              className="cursor-pointer text-xs text-text-muted transition-colors hover:text-text disabled:cursor-default disabled:opacity-40 disabled:hover:text-text-muted"
+              className="cursor-pointer rounded-md px-1.5 py-0.5 text-xs font-medium text-text-muted transition-colors hover:bg-surface-elevated hover:text-text disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-muted"
             >
               Show all
             </button>
@@ -174,19 +173,11 @@ export function ColumnVisibilityMenu({
         </div>
       }
     >
-      <Button
-        size="sm"
-        variant="ghost"
-        className={cn(
-          'text-text-muted hover:bg-surface-elevated hover:text-text',
-          (hiddenCount > 0 || isOpen) && 'bg-surface-elevated text-text'
-        )}
-        title="Show or hide columns"
-      >
-        <IconColumns3 size={12} />
+      <Button size="sm" variant="outline" title="Show or hide columns">
+        <IconColumns3 size={14} className="text-text-subtle" />
         Columns
         {hiddenCount > 0 && (
-          <span className="ml-0.5 rounded bg-surface px-1 py-0 font-mono text-xs text-text-subtle">
+          <span className="text-[12px] font-normal text-text-subtle tabular-nums">
             {visibleCount}/{columns.length}
           </span>
         )}

@@ -1,7 +1,14 @@
+// Sandboxed: this file may import only what a sandboxed preload can require
+// (contextBridge, ipcRenderer) and read only `process.platform`. Anything else
+// fails at load and leaves the renderer with no `window.api` at all.
 import { contextBridge, ipcRenderer } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
 import type {
   ActiveConnectionMeta,
+  ExplainSqlOptions,
+  ExplainSqlResult,
+  FixSqlOptions,
+  FixSqlResult,
+  ThemePreference,
   AiModelId,
   AiProviderId,
   AiGatewayIds,
@@ -44,7 +51,6 @@ import type {
   TableInfo,
   UsageSummary,
   TestConnectionResult,
-  SshKeyPick,
   UpdateCheckResult,
   ValueSearchOptions,
   ValueSearchResult,
@@ -64,8 +70,9 @@ const api = {
     update: (id: string, input: ConnectionInput) =>
       invoke<SavedConnection>('connections:update', id, input),
     delete: (id: string) => invoke<void>('connections:delete', id),
-    test: (input: ConnectionInput) => invoke<TestConnectionResult>('connections:test', input),
-    pickSshKey: () => invoke<SshKeyPick | null>('connections:pick-ssh-key')
+    /** With an id, blank secrets are filled from the saved connection in main. */
+    test: (input: ConnectionInput, connectionId?: string) =>
+      invoke<TestConnectionResult>('connections:test', input, connectionId)
   },
   db: {
     connect: (connectionId: string) => invoke<ActiveConnectionMeta>('db:connect', connectionId),
@@ -103,6 +110,8 @@ const api = {
   },
   ai: {
     generateSql: (opts: GenerateSqlOptions) => invoke<GenerateSqlResult>('ai:generate-sql', opts),
+    fixSql: (opts: FixSqlOptions) => invoke<FixSqlResult>('ai:fix-sql', opts),
+    explainSql: (opts: ExplainSqlOptions) => invoke<ExplainSqlResult>('ai:explain-sql', opts),
     filterTable: (opts: FilterTableOptions) => invoke<FilterTableResult>('ai:filter-table', opts),
     explainTable: (opts: ExplainTableOptions) =>
       invoke<ExplainTableResult>('ai:explain-table', opts),
@@ -137,22 +146,19 @@ const api = {
   app: {
     getVersion: () => invoke<string>('app:get-version'),
     checkUpdate: () => invoke<UpdateCheckResult>('app:check-update'),
-    openExternal: (url: string) => invoke<void>('app:open-external', url)
+    openExternal: (url: string) => invoke<void>('app:open-external', url),
+    getTheme: () => invoke<ThemePreference>('app:get-theme'),
+    setTheme: (theme: ThemePreference) => invoke<ThemePreference>('app:set-theme', theme)
   }
 }
 
 export type OrbitApi = typeof api
 
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
-  } catch (error) {
-    console.error(error)
-  }
-} else {
-  // @ts-ignore (define in dts)
-  window.electron = electronAPI
-  // @ts-ignore (define in dts)
-  window.api = api
+// Only `api`. The toolkit's `window.electron` used to sit beside it, handing the
+// page raw `ipcRenderer.send`/`on` and a copy of `process.env`, and nothing in
+// the renderer used it.
+try {
+  contextBridge.exposeInMainWorld('api', api)
+} catch (error) {
+  console.error(error)
 }

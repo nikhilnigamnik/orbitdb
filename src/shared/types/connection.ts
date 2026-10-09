@@ -6,8 +6,6 @@ export type DatabaseEngine = 'postgres' | 'mysql' | 'd1'
 
 export type ConnectionEnvironment = 'dev' | 'stage' | 'prod'
 
-export type SshAuthMethod = 'password' | 'key' | 'agent'
-
 /**
  * Accent a connection can be tagged with. A fixed set rather than free-form
  * hex: the renderer resolves each one to literal Tailwind classes, which only
@@ -36,18 +34,6 @@ export function normalizeFolder(raw: string | undefined | null): string {
   return typeof raw === 'string' ? raw.trim() : ''
 }
 
-export const SSH_DEFAULT_PORT = 22
-
-/**
- * Whether a connection actually rides a tunnel. Shared rather than duplicated
- * because the renderer badges it and the main process acts on it: D1 speaks
- * over the REST API, so a `sshEnabled` left set by switching engine must not
- * read as "tunnelled" on one side and be ignored on the other.
- */
-export function usesSshTunnel(input: Pick<ConnectionInput, 'engine' | 'sshEnabled'>): boolean {
-  return input.engine !== 'd1' && input.sshEnabled === true
-}
-
 export interface ConnectionInput {
   name: string
   engine: DatabaseEngine
@@ -64,44 +50,39 @@ export interface ConnectionInput {
   port: number
   database: string
   user: string
+  /** Never sent to the renderer: it receives '' and reads `hasPassword` instead. */
   password: string
   ssl: boolean
+  /**
+   * Verify the server certificate and host name when `ssl` is on. Optional, and
+   * absent reads as false: connections saved before it existed connected
+   * without verification, and must keep connecting the same way.
+   */
+  sslVerify?: boolean
   // D1-only credentials
   accountId?: string
   databaseId?: string
+  /** Same rule as `password`; the renderer reads `hasApiToken`. */
   apiToken?: string
-  // SSH tunnel - flat like the D1 fields above, because connections-store seals
-  // secrets by top-level key name and a nested block would not reach that list.
-  sshEnabled?: boolean
-  sshHost?: string
-  sshPort?: number
-  sshUser?: string
-  sshAuthMethod?: SshAuthMethod
-  sshPassword?: string
-  sshPrivateKey?: string
-  sshPassphrase?: string
-  /** SHA-256 host key fingerprint pinned on first connect. Empty means trust-on-first-use. */
-  sshHostKeyFingerprint?: string
-}
-
-/** What the SSH key file picker hands back: contents to seal, path to display. */
-export interface SshKeyPick {
-  path: string
-  contents: string
 }
 
 export interface SavedConnection extends ConnectionInput {
   id: string
   createdAt: string
   updatedAt: string
+  /**
+   * Set on the copy sent across IPC, where the secrets themselves are blanked.
+   * Inside main the secrets are present and these are absent. Saving a blank
+   * secret back keeps the stored one.
+   */
+  hasPassword?: boolean
+  hasApiToken?: boolean
 }
 
 export interface TestConnectionResult {
   success: boolean
   error?: string
   serverVersion?: string
-  /** Fingerprint the tunnel saw, so the form can pin it on save. */
-  sshHostKeyFingerprint?: string
 }
 
 export interface ActiveConnectionMeta {
@@ -109,4 +90,28 @@ export interface ActiveConnectionMeta {
   serverVersion: string
   currentDatabase: string
   currentUser: string
+}
+
+/**
+ * Whether a saved secret may stand in for a blank one in `next`. Only while the
+ * connection still points at the same server and account: otherwise an edited
+ * host would receive the old password - from a typo, or from a compromised
+ * renderer that never held the password in the first place.
+ */
+export function canReuseStoredSecrets(
+  previous: Pick<ConnectionInput, 'engine' | 'host' | 'port' | 'user' | 'accountId' | 'databaseId'>,
+  next: Pick<ConnectionInput, 'engine' | 'host' | 'port' | 'user' | 'accountId' | 'databaseId'>
+): boolean {
+  if (previous.engine !== next.engine) return false
+  if (next.engine === 'd1') {
+    return (
+      (previous.accountId ?? '') === (next.accountId ?? '') &&
+      (previous.databaseId ?? '') === (next.databaseId ?? '')
+    )
+  }
+  return (
+    previous.host.trim().toLowerCase() === next.host.trim().toLowerCase() &&
+    previous.port === next.port &&
+    previous.user === next.user
+  )
 }

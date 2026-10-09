@@ -22,81 +22,103 @@ const connection: SavedConnection = {
 }
 
 function setup(
-  state: { isActive?: boolean; isConnecting?: boolean; overrides?: Partial<SavedConnection> } = {}
+  state: {
+    isActive?: boolean
+    isConnecting?: boolean
+    isBusy?: boolean
+    connectError?: string
+    activeName?: string | null
+    overrides?: Partial<SavedConnection>
+  } = {}
 ) {
   const onConnect = vi.fn()
+  const onOpen = vi.fn()
   const onDisconnect = vi.fn()
   render(
     <ConnectionCard
       connection={{ ...connection, ...state.overrides }}
       isActive={state.isActive ?? false}
       isConnecting={state.isConnecting ?? false}
+      isBusy={state.isBusy}
+      connectError={state.connectError}
+      activeName={state.activeName}
       onConnect={onConnect}
+      onOpen={onOpen}
       onDisconnect={onDisconnect}
       onEdit={vi.fn()}
       onDelete={vi.fn()}
     />
   )
-  return { onConnect, onDisconnect, container: document.body }
+  return { onConnect, onOpen, onDisconnect, container: document.body }
+}
+
+function button(name: string | RegExp): HTMLButtonElement {
+  return screen.getByRole('button', { name }) as HTMLButtonElement
 }
 
 describe('the connect control', () => {
-  it('offers to connect when idle', () => {
+  it('offers to connect when idle, naming the connection', () => {
     const { onConnect } = setup()
-    const button = screen.getByLabelText('Connect')
-    fireEvent.click(button)
+    fireEvent.click(button('Connect to Local'))
     expect(onConnect).toHaveBeenCalled()
   })
 
   it('reports progress while connecting, and cannot be pressed again', () => {
     setup({ isConnecting: true })
     expect(screen.getByText('Connecting…')).toBeTruthy()
-    expect((screen.getByLabelText('Connecting') as HTMLButtonElement).disabled).toBe(true)
+    expect(button('Connecting to Local').disabled).toBe(true)
+  })
+
+  it('waits while another connection is mid-connect', () => {
+    // Starting a second connect would race the first for the active slot.
+    setup({ isBusy: true })
+    expect(button('Connect to Local').disabled).toBe(true)
+  })
+
+  it('still connects when something else is open - the store switches over', () => {
+    setup({ activeName: 'Staging' })
+    expect(button('Connect to Local').disabled).toBe(false)
+  })
+})
+
+describe('after a failed attempt', () => {
+  it('shows the error on the row that failed, with a Retry', () => {
+    // It used to be a banner at the top of the page that named no connection.
+    const { onConnect } = setup({ connectError: 'password authentication failed' })
+    expect(screen.getByRole('alert').textContent).toContain('password authentication failed')
+    fireEvent.click(button('Retry connecting to Local'))
+    expect(onConnect).toHaveBeenCalled()
+  })
+
+  it('shows no error on a row that did not fail', () => {
+    setup()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })
 
 describe('once connected', () => {
-  it('says what it does, not only what it is', () => {
-    // The old button was a green "Connected" that quietly performed a disconnect
-    // - it named a state and gave no hint of the action behind it.
-    setup({ isActive: true })
-    expect(screen.getByText('Connected')).toBeTruthy()
-    expect(screen.getByText('Disconnect')).toBeTruthy()
-  })
-
-  it('disconnects when pressed', () => {
-    const { onDisconnect } = setup({ isActive: true })
-    fireEvent.click(screen.getByLabelText('Disconnect'))
+  it('offers Open and Disconnect as two controls, both visible without hovering', () => {
+    // The old single button read "Connected" and turned into "Disconnect" only
+    // under the pointer, so what a click would do was unknowable until then.
+    const { onOpen, onDisconnect } = setup({ isActive: true })
+    fireEvent.click(button('Open Local'))
+    expect(onOpen).toHaveBeenCalled()
+    fireEvent.click(button('Disconnect from Local'))
     expect(onDisconnect).toHaveBeenCalled()
+    expect(screen.queryByText('Connected')).toBeNull()
   })
 
-  it('reveals the action on hover and on keyboard focus alike', () => {
+  it('makes Open the primary action and keeps Disconnect quiet', () => {
     setup({ isActive: true })
-    const state = screen.getByText('Connected')
-    const action = screen.getByText('Disconnect')
-
-    // Hover-only would strand anyone tabbing through the page.
-    expect(state.className).toContain('group-focus-visible/button:hidden')
-    expect(action.className).toContain('group-focus-visible/button:flex')
+    expect(button('Open Local').className).toContain('bg-accent')
+    const disconnect = button('Disconnect from Local')
+    expect(disconnect.className).not.toContain('bg-accent')
+    expect(disconnect.className).not.toMatch(/bg-success|bg-danger-fill/)
   })
 
-  it('does not dress the button as a success badge', () => {
-    // Green competed with the health dot and the dev environment chip in the
-    // same row, and read as status rather than as a control.
-    const { container } = render(
-      <ConnectionCard
-        connection={connection}
-        isActive
-        isConnecting={false}
-        onConnect={vi.fn()}
-        onDisconnect={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    )
-    const button = container.querySelector('[data-slot="button"]')!
-    expect(button.getAttribute('data-tone')).toBe('default')
-    expect(button.className).not.toMatch(/bg-success\//)
+  it('never offers to connect to what is already open', () => {
+    setup({ isActive: true })
+    expect(screen.queryByRole('button', { name: /Connect to/ })).toBeNull()
   })
 })
 
@@ -109,5 +131,48 @@ describe('the colour tag', () => {
   it('draws nothing when the connection was never tagged', () => {
     const { container } = setup()
     expect(container.querySelector('[class*="bg-tag-"]')).toBeNull()
+  })
+})
+
+describe('the health dot', () => {
+  function renderHealth(health: 'ok' | 'fail', healthError?: string) {
+    const onRefreshHealth = vi.fn()
+    render(
+      <ConnectionCard
+        connection={connection}
+        isActive={false}
+        isConnecting={false}
+        health={health}
+        healthError={healthError}
+        onConnect={vi.fn()}
+        onOpen={vi.fn()}
+        onDisconnect={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onRefreshHealth={onRefreshHealth}
+      />
+    )
+    return { onRefreshHealth }
+  }
+
+  it('is a 24px target around a 10px dot', () => {
+    renderHealth('ok')
+    const button = screen.getByRole('button', { name: 'Reachable' })
+    expect(button.className).toContain('size-6')
+    expect(button.querySelector('span')!.className).toContain('size-2.5')
+  })
+
+  it('names the error, which used to live only in a hover tooltip', () => {
+    const { onRefreshHealth } = renderHealth('fail', 'connect ECONNREFUSED')
+    const button = screen.getByRole('button', { name: /Unreachable: connect ECONNREFUSED/ })
+    fireEvent.click(button)
+    expect(onRefreshHealth).toHaveBeenCalled()
+  })
+})
+
+describe('the SSL lock', () => {
+  it('is announced as an image with a name', () => {
+    setup({ overrides: { ssl: true } })
+    expect(screen.getByRole('img', { name: 'SSL enabled' })).toBeTruthy()
   })
 })

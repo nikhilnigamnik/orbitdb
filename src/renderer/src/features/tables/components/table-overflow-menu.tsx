@@ -25,13 +25,9 @@ import {
   DropdownMenuSubContent
 } from '@renderer/components/ui/dropdown-menu'
 import { useTableDestructiveActions } from '@renderer/features/database/lib/use-table-destructive-actions'
-import {
-  buildExportFilename,
-  downloadCsv,
-  downloadJson,
-  downloadXlsx,
-  type ExportFormat
-} from '@renderer/lib/export'
+import { useToast } from '@renderer/components/ui/toast'
+import { exportToFile, type ExportFormat } from '@renderer/lib/export'
+import { errorMessage } from '@renderer/lib/errors'
 import { ROUTES, diagramRoute, tableStructureRoute } from '@renderer/config/routes'
 import type { TableDetails } from '@renderer/types'
 
@@ -55,6 +51,7 @@ export function TableOverflowMenu({
   onRenameTable
 }: TableOverflowMenuProps) {
   const navigate = useNavigate()
+  const toast = useToast()
   const isTable = details.type === 'table'
 
   const { requestTruncate, requestDrop, confirmDialog } = useTableDestructiveActions({
@@ -66,13 +63,10 @@ export function TableOverflowMenu({
 
   async function exportAs(format: ExportFormat) {
     if (exportRows.length === 0) return
-    const filename = buildExportFilename([details.schema, details.name], format)
     try {
-      if (format === 'json') downloadJson(filename, exportRows)
-      else if (format === 'csv') downloadCsv(filename, exportRows, exportColumns)
-      else await downloadXlsx(filename, exportRows, exportColumns)
+      await exportToFile(format, [details.schema, details.name], exportRows, exportColumns)
     } catch (err) {
-      console.error(`Failed to export as ${format}:`, err)
+      toast.error('Export failed', { description: errorMessage(err) })
     }
   }
 
@@ -88,38 +82,33 @@ export function TableOverflowMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="px-2 text-text-muted hover:bg-surface-elevated hover:text-text"
-            aria-label="Table actions"
-          >
-            <IconDots size={15} />
+          <Button size="icon-sm" variant="subtle" aria-label="Table actions">
+            <IconDots size={16} />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger disabled={exportRows.length === 0}>
-              <IconFileExport size={13} />
+              <IconFileExport size={16} />
               Export
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
-              <DropdownMenuItem onSelect={() => exportAs('json')}>
-                <IconJson size={13} />
+              <DropdownMenuItem onSelect={() => void exportAs('json')}>
+                <IconJson size={16} />
                 JSON (.json)
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => exportAs('csv')}>
-                <IconFileTypeCsv size={13} />
+              <DropdownMenuItem onSelect={() => void exportAs('csv')}>
+                <IconFileTypeCsv size={16} />
                 CSV (.csv)
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => exportAs('xlsx')}>
-                <IconFileTypeXls size={13} />
+              <DropdownMenuItem onSelect={() => void exportAs('xlsx')}>
+                <IconFileTypeXls size={16} />
                 Excel (.xlsx)
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
           <DropdownMenuItem onSelect={() => onRefresh()}>
-            <IconRefresh size={13} />
+            <IconRefresh size={16} />
             Refresh
           </DropdownMenuItem>
 
@@ -128,22 +117,22 @@ export function TableOverflowMenu({
               <DropdownMenuSeparator />
               {onRenameTable && (
                 <DropdownMenuItem onSelect={() => onRenameTable()}>
-                  <IconPencil size={13} />
+                  <IconPencil size={16} />
                   Rename table
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
                 onSelect={() => navigate(tableStructureRoute(details.schema, details.name))}
               >
-                <IconColumns size={13} />
+                <IconColumns size={16} />
                 Alter table
               </DropdownMenuItem>
               <DropdownMenuItem variant="danger" onSelect={requestTruncate}>
-                <IconEraser size={13} />
+                <IconEraser size={16} />
                 Truncate
               </DropdownMenuItem>
               <DropdownMenuItem variant="danger" onSelect={requestDrop}>
-                <IconTrash size={13} />
+                <IconTrash size={16} />
                 Drop
               </DropdownMenuItem>
             </>
@@ -151,11 +140,11 @@ export function TableOverflowMenu({
 
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={copyQualifiedName}>
-            <IconCopy size={13} />
+            <IconCopy size={16} />
             Copy qualified name
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => navigate(diagramRoute(details.schema))}>
-            <IconSitemap size={13} />
+            <IconSitemap size={16} />
             Open in diagram
           </DropdownMenuItem>
         </DropdownMenuContent>

@@ -14,6 +14,7 @@ import {
   CheckReferencesResult
 } from '../../../../shared/types'
 import { buildDdl } from '../../ddl'
+import { invalidateIntrospection } from '../../introspection-cache'
 import { toCount } from '../../coerce'
 import { LIST_TABLES_SQL, SQLITE_SCHEMA, quoteIdent, sqliteDdlDialect } from '../../sqlite-shared'
 import { sweepTables } from '../../value-search'
@@ -26,7 +27,6 @@ import {
   describeActive,
   disconnectAll,
   disconnectPool,
-  invalidateTableDetailsForConnection,
   loadSaved,
   mapWithConcurrency,
   searchDialect,
@@ -49,7 +49,7 @@ async function executeDdl(opts: DdlRequest): Promise<void> {
   const saved = loadSaved(opts.connectionId)
   const sql = buildDdl(opts.operation, opts.schema, opts.table, sqliteDdlDialect)
   await callD1(saved, sql)
-  invalidateTableDetailsForConnection(opts.connectionId)
+  invalidateIntrospection(opts.connectionId)
 }
 async function searchValue(opts: ValueSearchOptions): Promise<ValueSearchResult> {
   const saved = loadSaved(opts.connectionId)

@@ -1,28 +1,26 @@
 import * as React from 'react'
 import {
+  IconAlertCircle,
   IconDatabase,
-  IconDotsVertical,
+  IconDots,
   IconLock,
-  IconShieldLock,
   IconPencil,
-  IconPlugOff,
   IconTrash
 } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { Chip } from '@renderer/components/ui/chip'
-import { Spinner } from '@renderer/components/ui/spinner'
 import { Popover } from '@renderer/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/ui/tooltip'
 import {
   CONNECTION_COLOR_CLASS,
   DEFAULT_ENVIRONMENT,
-  ENVIRONMENT_LABEL,
-  usesSshTunnel
+  ENVIRONMENT_LABEL
 } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 import type { ConnectionEnvironment, SavedConnection } from '@renderer/types'
 import type { ConnectionHealth } from '../lib/use-connection-health'
 import { ENGINE_ICON } from './engine-icons'
+import { ConnectionActions } from './connection-actions'
 
 type ChipTone = React.ComponentProps<typeof Chip>['tone']
 
@@ -30,9 +28,16 @@ interface ConnectionCardProps {
   connection: SavedConnection
   isActive: boolean
   isConnecting: boolean
+  /** Another connection is mid-connect, so this row's Connect waits. */
+  isBusy?: boolean
+  /** Why this connection's last attempt failed. Shown on the row, with Retry. */
+  connectError?: string
+  /** The connection open right now, named on this row's Connect as a switch. */
+  activeName?: string | null
   health?: ConnectionHealth
   healthError?: string
   onConnect: () => void
+  onOpen: () => void
   onDisconnect: () => void
   onEdit: () => void
   onDelete: () => void
@@ -41,9 +46,9 @@ interface ConnectionCardProps {
 
 const HEALTH_DOT_CLASSES: Record<ConnectionHealth, string> = {
   unknown: 'bg-text-subtle/55',
-  checking: 'bg-warning shadow-[0_0_4px_0_rgba(251,191,36,0.45)] animate-pulse',
-  ok: 'bg-success shadow-[0_0_4px_0_rgba(52,211,153,0.4)]',
-  fail: 'bg-danger shadow-[0_0_4px_0_rgba(244,63,94,0.45)]'
+  checking: 'bg-warning animate-pulse',
+  ok: 'bg-success',
+  fail: 'bg-danger'
 }
 
 const HEALTH_LABEL: Record<ConnectionHealth, string> = {
@@ -54,12 +59,12 @@ const HEALTH_LABEL: Record<ConnectionHealth, string> = {
 }
 
 const ENGINE_STYLES: Record<SavedConnection['engine'], { bg: string; iconClass: string }> = {
-  postgres: { bg: 'bg-info/8', iconClass: 'text-info' },
-  mysql: { bg: 'bg-orange/8', iconClass: 'text-orange' },
-  d1: { bg: 'bg-warning/8', iconClass: 'text-warning' }
+  postgres: { bg: 'bg-info/10', iconClass: 'text-info' },
+  mysql: { bg: 'bg-orange/10', iconClass: 'text-orange' },
+  d1: { bg: 'bg-warning/12', iconClass: 'text-warning' }
 }
 
-const ENGINE_FALLBACK = { bg: 'bg-text-muted/8', iconClass: 'text-text-muted' }
+const ENGINE_FALLBACK = { bg: 'bg-surface-active', iconClass: 'text-text-muted' }
 
 const ENVIRONMENT_TONE: Record<ConnectionEnvironment, ChipTone> = {
   dev: 'emerald',
@@ -85,9 +90,13 @@ export function ConnectionCard({
   connection,
   isActive,
   isConnecting,
+  isBusy = false,
+  connectError,
+  activeName = null,
   health = 'unknown',
   healthError,
   onConnect,
+  onOpen,
   onDisconnect,
   onEdit,
   onDelete,
@@ -100,136 +109,128 @@ export function ConnectionCard({
   const parts = metaParts(connection)
   const environment = connection.environment ?? DEFAULT_ENVIRONMENT
   const accent = connection.color ? CONNECTION_COLOR_CLASS[connection.color] : null
+  const healthName =
+    health === 'fail' && healthError
+      ? `${HEALTH_LABEL.fail}: ${healthError}. Click to check again`
+      : HEALTH_LABEL[health]
 
   return (
+    // One row of an Attio list: full width, a hairline underneath, and the
+    // hover grey rather than a card edge.
     <div
       className={cn(
-        'group flex items-center gap-3 rounded-lg border bg-surface px-3.5 py-3 transition-colors',
-        isActive ? 'border-border-strong' : 'border-border  hover:bg-surface-elevated/30'
+        'group relative flex min-h-14 items-center gap-3 border-b border-border px-4 py-2 transition-colors',
+        isActive ? 'bg-surface-active/40' : 'hover:bg-surface-elevated/60'
       )}
     >
       {/* A rail rather than a tint on the engine tile: the tile already carries
           the engine's colour, and overwriting it would trade one signal for
-          another instead of adding one. */}
+          another instead of adding one. Pinned to the row's edge so tagged and
+          untagged rows keep their tiles in one column. */}
       {accent && (
-        <span aria-hidden className={cn('-ml-1 h-8 w-0.5 shrink-0 rounded-full', accent)} />
+        <span
+          aria-hidden
+          className={cn('absolute inset-y-3 left-1.5 w-[3px] rounded-full', accent)}
+        />
       )}
 
       <div className="relative shrink-0">
         <div
           className={cn(
-            'flex h-9 w-9 items-center justify-center rounded-md ring-1 ring-inset ring-white/5',
+            'flex size-8 items-center justify-center rounded-lg',
             engine.bg,
             engine.iconClass
           )}
           aria-hidden
         >
-          <EngineIcon className="h-4 w-4" />
+          <EngineIcon className="size-4" />
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
+            {/* A 24px target around a 10px dot: the padding is the hit area, so
+                the dot keeps its size and position on the tile's corner. The
+                error is in the name too, not only in a hover tooltip. */}
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 onRefreshHealth?.()
               }}
-              aria-label={HEALTH_LABEL[health]}
-              className={cn(
-                'absolute -bottom-0.5 -right-0.5 h-2 w-2 cursor-pointer rounded-full ring-2 ring-surface transition-transform hover:scale-125',
-                HEALTH_DOT_CLASSES[health]
-              )}
-            />
+              aria-label={healthName}
+              className="group/health absolute -right-[9px] -bottom-[9px] flex size-6 cursor-pointer items-center justify-center rounded-full"
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  'size-2.5 rounded-full ring-2 ring-surface transition-transform group-hover/health:scale-125',
+                  HEALTH_DOT_CLASSES[health]
+                )}
+              />
+            </button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
             {HEALTH_LABEL[health]}
             {health === 'fail' && healthError && (
-              <div className="mt-1 max-w-[20rem] font-mono text-xs text-text-subtle">
-                {healthError}
-              </div>
+              <div className="mt-1 max-w-[20rem] font-mono text-xs opacity-70">{healthError}</div>
             )}
           </TooltipContent>
         </Tooltip>
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-xs font-medium leading-tight text-text">
-            {connection.name}
-          </span>
+          <span className="truncate text-sm font-medium text-text">{connection.name}</span>
           <Chip tone={ENVIRONMENT_TONE[environment]}>{ENVIRONMENT_LABEL[environment]}</Chip>
           {connection.ssl && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="flex shrink-0 items-center text-text-subtle/70">
-                  <IconLock size={11} />
+                <span
+                  role="img"
+                  aria-label="SSL enabled"
+                  className="flex shrink-0 items-center text-text-subtle"
+                >
+                  <IconLock size={14} aria-hidden />
                 </span>
               </TooltipTrigger>
               <TooltipContent side="bottom">SSL enabled</TooltipContent>
             </Tooltip>
           )}
-          {usesSshTunnel(connection) && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="flex shrink-0 items-center text-text-subtle/70">
-                  <IconShieldLock size={11} />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                Tunnelled through {connection.sshHost || 'SSH'}
-              </TooltipContent>
-            </Tooltip>
-          )}
         </div>
-        <div className="mt-1 truncate font-mono text-xs leading-tight text-text-subtle">
+        <div className="truncate text-[12px] text-text-subtle tabular-nums">
           {parts.length === 0 ? (
             <span className="italic">no host configured</span>
           ) : (
-            parts.join('  ·  ')
+            parts.join(' · ')
           )}
         </div>
+        {/* On the row that failed, beside the Retry that acts on it - not in a
+            banner at the top of the page, which named no connection. */}
+        {connectError && (
+          <p role="alert" className="flex items-start gap-1.5 pt-0.5 text-[12px] text-danger-text">
+            <IconAlertCircle size={13} className="mt-px shrink-0" aria-hidden />
+            <span className="min-w-0 break-words">{connectError}</span>
+          </p>
+        )}
       </div>
 
-      <Button
-        variant="secondary"
-        onClick={isActive ? onDisconnect : onConnect}
-        disabled={isConnecting}
-        aria-label={isActive ? 'Disconnect' : isConnecting ? 'Connecting' : 'Connect'}
-        className={cn(
-          'w-28 justify-center',
-          isActive && 'hover:border-danger/30 hover:bg-danger/10 hover:text-danger'
-        )}
-      >
-        {isConnecting ? (
-          <>
-            <Spinner size={12} />
-            <span>Connecting…</span>
-          </>
-        ) : isActive ? (
-          // The button reads as the state it is in, and as the action it performs
-          // once you reach for it - a green "Connected" button said neither, and
-          // gave no hint that clicking it disconnects.
-          <>
-            <span className="flex items-center gap-1.5 group-hover/button:hidden group-focus-visible/button:hidden">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden />
-              Connected
-            </span>
-            <span className="hidden items-center gap-1.5 group-hover/button:flex group-focus-visible/button:flex">
-              <IconPlugOff size={12} />
-              Disconnect
-            </span>
-          </>
-        ) : (
-          <span>Connect</span>
-        )}
-      </Button>
+      <ConnectionActions
+        name={connection.name}
+        isActive={isActive}
+        isConnecting={isConnecting}
+        isBusy={isBusy}
+        hasFailed={!!connectError}
+        activeName={activeName}
+        onConnect={onConnect}
+        onOpen={onOpen}
+        onDisconnect={onDisconnect}
+      />
 
       <div className="shrink-0">
         <Popover
           openPopover={menuOpen}
           setOpenPopover={setMenuOpen}
           align="end"
-          popoverContentClassName="w-36 overflow-hidden"
+          popoverContentClassName="w-40 overflow-hidden"
           content={
             <div className="flex flex-col p-1">
               <button
@@ -238,9 +239,9 @@ export function ConnectionCard({
                   setMenuOpen(false)
                   onEdit()
                 }}
-                className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-text hover:bg-surface-elevated"
+                className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-sm text-text hover:bg-surface-elevated"
               >
-                <IconPencil size={13} />
+                <IconPencil size={16} className="text-text-subtle" />
                 Edit
               </button>
               <button
@@ -249,21 +250,16 @@ export function ConnectionCard({
                   setMenuOpen(false)
                   onDelete()
                 }}
-                className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-danger hover:bg-danger/10"
+                className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-sm text-danger hover:bg-danger/10"
               >
-                <IconTrash size={13} />
+                <IconTrash size={16} />
                 Delete
               </button>
             </div>
           }
         >
-          <Button
-            size="icon-xs"
-            variant="secondary"
-            className="cursor-pointer text-text-muted hover:bg-surface-elevated hover:text-text"
-            aria-label="More actions"
-          >
-            <IconDotsVertical size={14} />
+          <Button size="icon-sm" variant="subtle" aria-label="More actions">
+            <IconDots size={16} />
           </Button>
         </Popover>
       </div>

@@ -119,3 +119,67 @@ describe('row controls', () => {
     expect(actions!.className).toContain('focus-within:opacity-100')
   })
 })
+
+describe('the Attio grid', () => {
+  it('leads each header with a column-type icon', () => {
+    setup([column('total', 'int4')], [])
+    const th = screen.getByText('total').closest('th')!
+    expect(th.querySelector('svg[data-kind="number"]')).not.toBeNull()
+  })
+
+  it('draws hairlines on both axes of a data cell', () => {
+    setup([column('note')], [{ note: 'hello' }])
+    const td = screen.getByText('hello').closest('td')!
+    expect(td.className).toContain('border-b')
+    expect(td.className).toContain('border-r')
+  })
+
+  it('centres the row and header checkboxes in their column', () => {
+    // The checkbox is a block-level flex box, so the cell's text-center never
+    // moved it - it sat flush against the grid's left edge.
+    setup([column('note')], [{ note: 'hello' }])
+    for (const name of ['Select all rows', 'Select row 1']) {
+      expect(screen.getByLabelText(name).className.split(/\s+/)).toContain('mx-auto')
+    }
+  })
+
+  it('right-aligns numbers so their digits line up', () => {
+    setup([column('label'), column('total', 'int4')], [{ label: 'a', total: 42 }])
+    expect(screen.getByText('42').closest('td')!.className).toContain('text-right')
+    expect(screen.getByText('a').closest('td')!.className).not.toContain('text-right')
+  })
+
+  it('draws an enum value as a tinted tag', () => {
+    const status = { ...column('status', 'mood', 'USER-DEFINED'), enumValues: ['open', 'closed'] }
+    setup([status], [{ status: 'open' }])
+    expect(screen.getByText('open').className).toMatch(/\bbg-tag-/)
+  })
+
+  it('keeps a selected row neutral, never accent blue', () => {
+    render(
+      <DataGrid
+        columns={[column('note')]}
+        rows={[{ note: 'picked' }]}
+        orderBy={null}
+        orderDir="asc"
+        onSort={vi.fn()}
+        onEditRow={vi.fn()}
+        onDeleteRow={vi.fn()}
+        canMutate={false}
+        rowSelection={{ 0: true }}
+        onRowSelectionChange={vi.fn()}
+      />
+    )
+    const row = screen.getByText('picked').closest('tr')!
+    expect(row.className).toContain('bg-row-selected')
+    expect(row.className).not.toMatch(/accent/)
+  })
+
+  it('carries the row tint into its sticky row-actions cell', () => {
+    // That cell is opaque so scrolled content cannot show through it, and it
+    // used to stay white - the hover band stopped short of the right edge.
+    setup([column('id')], [{ id: 1 }], true)
+    const actions = screen.getByTitle('Edit row').closest('td')!
+    expect(actions.className).toContain('group-hover:bg-row-hover')
+  })
+})

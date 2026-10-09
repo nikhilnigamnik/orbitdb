@@ -1,7 +1,14 @@
 import * as React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { IconPlug, IconSchema } from '@tabler/icons-react'
+import {
+  IconCheck,
+  IconChevronDown,
+  IconChevronRight,
+  IconPlug,
+  IconSchema
+} from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import { PageHeader } from '@renderer/components/layout/page-header'
 import { EmptyState } from '@renderer/components/common/empty-state'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { LoadingState } from '@renderer/components/common/loading-state'
@@ -22,18 +29,20 @@ export function DiagramPage() {
 
   if (!active) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <EmptyState
-          icon={<IconPlug size={24} />}
-          title="No active connection"
-          description="Pick a connection to see the schema diagram."
-          action={
-            <Button size="sm" onClick={() => navigate(ROUTES.connections)}>
-              Go to connections
-            </Button>
-          }
-        />
-      </div>
+      <DiagramFrame>
+        <div className="flex h-full items-center justify-center p-6">
+          <EmptyState
+            icon={<IconPlug size={20} />}
+            title="No active connection"
+            description="Pick a connection to see the schema diagram."
+            action={
+              <Button size="sm" variant="outline" onClick={() => navigate(ROUTES.connections)}>
+                Go to connections
+              </Button>
+            }
+          />
+        </div>
+      </DiagramFrame>
     )
   }
 
@@ -68,18 +77,24 @@ function DiagramContent({ connectionId, schema, onPickSchema }: DiagramContentPr
 
   if (schemasState.error) {
     return (
-      <div className="p-4">
-        <ErrorState
-          title="Failed to load schemas"
-          message={schemasState.error}
-          onRetry={schemasState.refresh}
-        />
-      </div>
+      <DiagramFrame>
+        <div className="p-4">
+          <ErrorState
+            title="Failed to load schemas"
+            message={schemasState.error}
+            onRetry={schemasState.refresh}
+          />
+        </div>
+      </DiagramFrame>
     )
   }
 
   if (!schemasState.data || !schema) {
-    return <LoadingState />
+    return (
+      <DiagramFrame>
+        <LoadingState />
+      </DiagramFrame>
+    )
   }
 
   return (
@@ -92,49 +107,73 @@ function DiagramContent({ connectionId, schema, onPickSchema }: DiagramContentPr
   )
 }
 
-interface DiagramToolbarProps {
+const DIAGRAM_CRUMB = { label: 'Diagram', icon: <IconSchema /> }
+
+/**
+ * The page header plus the canvas area under it. Every state renders inside
+ * one, so a loader or an error sits in the same spot the diagram will.
+ */
+function DiagramFrame({
+  adornment,
+  children
+}: {
+  adornment?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-surface">
+      <PageHeader breadcrumbs={[DIAGRAM_CRUMB]} titleAdornment={adornment} />
+      <div className="min-h-0 flex-1">{children}</div>
+    </div>
+  )
+}
+
+interface SchemaPickerProps {
   schemas: string[]
   activeSchema: string
   onPickSchema: (name: string) => void
 }
 
-function DiagramToolbar({ schemas, activeSchema, onPickSchema }: DiagramToolbarProps) {
+/** The schema reads as the breadcrumb's last step, and opens a menu to switch it. */
+function SchemaPicker({ schemas, activeSchema, onPickSchema }: SchemaPickerProps) {
   const [open, setOpen] = React.useState(false)
   return (
-    <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2">
-      <IconSchema size={14} className="text-text-subtle" />
-      <span className="text-xs text-text-subtle">Schema</span>
-      <Popover
-        openPopover={open}
-        setOpenPopover={setOpen}
-        align="start"
-        popoverContentClassName="w-56 overflow-hidden"
-        content={
-          <div className="flex max-h-64 flex-col overflow-auto p-1">
-            {schemas.map((name) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => {
-                  onPickSchema(name)
-                  setOpen(false)
-                }}
-                className={cn(
-                  'flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-left font-mono text-xs hover:bg-surface-elevated',
-                  activeSchema === name ? 'text-text' : 'text-text-muted'
-                )}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-        }
-      >
-        <Button size="sm" variant="ghost" className="font-mono text-xs text-text">
-          {activeSchema}
-        </Button>
-      </Popover>
-    </div>
+    <Popover
+      openPopover={open}
+      setOpenPopover={setOpen}
+      align="start"
+      popoverContentClassName="w-56 overflow-hidden"
+      content={
+        <div className="flex max-h-64 flex-col overflow-auto p-1">
+          <p className="flex h-7 items-center px-2 text-[12px] font-medium text-text-subtle">
+            Schemas
+          </p>
+          {schemas.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => {
+                onPickSchema(name)
+                setOpen(false)
+              }}
+              className={cn(
+                'flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-surface-elevated',
+                activeSchema === name ? 'font-medium text-text' : 'text-text-muted'
+              )}
+            >
+              <IconSchema size={16} className="shrink-0 text-text-subtle" />
+              <span className="min-w-0 flex-1 truncate">{name}</span>
+              {activeSchema === name && <IconCheck size={14} className="shrink-0 text-accent" />}
+            </button>
+          ))}
+        </div>
+      }
+    >
+      <Button size="sm" variant="subtle" className="-ml-1 gap-1 px-1.5 text-sm text-text">
+        {activeSchema}
+        <IconChevronDown size={14} className="text-text-subtle" />
+      </Button>
+    </Popover>
   )
 }
 
@@ -151,47 +190,59 @@ function DiagramView({ connectionId, schemas, schema, onPickSchema }: DiagramVie
     [connectionId, schema]
   )
 
-  // Until the graph loads the first time, hold the toolbar back and show one
-  // bare full-area loader - same spot as the schema-list loader - so navigating
-  // to the diagram is a single continuous spinner, not loader-then-loader.
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false)
   React.useEffect(() => {
     if (data) setHasLoadedOnce(true)
   }, [data])
 
+  const picker = (
+    <span className="flex items-center gap-1">
+      <IconChevronRight size={14} className="shrink-0 text-text-subtle/70" />
+      <SchemaPicker schemas={schemas} activeSchema={schema} onPickSchema={onPickSchema} />
+    </span>
+  )
+
+  // Until the graph loads the first time, hold the schema picker back so the
+  // header does not change twice on the way in; the loader sits where the
+  // schema-list loader did, so arriving is one continuous spinner.
   if (!hasLoadedOnce) {
-    if (isLoading) return <LoadingState />
+    if (isLoading) {
+      return (
+        <DiagramFrame>
+          <LoadingState />
+        </DiagramFrame>
+      )
+    }
     if (error) {
       return (
-        <div className="p-4">
-          <ErrorState title="Failed to load schema graph" message={error} onRetry={refresh} />
-        </div>
+        <DiagramFrame>
+          <div className="p-4">
+            <ErrorState title="Failed to load schema graph" message={error} onRetry={refresh} />
+          </div>
+        </DiagramFrame>
       )
     }
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <DiagramToolbar schemas={schemas} activeSchema={schema} onPickSchema={onPickSchema} />
-      <div className="min-h-0 flex-1">
-        {isLoading ? (
-          <LoadingState />
-        ) : error ? (
-          <div className="p-4">
-            <ErrorState title="Failed to load schema graph" message={error} onRetry={refresh} />
-          </div>
-        ) : !data || data.tables.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <EmptyState
-              icon={<IconSchema size={20} />}
-              title="No tables in this schema"
-              description="Pick a different schema from the toolbar."
-            />
-          </div>
-        ) : (
-          <SchemaGraphCanvas graph={data} schema={schema} connectionId={connectionId} />
-        )}
-      </div>
-    </div>
+    <DiagramFrame adornment={picker}>
+      {isLoading ? (
+        <LoadingState />
+      ) : error ? (
+        <div className="p-4">
+          <ErrorState title="Failed to load schema graph" message={error} onRetry={refresh} />
+        </div>
+      ) : !data || data.tables.length === 0 ? (
+        <div className="flex h-full items-center justify-center p-6">
+          <EmptyState
+            icon={<IconSchema size={20} />}
+            title="No tables in this schema"
+            description="Pick a different schema from the toolbar."
+          />
+        </div>
+      ) : (
+        <SchemaGraphCanvas graph={data} schema={schema} connectionId={connectionId} />
+      )}
+    </DiagramFrame>
   )
 }

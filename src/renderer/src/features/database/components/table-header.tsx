@@ -1,3 +1,5 @@
+import { IconEye, IconSchema, IconTable } from '@tabler/icons-react'
+import { PageHeader } from '@renderer/components/layout/page-header'
 import { Chip } from '@renderer/components/ui/chip'
 import { SlidingTabs } from '@renderer/components/ui/sliding-tabs'
 import { formatNumber } from '@renderer/lib/format'
@@ -9,6 +11,8 @@ interface TableHeaderProps {
   onChangeTab: (tab: 'data' | 'structure') => void
   /** Exact unfiltered row count, once known. Null while loading or skipped. */
   totalRows: number | null
+  /** Makes the schema crumb a link back to the connection overview. */
+  onOpenSchema?: () => void
 }
 
 const TYPE_LABEL: Record<TableDetails['type'], string | null> = {
@@ -19,36 +23,44 @@ const TYPE_LABEL: Record<TableDetails['type'], string | null> = {
   materialized_view: 'Materialized view'
 }
 
-export function TableHeader({ details, activeTab, onChangeTab, totalRows }: TableHeaderProps) {
+/**
+ * The page's top bar for a table: `schema > table` as the breadcrumb, the size
+ * beside the title, and the Data / Structure switch on the right.
+ */
+export function TableHeader({
+  details,
+  activeTab,
+  onChangeTab,
+  totalRows,
+  onOpenSchema
+}: TableHeaderProps) {
   const columnCount = details.columns.length
   const typeLabel = TYPE_LABEL[details.type]
   // Prefer the counted total. The estimate is a fallback for tables too large to
   // count, and only then is it marked approximate.
   const rowCount = totalRows ?? details.estimatedRows
   const isExact = totalRows != null
+  const TitleIcon = details.type === 'table' ? IconTable : IconEye
 
   return (
-    <div className="shrink-0 border-b border-border px-5 py-3">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <h2 className="truncate text-xs font-semibold leading-tight tracking-tight text-text">
-              {details.name}
-            </h2>
-            {typeLabel && <Chip>{typeLabel}</Chip>}
-          </div>
-          <div className="flex min-w-0 items-center gap-1.5 text-[10px] leading-tight text-text-subtle">
-            <span className="font-mono text-text-muted">{details.schema}</span>
-            <span className="text-text-subtle/50">·</span>
+    <PageHeader
+      breadcrumbs={[
+        { label: details.schema, icon: <IconSchema />, onClick: onOpenSchema },
+        { label: details.name, icon: <TitleIcon /> }
+      ]}
+      titleAdornment={
+        <div className="flex items-center gap-2">
+          {typeLabel && <Chip>{typeLabel}</Chip>}
+          <div className="flex items-center gap-1.5 text-[12px] whitespace-nowrap text-text-subtle">
             <span>
-              <span className="font-mono text-text-muted">{columnCount}</span> column
+              <span className="text-text-muted tabular-nums">{columnCount}</span> column
               {columnCount === 1 ? '' : 's'}
             </span>
             {rowCount != null && (
               <>
-                <span className="text-text-subtle/50">·</span>
+                <span className="text-text-subtle/60">·</span>
                 <span>
-                  <span className="font-mono text-text-muted">
+                  <span className="text-text-muted tabular-nums">
                     {isExact ? '' : '~'}
                     {formatNumber(rowCount)}
                   </span>{' '}
@@ -58,7 +70,8 @@ export function TableHeader({ details, activeTab, onChangeTab, totalRows }: Tabl
             )}
           </div>
         </div>
-
+      }
+      actions={
         <SlidingTabs
           tabs={[
             { id: 'data', label: 'Data' },
@@ -67,7 +80,7 @@ export function TableHeader({ details, activeTab, onChangeTab, totalRows }: Tabl
           value={activeTab}
           onChange={onChangeTab}
         />
-      </div>
-    </div>
+      }
+    />
   )
 }
