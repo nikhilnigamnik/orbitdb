@@ -29,9 +29,12 @@ const FATAL_SEVERITIES = new Set(['FATAL', 'PANIC'])
 /**
  * A server error carries a severity and leaves the session usable - an aborted
  * transaction is still a transaction the user has to roll back. Anything else is
- * the socket going away, which the client's own 'error' event also reports.
+ * the socket going away, which the client's own 'error' event also reports -
+ * except our own cancel, which is raised before anything reached the socket and
+ * must not cost the user an open transaction or a SET ROLE.
  */
-function isFatalPgError(err: unknown): boolean {
+export function isFatalPgError(err: unknown): boolean {
+  if (err instanceof EditorCancelledError) return false
   if (!(err instanceof Error)) return true
   const severity = (err as Error & { severity?: unknown }).severity
   if (typeof severity !== 'string') return true

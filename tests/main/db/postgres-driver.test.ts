@@ -316,6 +316,24 @@ describe('introspection caching', () => {
   it('caches the schema graph until something may have changed the schema', async () => {
     const loads = (): number => countPool('select c.relname as name')
     await driver.getSchemaGraph(SAVED.id, 'public')
+  it('keeps the session when the cancel lands before the run attached', async () => {
+    // The cancel is raised by this app before anything reached the socket. It
+    // carries no severity, which used to read as fatal and end the session -
+    // rolling back whatever transaction the user had open on it.
+    state.connectGate = gate()
+    const running = driver.runQuery({ connectionId: SAVED.id, sql: 'select 1', queryId: 'q1' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await driver.cancelQuery(SAVED.id, 'q1')
+    state.connectGate.open()
+    await running
+
+    expect(state.clients).toHaveLength(1)
+    expect(state.clients[0].isEnded, 'the session survives its own cancel').toBe(false)
+
+    await driver.runQuery({ connectionId: SAVED.id, sql: 'select 2' })
+    expect(state.clients, 'the next run reuses the session').toHaveLength(1)
+  })
+
     await driver.getSchemaGraph(SAVED.id, 'public')
     expect(loads()).toBe(1)
 
