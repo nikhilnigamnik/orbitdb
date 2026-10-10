@@ -372,6 +372,8 @@ Feature folders under `src/renderer/src/features/{connections, database, tables,
 
 Routing is React Router v7 (`src/renderer/src/app.tsx` + `config/routes.ts`). Active table is encoded in the URL as `?schema=...&table=...`, which `table-data-view.tsx` reads and `schema-tree.tsx` highlights.
 
+**The URL does not name its connection, and the router commits navigations as transitions.** `HashRouter` wraps every location update in `startTransition`, so `connect(id); navigate(...)` renders the new connection beside the _old_ URL for one commit. `DatabasePage` therefore records which connection each history entry (`location.key`) was chosen under, and treats a table from another one - or from a URL left by a reload, which belongs to none - as foreign: it neither opens it nor saves it as the last table, and restores the connection's own instead. Before that, the stale commit asked Postgres for D1's `main.devices` ("Table main.devices not found") and wrote it into Postgres's last table, so every later switch reopened it. `tests/renderer/database-page-switch.test.tsx` drives the real `HashRouter` to pin it.
+
 ## Conventions that matter here
 
 - `pnpm` only - postinstall hook runs `electron-builder install-app-deps` (rebuilds native modules).
