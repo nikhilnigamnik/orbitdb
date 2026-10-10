@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ErrorState } from '@renderer/components/common/error-state'
 import { LoadingState } from '@renderer/components/common/loading-state'
 import { useAsync } from '@renderer/hooks/use-async'
@@ -8,7 +8,12 @@ import { unwrap } from '@renderer/lib/ipc'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
 import { TableDataView } from '@renderer/features/tables/components/table-data-view'
 import { ROUTES, tableRoute } from '@renderer/config/routes'
-import { pushRecent, renameTableRef } from '@renderer/features/database/lib/table-prefs'
+import {
+  loadLastTable,
+  pushRecent,
+  renameTableRef,
+  saveLastTable
+} from '@renderer/features/database/lib/table-prefs'
 import { moveViewPrefs } from '@renderer/features/tables/lib/view-prefs'
 import { emitSchemaTablesChanged } from '@renderer/features/database/lib/schema-events'
 import type { DdlOperation, DdlFormKind, TableDetails } from '@renderer/types'
@@ -19,23 +24,17 @@ import { DdlDialog } from './ddl-dialog'
 import { ConnectionPicker } from './connection-picker'
 import { ConnectionOverview } from './connection-overview'
 
-function readLastTable(connectionId: string): string | null {
-  try {
-    const raw = localStorage.getItem(`orbitdb:last-table:${connectionId}`)
-    if (!raw) return null
-    const saved = JSON.parse(raw) as { schema?: string; table?: string }
-    if (!saved.schema || !saved.table) return null
-    return tableRoute(saved.schema, saved.table)
-  } catch {
-    // ignore unreadable/quota-exceeded localStorage
-    return null
-  }
+function lastTableRoute(connectionId: string): string {
+  const last = loadLastTable(connectionId)
+  return last ? tableRoute(last.schema, last.table) : ROUTES.database
 }
 
 export function DatabasePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { active } = useConnection()
+  const connectionId = active?.connectionId ?? null
   const schema = searchParams.get('schema') ?? ''
   const table = searchParams.get('table') ?? ''
   const view = searchParams.get('view')
@@ -47,39 +46,51 @@ export function DatabasePage() {
     setActiveTab(view === 'structure' ? 'structure' : 'data')
   }, [schema, table, view])
 
-  // Which connection the schema/table in the URL belongs to. Survives a
-  // disconnect so reconnecting elsewhere is still seen as a connection change -
-  // otherwise the previous connection's table leaks into the new one and its
-  // details lookup fails with "Table X not found".
-  const selectionOwner = React.useRef<string | null>(null)
+  // Which connection the schema/table in the URL was chosen under: the one active
+  // when the navigation landed. The router commits a navigation as a transition,
+  // after the connection change it follows, so a switch first renders the new
+  // connection beside the old URL. Opening that table failed with "Table X not
+  // found", and saving it made it the new connection's last table, which every
+  // later switch reopened. A URL the page mounts on with no connection - after a
+  // reload - belongs to none, so the picker cannot carry it over either.
+  const [selection, setSelection] = React.useState({ key: location.key, owner: connectionId })
+  const isNewLocation = selection.key !== location.key
+  if (isNewLocation) setSelection({ key: location.key, owner: connectionId })
+  const isForeignSelection = !isNewLocation && selection.owner !== connectionId
+
+  // Reopens the connection's last table when the page lands on it with no table
+  // selected, or with another connection's. Survives a disconnect, so
+  // reconnecting to the same database keeps the table on screen.
+  const restoredFor = React.useRef<string | null>(null)
   React.useEffect(() => {
     if (!active) return
-    if (selectionOwner.current === active.connectionId) return
-    const isForeignSelection = Boolean(schema && table) && selectionOwner.current !== null
-    selectionOwner.current = active.connectionId
+    if (restoredFor.current === active.connectionId && !isForeignSelection) return
+    restoredFor.current = active.connectionId
     if (schema && table && !isForeignSelection) return
-    navigate(readLastTable(active.connectionId) ?? ROUTES.database, { replace: true })
+    navigate(lastTableRoute(active.connectionId), { replace: true })
     // schema/table intentionally not in deps - only restore on connection change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, navigate])
+  }, [active, isForeignSelection, navigate])
 
   React.useEffect(() => {
-    if (!active || !schema || !table) return
-    try {
-      localStorage.setItem(
-        `orbitdb:last-table:${active.connectionId}`,
-        JSON.stringify({ schema, table })
-      )
-    } catch {
-      // ignore quota/private-mode errors
-    }
+    if (!active || !schema || !table || isForeignSelection) return
+    saveLastTable(active.connectionId, { schema, table })
     pushRecent(active.connectionId, { schema, table })
-  }, [active, schema, table])
+  }, [active, schema, table, isForeignSelection])
 
   if (!active) {
     return (
       <main className="flex min-w-0 flex-1 overflow-hidden bg-surface">
         <ConnectionPicker />
+      </main>
+    )
+  }
+
+  if (isForeignSelection) {
+    // Held for the one commit before the restore above replaces the URL.
+    return (
+      <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-surface">
+        <LoadingState />
       </main>
     )
   }
