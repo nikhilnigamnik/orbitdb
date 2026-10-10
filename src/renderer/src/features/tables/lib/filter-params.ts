@@ -1,6 +1,6 @@
 import { tableRoute } from '@renderer/config/routes'
 import type { FilterJoin, RowFilter } from '@renderer/types'
-import { OPERATORS } from './filter-editor'
+import { isUnaryOperator, OPERATORS } from './filter-editor'
 
 /**
  * Filters as URL parameters, so a filtered view can be linked and reopened.
@@ -37,8 +37,13 @@ export function decodeFilters(raw: string | null): RowFilter[] {
     if (typeof operator !== 'string' || !VALID_OPERATORS.has(operator as RowFilter['operator'])) {
       return []
     }
-    if (value != null && typeof value !== 'string') return []
-    return [{ column, operator: operator as RowFilter['operator'], value: value as string }]
+    const known = operator as RowFilter['operator']
+    if (typeof value === 'string') return [{ column, operator: known, value }]
+    // Only a unary operator may arrive without a value. A comparison with
+    // nothing to compare against would show an active chip while main skipped
+    // the clause, so the whole table would load under a filter that looks applied.
+    if (value != null || !isUnaryOperator(known)) return []
+    return [{ column, operator: known }]
   })
 }
 

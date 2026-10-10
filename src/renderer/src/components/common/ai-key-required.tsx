@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { IconSettings, IconSparkles } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
 import { ROUTES } from '@renderer/config/routes'
-import { isAiSetupMessage } from '@renderer/config/site'
+import { AI_SETUP_COPY, isAiSetupMessage } from '@renderer/config/site'
 import { cn } from '@renderer/lib/utils'
 
 /**
@@ -30,11 +30,8 @@ export function AiKeyRequired({ onNavigate, className }: AiKeyRequiredProps) {
       <span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-accent/10 text-accent-text">
         <IconSparkles size={20} />
       </span>
-      <p className="text-sm font-medium text-text">Set up an AI provider</p>
-      <p className="mt-1 max-w-[34ch] text-xs text-text-muted">
-        Add a key for Anthropic, OpenAI, Google or a Cloudflare gateway in Settings. It stays
-        encrypted on this machine.
-      </p>
+      <p className="text-sm font-medium text-text">{AI_SETUP_COPY.title}</p>
+      <p className="mt-1 max-w-[34ch] text-xs text-text-muted">{AI_SETUP_COPY.description}</p>
       <Button
         size="sm"
         variant="outline"
@@ -45,7 +42,7 @@ export function AiKeyRequired({ onNavigate, className }: AiKeyRequiredProps) {
         }}
       >
         <IconSettings size={14} />
-        Open settings
+        {AI_SETUP_COPY.action}
       </Button>
     </div>
   )

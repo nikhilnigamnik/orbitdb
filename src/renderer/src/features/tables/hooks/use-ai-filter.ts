@@ -14,6 +14,7 @@ import { unwrap } from '@renderer/lib/ipc'
 import { errorMessage } from '@renderer/lib/errors'
 import { isMissingAiKeyError } from '@renderer/components/common/ai-key-required'
 import { ROUTES } from '@renderer/config/routes'
+import { AI_SETUP_COPY } from '@renderer/config/site'
 import { useDisclosure } from '@renderer/hooks/use-disclosure'
 import { buildFilterSuggestions } from '../lib/filter-suggestions'
 import { isDialogInTheWay } from '../lib/dialog-guard'
@@ -86,9 +87,14 @@ export function useAiFilter({
       if (!isMountedRef.current) return
       // Every condition was dropped. Applying an empty filter set would widen the
       // view to the whole table and read as an answer - say so and let the user
-      // rephrase instead.
-      if (result.filters.length === 0 && result.notes?.length) {
-        toast.warning('Could not build that filter', { description: result.notes.join('\n') })
+      // rephrase instead. A drop that left no note (a column the model made up)
+      // is refused the same way rather than applied.
+      if (result.filters.length === 0) {
+        toast.warning('Could not build that filter', {
+          description: result.notes?.length
+            ? result.notes.join('\n')
+            : 'No usable condition came back. Try naming the column or value differently.'
+        })
         return
       }
       setFilters(result.filters)
@@ -104,9 +110,9 @@ export function useAiFilter({
       const message = errorMessage(err)
       // A missing key is a setup step, not a failure - say what to do about it.
       if (isMissingAiKeyError(message)) {
-        toast.error('AI needs an Anthropic API key', {
-          description: 'It stays encrypted on this machine.',
-          action: { label: 'Open settings', onClick: () => navigate(ROUTES.settings) }
+        toast.error(AI_SETUP_COPY.title, {
+          description: AI_SETUP_COPY.description,
+          action: { label: AI_SETUP_COPY.action, onClick: () => navigate(ROUTES.settings) }
         })
       } else {
         toast.error('AI filter failed', { description: message })
