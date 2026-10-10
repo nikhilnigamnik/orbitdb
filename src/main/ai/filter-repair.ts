@@ -59,6 +59,10 @@ export function snapEnumValue(value: string, labels: string[]): string | null {
  * spend a round-trip discovering that. Snapping the case here is what turns the
  * model's plausible `action = 'update'` into the `action = 'Update'` the database
  * will accept.
+ *
+ * Every drop but a hallucinated column leaves a note. The renderer applies an
+ * empty filter set that carries no notes, which widens the grid to the whole
+ * table - so a silent drop of the only condition reads as "show everything".
  */
 export function repairFilters(raw: RawFilter[], columns: ColumnInfo[]): RepairedFilters {
   const byName = new Map(columns.map((c) => [c.name, c]))
@@ -75,15 +79,27 @@ export function repairFilters(raw: RawFilter[], columns: ColumnInfo[]): Repaired
       continue
     }
 
-    if (f.value && LOOKS_LIKE_EXPRESSION.test(f.value)) continue
+    // The response schema leaves `value` optional for the unary operators above,
+    // so a comparison can arrive with nothing to compare against. The driver
+    // skips such a clause while the grid still shows the chip, so every row
+    // would load under a filter that looks applied.
+    if (f.value == null) {
+      notes.push(`No value was given for "${f.column}" - that condition was dropped.`)
+      continue
+    }
+
+    if (LOOKS_LIKE_EXPRESSION.test(f.value)) {
+      notes.push(
+        `"${f.column}" needs a literal value, not an expression like "${f.value}" - that condition was dropped.`
+      )
+      continue
+    }
 
     const labels = column.enumValues
     if (!labels?.length) {
       filters.push({ column: f.column, operator: f.operator, value: f.value })
       continue
     }
-
-    if (f.value == null) continue // binary operator with no value is dead anyway
 
     // `enum ILIKE text` is "operator does not exist" in Postgres, so a wildcard
     // match can never run. Stripping the wildcards recovers the intent instead.

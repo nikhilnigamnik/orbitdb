@@ -16,7 +16,9 @@ import {
 } from '@tabler/icons-react'
 import { Chip } from '@renderer/components/ui/chip'
 import { Kbd } from '@renderer/components/ui/kbd'
+import { useToast } from '@renderer/components/ui/toast'
 import { unwrap } from '@renderer/lib/ipc'
+import { errorMessage } from '@renderer/lib/errors'
 import { cn } from '@renderer/lib/utils'
 import { formatNumber } from '@renderer/lib/format'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
@@ -105,6 +107,7 @@ const COMMAND_CLASSES = [
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate()
+  const toast = useToast()
   const { connections, active, connect, disconnect, isConnecting } = useConnection()
   const { theme, setTheme } = useTheme()
 
@@ -153,8 +156,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     try {
       await connect(id)
       navigate(ROUTES.database)
-    } catch {
-      // connect() surfaces the error via context state
+    } catch (err) {
+      // The palette has closed and the page underneath is not the connections
+      // list, so nothing else would show why the connect failed.
+      const name = connections.find((c) => c.id === id)?.name ?? 'the database'
+      toast.error(`Could not connect to ${name}`, { description: errorMessage(err) })
     }
   }
 

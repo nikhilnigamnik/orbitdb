@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CascadeCycleError,
   CascadeLimitError,
   buildMatchSql,
+  lockStatements,
   normaliseTuples,
   planCascadeDelete,
+  rootTuples,
   toCascadeResult,
   toPkTuples,
+  tuplesPerStatement,
   type CascadeDeleteDeps
 } from '../../../src/main/db/cascade-delete'
 import {
   CASCADE_DELETE_BIND_CHUNK,
   CASCADE_DELETE_KEY_LIMIT,
   CASCADE_DELETE_MAX_DEPTH,
+  D1_MAX_BOUND_PARAMS,
   type ReferencingKeyInfo
 } from '../../../src/shared/types'
 import type { ValueSearchDialect } from '../../../src/main/db/value-search'
@@ -89,6 +94,33 @@ interface FakeRun {
   schema: FakeSchema
 }
 
+/**
+ * The database's own check, at statement end: nothing left may still point at
+ * a row that just went. Without it a delete in the wrong order passes here and
+ * is refused by a real server.
+ */
+function assertNothingDangling(
+  schema: FakeSchema,
+  name: string,
+  removed: Record<string, unknown>[]
+): void {
+  for (const fk of schema.keys[name] ?? []) {
+    // SET NULL, SET DEFAULT and CASCADE are the database's to handle.
+    if (fk.onDelete !== 'NO ACTION' && fk.onDelete !== 'RESTRICT') continue
+    const children = schema.tables[`${fk.schema}.${fk.table}`] ?? []
+    const isDangling = children.some((child) =>
+      removed.some((gone) =>
+        fk.columns.every((column, i) => child[column] === gone[fk.referencedColumns[i]])
+      )
+    )
+    if (isDangling) {
+      throw new Error(
+        `foreign key violation: ${fk.schema}.${fk.table} (${fk.columns.join(', ')}) still points at a deleted ${name} row`
+      )
+    }
+  }
+}
+
 function fake(schema: FakeSchema): FakeRun {
   const keyLookups = new Map<string, number>()
   const deps: CascadeDeleteDeps = {
@@ -122,7 +154,9 @@ function fake(schema: FakeSchema): FakeRun {
         const name = `${table[1]}.${table[2]}`
         if (order[order.length - 1] !== name) order.push(name)
         const matchesRow = predicateFor(statement.sql, statement.params)
-        schema.tables[name] = (schema.tables[name] ?? []).filter((row) => !matchesRow(row))
+        const rows = schema.tables[name] ?? []
+        schema.tables[name] = rows.filter((row) => !matchesRow(row))
+        assertNothingDangling(schema, name, rows.filter(matchesRow))
       }
       return order
     }
@@ -214,6 +248,52 @@ describe('normaliseTuples', () => {
 describe('toPkTuples', () => {
   it('refuses a partial key rather than matching on what is left', () => {
     expect(() => toPkTuples(['org', 'id'], [{ org: 'a' }])).toThrow(/Missing primary key column id/)
+  })
+})
+
+describe('rootTuples', () => {
+  it('drops NULL and duplicate keys before anything runs', () => {
+    expect(rootTuples('app', 'user', ['id'], [{ id: 1 }, { id: null }, { id: 1 }])).toEqual([[1]])
+  })
+
+  it('refuses a key list with nothing usable, with the message the planner uses', () => {
+    // The drivers lock the target rows before the planner runs. Fed the raw
+    // tuples, an all-NULL list reached the server as `where ("id" in ())`.
+    expect(() => rootTuples('app', 'user', ['id'], [{ id: null }])).toThrow(
+      /no primary key values to start from/
+    )
+    expect(() => rootTuples('app', 'user', ['id'], [])).toThrow(
+      /no primary key values to start from/
+    )
+  })
+})
+
+describe('tuplesPerStatement', () => {
+  it('keeps the tuple chunk on an engine with no parameter cap', () => {
+    expect(tuplesPerStatement({ dialect }, 1)).toBe(CASCADE_DELETE_BIND_CHUNK)
+    expect(tuplesPerStatement({ dialect }, 4)).toBe(CASCADE_DELETE_BIND_CHUNK)
+  })
+
+  it('fits whole tuples under a parameter cap, and never fewer than one', () => {
+    const d1 = { dialect, maxBindParams: D1_MAX_BOUND_PARAMS }
+    expect(tuplesPerStatement(d1, 1)).toBe(100)
+    expect(tuplesPerStatement(d1, 3)).toBe(33)
+    expect(tuplesPerStatement(d1, 250)).toBe(1)
+  })
+})
+
+describe('lockStatements', () => {
+  it('splits the lock by the parameter cap of the engine', () => {
+    const values = Array.from({ length: 250 }, (_, i) => [i])
+    const locks = lockStatements({ dialect, maxBindParams: 100 }, 'app', 'user', ['id'], values)
+    expect(locks.map((lock) => lock.params.length)).toEqual([100, 100, 50])
+    expect(locks[0].sql).toMatch(
+      /^select 1 from «app»\.«user» where \(«id» in \(.+\)\) for update$/
+    )
+  })
+
+  it('emits nothing for an empty list rather than an empty IN', () => {
+    expect(lockStatements({ dialect }, 'app', 'user', ['id'], [])).toEqual([])
   })
 })
 
@@ -502,6 +582,293 @@ describe('planCascadeDelete', () => {
     await expect(planCascadeDelete('app', 'user', ['id'], [[null]], run.deps)).rejects.toThrow(
       /no primary key values/
     )
+  })
+
+  it('binds no more parameters per statement than the engine allows', async () => {
+    // A composite key spends two parameters per tuple, so D1's cap of 100 fits
+    // fifty tuples - not the thousand the tuple chunk would have bound, which
+    // D1 rejected outright and the per-key catch then recorded as a failure,
+    // leaving the subtree out of the plan.
+    const posts = Array.from({ length: 120 }, (_, i) => ({ a: i, b: i * 2, user_id: 1 }))
+    const comments = posts.map((post, i) => ({ id: i, post_a: post.a, post_b: post.b }))
+    const run = fake({
+      tables: { 'app.user': [{ id: 1 }], 'app.post': posts, 'app.comment': comments },
+      keys: {
+        'app.user': [key({ table: 'post' })],
+        'app.post': [
+          key({
+            name: 'comment_fk',
+            table: 'comment',
+            referencedTable: 'post',
+            columns: ['post_a', 'post_b'],
+            referencedColumns: ['a', 'b']
+          })
+        ]
+      }
+    })
+    const bound: number[] = []
+    const deps: CascadeDeleteDeps = {
+      ...run.deps,
+      maxBindParams: D1_MAX_BOUND_PARAMS,
+      select: async (sql, params) => {
+        bound.push(params.length)
+        return run.deps.select(sql, params)
+      }
+    }
+
+    const { plan, statements } = await planCascadeDelete('app', 'user', ['id'], [[1]], deps)
+    for (const statement of statements) bound.push(statement.params.length)
+
+    expect(Math.max(...bound)).toBeLessThanOrEqual(D1_MAX_BOUND_PARAMS)
+    expect(plan.failures).toEqual([])
+    expect(plan.steps.map((s) => [s.table, s.rowCount])).toEqual([
+      ['post', 120],
+      ['comment', 120]
+    ])
+    // 120 two-column tuples at fifty a statement: three for comment, then one each.
+    expect(statements.map((s) => s.table)).toEqual([
+      'comment',
+      'comment',
+      'comment',
+      'post',
+      'user'
+    ])
+    expect(run.runStatements(statements)).toEqual(['app.comment', 'app.post', 'app.user'])
+    expect(run.schema.tables['app.comment']).toEqual([])
+  })
+
+  it('keeps the thousand-tuple chunk where nothing caps the parameters', async () => {
+    const posts = Array.from({ length: 120 }, (_, i) => ({ a: i, b: i * 2, user_id: 1 }))
+    const run = fake({
+      tables: {
+        'app.user': [{ id: 1 }],
+        'app.post': posts,
+        'app.comment': posts.map((post, i) => ({ id: i, post_a: post.a, post_b: post.b }))
+      },
+      keys: {
+        'app.user': [key({ table: 'post' })],
+        'app.post': [
+          key({
+            table: 'comment',
+            referencedTable: 'post',
+            columns: ['post_a', 'post_b'],
+            referencedColumns: ['a', 'b']
+          })
+        ]
+      }
+    })
+
+    const { statements } = await planCascadeDelete('app', 'user', ['id'], [[1]], run.deps)
+
+    expect(statements.map((s) => [s.table, s.params.length])).toEqual([
+      ['comment', 240],
+      ['post', 1],
+      ['user', 1]
+    ])
+  })
+
+  it('refuses a loop rather than deleting a row before the one still pointing at it', async () => {
+    // users.current_org_id -> orgs.id and orgs.owner_id -> users.id, with the
+    // user owning the org they belong to. The org must go before the user and
+    // the user before the org. The old walk planned the user again two levels
+    // down, deleted it first, and ran into the foreign key - after a preview
+    // that had re-counted the same rows at every level.
+    const run = fake({
+      tables: {
+        'app.user': [{ id: 1, current_org_id: 10 }],
+        'app.org': [{ id: 10, owner_id: 1 }]
+      },
+      keys: {
+        'app.user': [key({ name: 'org_owner_fk', table: 'org', columns: ['owner_id'] })],
+        'app.org': [
+          key({
+            name: 'user_org_fk',
+            table: 'user',
+            referencedTable: 'org',
+            columns: ['current_org_id'],
+            referencedColumns: ['id']
+          })
+        ]
+      }
+    })
+
+    const attempt = planCascadeDelete('app', 'user', ['id'], [[1]], run.deps)
+
+    await expect(attempt).rejects.toBeInstanceOf(CascadeCycleError)
+    await expect(attempt).rejects.toThrow(
+      /would loop: rows in app\.org reached through owner_id are already queued/
+    )
+    // Refused outright: nothing was planned, so there was nothing to run.
+    expect(run.schema.tables['app.user']).toHaveLength(1)
+    expect(run.schema.tables['app.org']).toHaveLength(1)
+  })
+
+  it('lets two keys into one table overlap at the same level', async () => {
+    // posts.author_id and posts.editor_id both point at users, so the two post
+    // nodes at depth 1 select overlapping post ids to feed comments. That is
+    // two paths side by side, not a loop.
+    const run = fake({
+      tables: {
+        'app.user': [{ id: 1 }],
+        'app.post': [
+          { id: 10, author_id: 1, editor_id: 1 },
+          { id: 11, author_id: 1, editor_id: 2 }
+        ],
+        'app.comment': [
+          { id: 100, post_id: 10 },
+          { id: 101, post_id: 11 }
+        ]
+      },
+      keys: {
+        'app.user': [
+          key({ name: 'post_author_fk', table: 'post', columns: ['author_id'] }),
+          key({ name: 'post_editor_fk', table: 'post', columns: ['editor_id'] })
+        ],
+        'app.post': [
+          key({
+            table: 'comment',
+            referencedTable: 'post',
+            columns: ['post_id'],
+            referencedColumns: ['id']
+          })
+        ]
+      }
+    })
+
+    const { plan, statements } = await planCascadeDelete('app', 'user', ['id'], [[1]], run.deps)
+
+    expect(plan.steps.map((s) => [s.table, s.depth, s.rowCount])).toEqual([
+      ['post', 1, 2],
+      ['post', 1, 1],
+      ['comment', 2, 2],
+      ['comment', 2, 1]
+    ])
+    expect(plan.totalRows).toBe(4)
+    expect(run.runStatements(statements)).toEqual(['app.comment', 'app.post', 'app.user'])
+    expect(run.schema.tables['app.post']).toEqual([])
+    expect(run.schema.tables['app.comment']).toEqual([])
+  })
+
+  it('deletes rows reached along two paths after the dependents of both', async () => {
+    // A user's comment on the user's own post, with a like on it. comments is
+    // reached through user_id at depth 1 and through posts.id at depth 2 with
+    // the same rows, so the likes under it are one node linked from both. In
+    // reverse walk order the deeper comments node ran before the likes whenever
+    // the catalogue listed comments.user_id ahead of posts.author_id, and the
+    // database refused it. Not a loop: nothing here points back up.
+    const run = fake({
+      tables: {
+        'app.user': [{ id: 1 }],
+        'app.post': [{ id: 10, author_id: 1 }],
+        'app.comment': [{ id: 100, user_id: 1, post_id: 10 }],
+        'app.like': [{ id: 1000, comment_id: 100 }]
+      },
+      keys: {
+        'app.user': [
+          key({ name: 'comment_user_fk', table: 'comment' }),
+          key({ name: 'post_author_fk', table: 'post', columns: ['author_id'] })
+        ],
+        'app.post': [
+          key({
+            name: 'comment_post_fk',
+            table: 'comment',
+            referencedTable: 'post',
+            columns: ['post_id'],
+            referencedColumns: ['id']
+          })
+        ],
+        'app.comment': [
+          key({
+            name: 'like_fk',
+            table: 'like',
+            referencedTable: 'comment',
+            columns: ['comment_id'],
+            referencedColumns: ['id']
+          })
+        ]
+      }
+    })
+
+    const { plan, statements } = await planCascadeDelete('app', 'user', ['id'], [[1]], run.deps)
+
+    // The like sits below the deeper of its two parents.
+    expect(plan.steps.map((s) => [s.table, s.depth])).toEqual([
+      ['comment', 1],
+      ['post', 1],
+      ['comment', 2],
+      ['like', 3]
+    ])
+    // One comment, one post, one like - the comment reached twice counts once.
+    expect(plan.totalRows).toBe(3)
+    expect(run.runStatements(statements)).toEqual([
+      'app.like',
+      'app.comment',
+      'app.post',
+      'app.comment',
+      'app.user'
+    ])
+    expect(Object.values(run.schema.tables).every((rows) => rows.length === 0)).toBe(true)
+  })
+
+  it('skips every count on the execute replan, which only needs the statements', async () => {
+    const run = fake({
+      tables: {
+        'app.user': [{ id: 1 }, { id: 2 }],
+        'app.post': [
+          { id: 10, user_id: 1 },
+          { id: 11, user_id: 1 },
+          { id: 12, user_id: 2 }
+        ],
+        'app.comment': [
+          { id: 100, post_id: 10 },
+          { id: 101, post_id: 11 },
+          { id: 102, post_id: 12 }
+        ],
+        'app.audit': []
+      },
+      keys: {
+        'app.user': [key({ table: 'post' }), key({ name: 'audit_fk', table: 'audit' })],
+        'app.post': [
+          key({
+            table: 'comment',
+            referencedTable: 'post',
+            columns: ['post_id'],
+            referencedColumns: ['id']
+          })
+        ]
+      }
+    })
+    let counts = 0
+    const deps: CascadeDeleteDeps = {
+      ...run.deps,
+      select: async (sql, params) => {
+        if (sql.startsWith('select count(*)')) counts += 1
+        return run.deps.select(sql, params)
+      }
+    }
+
+    const preview = await planCascadeDelete('app', 'user', ['id'], [[1]], deps)
+    expect(counts, 'the preview still counts').toBeGreaterThan(0)
+    expect(preview.statements.map((s) => s.table)).toEqual(['comment', 'post', 'user'])
+
+    counts = 0
+    const { plan, statements } = await planCascadeDelete('app', 'user', ['id'], [[1]], deps, {
+      shouldCount: false
+    })
+
+    expect(counts).toBe(0)
+    expect(plan.totalRows).toBe(0)
+    // The empty audit table the count had pruned is now a delete matching nothing.
+    expect(statements.map((s) => s.table)).toEqual(['comment', 'audit', 'post', 'user'])
+    expect(run.runStatements(statements)).toEqual([
+      'app.comment',
+      'app.audit',
+      'app.post',
+      'app.user'
+    ])
+    expect(run.schema.tables['app.user']).toEqual([{ id: 2 }])
+    expect(run.schema.tables['app.post']).toEqual([{ id: 12, user_id: 2 }])
+    expect(run.schema.tables['app.comment']).toEqual([{ id: 102, post_id: 12 }])
   })
 })
 

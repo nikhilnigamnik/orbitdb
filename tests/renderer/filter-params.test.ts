@@ -74,3 +74,36 @@ describe('the connector', () => {
     expect(decodeJoin('or')).toBe('or')
   })
 })
+
+describe('a comparison with nothing to compare against', () => {
+  // `?filters=[{"column":"id","operator":"=","value":null}]` used to show an
+  // active `id =` chip while main omitted the clause, so every row loaded under
+  // a filter that looked applied.
+  it('drops a binary operator whose value is JSON null', () => {
+    const raw = JSON.stringify([{ column: 'id', operator: '=', value: null }])
+    expect(decodeFilters(raw)).toEqual([])
+  })
+
+  it('drops a binary operator with no value at all, keeping its neighbours', () => {
+    const raw = JSON.stringify([
+      { column: 'id', operator: 'ilike' },
+      { column: 'name', operator: '=', value: 'keep' }
+    ])
+    expect(decodeFilters(raw)).toEqual([{ column: 'name', operator: '=', value: 'keep' }])
+  })
+
+  it('keeps an empty string, which is a value', () => {
+    const raw = JSON.stringify([{ column: 'name', operator: '=', value: '' }])
+    expect(decodeFilters(raw)).toEqual([{ column: 'name', operator: '=', value: '' }])
+  })
+
+  it('still lets a unary operator arrive with a null value', () => {
+    const raw = JSON.stringify([{ column: 'deleted_at', operator: 'is not null', value: null }])
+    expect(decodeFilters(raw)).toEqual([{ column: 'deleted_at', operator: 'is not null' }])
+  })
+
+  it('still drops a unary operator carrying something that is not a string', () => {
+    const raw = JSON.stringify([{ column: 'deleted_at', operator: 'is null', value: 42 }])
+    expect(decodeFilters(raw)).toEqual([])
+  })
+})

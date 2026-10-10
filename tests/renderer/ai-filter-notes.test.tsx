@@ -4,7 +4,9 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TableDataView } from '@renderer/features/tables/components/table-data-view'
 import { ToastProvider } from '@renderer/components/ui/toast'
+import { AI_SETUP_COPY } from '@renderer/config/site'
 import type { ColumnInfo, TableDetails } from '@renderer/types'
+import { INCOMPLETE_GATEWAY_MESSAGE, MISSING_AI_KEY_MESSAGE } from '../../src/shared/ai-models'
 
 afterEach(cleanup)
 
@@ -35,6 +37,10 @@ const details: TableDetails = {
 
 function ok<T>(data: T) {
   return Promise.resolve({ success: true as const, data })
+}
+
+function failed(error: string) {
+  return Promise.resolve({ success: false as const, error })
 }
 
 function mount(filterTable: () => Promise<unknown>) {
@@ -85,6 +91,20 @@ describe('when the AI filter drops conditions it could not make executable', () 
     expect(screen.getByPlaceholderText(/filter audit_logs/i)).toBeTruthy()
   })
 
+  it('refuses an empty answer that carries no note at all', async () => {
+    // A column the model made up is dropped without a note. That must not
+    // slip past the guard and apply [] - the grid would widen just the same.
+    const getRows = mount(() => ok({ filters: [] }))
+    await screen.findByText('a1')
+    const before = getRows.mock.calls.length
+
+    await ask()
+
+    expect(await screen.findByText('Could not build that filter')).toBeTruthy()
+    expect(screen.getByText(/no usable condition/i)).toBeTruthy()
+    expect(getRows.mock.calls.length).toBe(before)
+  })
+
   it('applies the conditions that survived and still says what went', async () => {
     const getRows = mount(() =>
       ok({
@@ -103,5 +123,25 @@ describe('when the AI filter drops conditions it could not make executable', () 
       expect(last?.filters).toEqual([{ column: 'id', operator: '=', value: 'a1' }])
     })
     expect(getRows.mock.calls.length).toBeGreaterThan(before)
+  })
+})
+
+describe('when AI is not set up yet', () => {
+  it.each([
+    ['no key for the selected provider', MISSING_AI_KEY_MESSAGE],
+    ['a half-configured Cloudflare gateway', INCOMPLETE_GATEWAY_MESSAGE]
+  ])('points at Settings without naming one provider (%s)', async (_, message) => {
+    // isMissingAiKeyError matches every provider's setup message, so the toast
+    // cannot know which key is missing. It used to say "Anthropic" regardless,
+    // telling a user with OpenAI selected to add the wrong key.
+    mount(() => failed(message))
+    await screen.findByText('a1')
+
+    await ask()
+
+    expect(await screen.findByText(AI_SETUP_COPY.title)).toBeTruthy()
+    expect(screen.queryByText(/Anthropic API key/)).toBeNull()
+    expect(screen.getByText(/OpenAI/), 'every provider is offered, not one').toBeTruthy()
+    expect(screen.getByText(AI_SETUP_COPY.action)).toBeTruthy()
   })
 })

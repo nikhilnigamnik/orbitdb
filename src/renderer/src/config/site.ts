@@ -27,6 +27,20 @@ export {
 
 export { formatCost, isPricedModel, rateFor } from '../../../shared/ai-pricing'
 
+/**
+ * The "finish setting up AI" state, worded for every provider at once.
+ * `isAiSetupMessage` matches all four providers' setup errors - and the
+ * half-configured gateway - so no surface can know which key is missing. One
+ * toast used to name Anthropic regardless, telling a user with OpenAI selected
+ * to add the wrong key.
+ */
+export const AI_SETUP_COPY = {
+  title: 'Set up an AI provider',
+  description:
+    'Add a key for Anthropic, OpenAI, Google or a Cloudflare gateway in Settings. It stays encrypted on this machine.',
+  action: 'Open settings'
+} as const
+
 export const APP_NAME = 'OrbitDB'
 export const APP_TAGLINE = 'Postgres + MySQL, made friendly'
 

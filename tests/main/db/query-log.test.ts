@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { clearQueryLogs, listQueryLogs, recordQuery } from '../../../src/main/db/query-log'
+import {
+  clearQueryLogs,
+  listQueryLogs,
+  recordQuery,
+  recordedQuery
+} from '../../../src/main/db/query-log'
 
 const base = {
   connectionId: 'c1',
@@ -69,5 +74,49 @@ describe('the buffer', () => {
     expect(entry.params).toEqual([])
     expect(entry.rowCount).toBeNull()
     expect(entry.ranAt).toBeTruthy()
+  })
+})
+
+describe('recordedQuery', () => {
+  // The pools patch their own `query` with this; a client checked out for a
+  // transaction is not covered by that patch and wraps each statement instead.
+  it('records a call that succeeds, with the row count read off its result', async () => {
+    const result = await recordedQuery(
+      { connectionId: 'c1', engine: 'postgres', sql: 'delete from t where id = $1', params: [7] },
+      async () => ({ rowCount: 3 }),
+      (res) => res.rowCount
+    )
+
+    expect(result).toEqual({ rowCount: 3 })
+    expect(listQueryLogs()[0]).toMatchObject({
+      connectionId: 'c1',
+      engine: 'postgres',
+      sql: 'delete from t where id = $1',
+      params: [7],
+      rowCount: 3,
+      success: true,
+      origin: 'internal'
+    })
+  })
+
+  it('records a call that fails, in its own words, and still throws it', async () => {
+    const failure = new Error('syntax error at end of input')
+
+    await expect(
+      recordedQuery(
+        { connectionId: 'c1', engine: 'mysql', sql: 'select 1 from t where (`id` in ())' },
+        async () => {
+          throw failure
+        },
+        () => null
+      )
+    ).rejects.toBe(failure)
+
+    expect(listQueryLogs()[0]).toMatchObject({
+      engine: 'mysql',
+      success: false,
+      error: 'syntax error at end of input',
+      params: []
+    })
   })
 })

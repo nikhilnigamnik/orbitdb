@@ -120,11 +120,25 @@ describe('repairing the filters a model returned', () => {
     expect(notes).toEqual([])
   })
 
-  it('drops a value that still smells like a SQL expression', () => {
-    // Values are bound as parameters, so this would be sent as a literal.
-    const { filters } = repair([{ column: 'user_name', operator: '=', value: 'now()' }])
+  it('drops a value that still smells like a SQL expression, and says which', () => {
+    // Values are bound as parameters, so this would be sent as a literal. When it
+    // was the only condition the result is empty, and an empty result with no
+    // note is applied as "show everything" - so the drop has to be reported.
+    const { filters, notes } = repair([{ column: 'user_name', operator: '=', value: 'now()' }])
 
     expect(filters).toEqual([])
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toContain('user_name')
+    expect(notes[0]).toContain('now()')
+  })
+
+  it('reports an expression dropped from an enum column the same way', () => {
+    const { filters, notes } = repair([{ column: 'action', operator: '=', value: 'current_date' }])
+
+    expect(filters).toEqual([])
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toContain('action')
+    expect(notes[0]).toContain('current_date')
   })
 
   it('keeps the conditions it can while dropping the ones it cannot', () => {
@@ -147,5 +161,46 @@ describe('repairing the filters a model returned', () => {
 
     expect(filters).toEqual([{ column: 'action', operator: 'ilike', value: '%up%' }])
     expect(notes).toEqual([])
+  })
+})
+
+describe('a comparison the model left without a value', () => {
+  // The response schema makes `value` optional for "is null"/"is not null", so a
+  // binary operator can arrive without one. The driver skips such a clause
+  // while the grid still shows the chip, so every row would load under a
+  // filter that looks applied.
+  it('is dropped on a plain column with a note', () => {
+    const { filters, notes } = repair([{ column: 'user_name', operator: '=' }])
+
+    expect(filters).toEqual([])
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toContain('user_name')
+  })
+
+  it('is dropped on an enum column with a note', () => {
+    const { filters, notes } = repair([{ column: 'action', operator: '!=' }])
+
+    expect(filters).toEqual([])
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toContain('action')
+  })
+
+  it('keeps an empty string, which is a real value to compare against', () => {
+    const { filters, notes } = repair([{ column: 'user_name', operator: '=', value: '' }])
+
+    expect(filters).toEqual([{ column: 'user_name', operator: '=', value: '' }])
+    expect(notes).toEqual([])
+  })
+
+  it('never leaves an empty result unexplained', () => {
+    // use-ai-filter applies an empty set that carries no notes, which widens the
+    // grid to the whole table - so every drop but a hallucinated column notes.
+    const { filters, notes } = repair([
+      { column: 'user_name', operator: '>' },
+      { column: 'user_name', operator: '=', value: "date_trunc('day', now())" }
+    ])
+
+    expect(filters).toEqual([])
+    expect(notes).toHaveLength(2)
   })
 })

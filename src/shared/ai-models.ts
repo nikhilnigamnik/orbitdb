@@ -171,6 +171,27 @@ export function currentAiModelId(value: string): string {
   return RENAMED_AI_MODEL_IDS[value] ?? value
 }
 
+/**
+ * Models that left the picker, and the current model of the same vendor and
+ * tier. Settings follow this so a retired model lands on its successor rather
+ * than on the provider's default - which under the gateway is another vendor's
+ * model. Pricing deliberately does not: a retired model keeps its own rate.
+ */
+export const SUCCEEDED_AI_MODEL_IDS: Record<string, string> = {
+  'gemini-3.6-flash': 'gemini-3.8-flash',
+  'gemini-2.5-flash': 'gemini-3.8-flash',
+  'gemini-2.5-flash-lite': 'gemini-3.5-flash-lite',
+  'gemini-2.5-pro': 'gemini-3.1-pro-preview',
+  'google-ai-studio/gemini-3.6-flash': 'google-ai-studio/gemini-3.8-flash',
+  'google-ai-studio/gemini-2.5-flash': 'google-ai-studio/gemini-3.8-flash'
+}
+
+/** The id to select for a stored model: the rename first, then the successor. */
+export function migrateAiModelId(value: string): string {
+  const renamed = currentAiModelId(value)
+  return SUCCEEDED_AI_MODEL_IDS[renamed] ?? renamed
+}
+
 export function isAiModelId(provider: AiProviderId, value: unknown): value is AiModelId {
   return isAiProviderId(provider) && aiProvider(provider).models.some((m) => m.id === value)
 }

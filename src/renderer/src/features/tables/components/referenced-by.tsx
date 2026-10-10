@@ -8,6 +8,7 @@ import { errorMessage } from '@renderer/lib/errors'
 import { unwrap } from '@renderer/lib/ipc'
 import { cn } from '@renderer/lib/utils'
 import type { ReferencingKeyInfo, RowFilter } from '@renderer/types'
+import { tileColor } from '@renderer/features/database/lib/tile-color'
 import { childFilters, childTableLabel } from '../lib/referencing'
 import { tableRouteWithFilters } from '../lib/filter-params'
 
@@ -139,7 +140,7 @@ export function ReferencedBy({ connectionId, schema, table, row, onNavigate }: R
                 aria-hidden
                 className={cn(
                   'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white',
-                  tileClass(link.key.table)
+                  tileColor(link.key.table)
                 )}
               >
                 <IconTable size={14} />
@@ -168,28 +169,6 @@ export function ReferencedBy({ connectionId, schema, table, row, onNavigate }: R
       </div>
     </Panel>
   )
-}
-
-/**
- * Attio gives every object a coloured tile. Tables have no colour of their own,
- * so one is derived from the name - stable across renders and sessions, which is
- * what lets the tile work as a landmark.
- */
-const TILE_CLASSES = [
-  'bg-tag-blue',
-  'bg-tag-violet',
-  'bg-tag-cyan',
-  'bg-tag-green',
-  'bg-tag-amber',
-  'bg-tag-orange',
-  'bg-tag-rose',
-  'bg-tag-slate'
-] as const
-
-function tileClass(name: string): string {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0
-  return TILE_CLASSES[Math.abs(hash) % TILE_CLASSES.length]
 }
 
 function Panel({ count, children }: { count?: number; children: React.ReactNode }) {

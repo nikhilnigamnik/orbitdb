@@ -101,11 +101,11 @@ describe('the API key', () => {
     expect(fileOnDisk().ai.keys.anthropic).toBe(sealed(KEY))
   })
 
-  it('follows a renamed model id, then falls back if the new name was retired', async () => {
+  it('follows a renamed model id, then its successor once the new name was retired', async () => {
     // The gateway's Gemini rows were `google/…` until the prefix turned out to
     // have to be `google-ai-studio/…`. Gemini 3.6 Flash has since left the
-    // picker, so the renamed id lands on the gateway's own default rather than
-    // being treated as unknown and moving the user off the gateway.
+    // picker, so the renamed id lands on the same vendor's current Flash model
+    // rather than on the gateway's default, which is another vendor's model.
     writeFile({
       version: 3,
       ai: {
@@ -118,7 +118,7 @@ describe('the API key', () => {
     store = await freshStore()
 
     expect(store.getAiSettings().provider).toBe('cloudflare')
-    expect(store.getAiSettings().model).toBe('anthropic/claude-sonnet-5-5')
+    expect(store.getAiSettings().model).toBe('google-ai-studio/gemini-3.8-flash')
   })
 
   it('still falls back when a model was dropped rather than renamed', async () => {

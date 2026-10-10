@@ -6,9 +6,10 @@
  * One table's worth of rows that go when the target row does.
  *
  * `columns` are the child's own columns holding the reference, and `depth` is
- * how many hops from the row the user asked to delete - 1 is a direct child.
- * Deleting deepest-first is what makes the whole thing legal, so the depth is
- * carried rather than recomputed.
+ * the level the step is deleted at: the longest chain of references from the
+ * row the user asked to delete, so 1 is a direct child and a table reached
+ * along two paths sits below the deeper one. Deleting deepest-first is what
+ * makes the whole thing legal, so the depth is carried rather than recomputed.
  */
 export interface CascadeDeleteStep {
   schema: string
@@ -87,6 +88,14 @@ export const CASCADE_DELETE_MAX_DEPTH = 6
  * splitting one delete into ten changes nothing a caller can observe.
  */
 export const CASCADE_DELETE_BIND_CHUNK = 1_000
+
+/**
+ * D1's cap on bound parameters in one statement
+ * (developers.cloudflare.com/d1/platform/limits). The tuple chunk above is far
+ * past it, so D1 chunks by parameters instead: a single-column key binds this
+ * many values per statement, a composite key this many divided by its width.
+ */
+export const D1_MAX_BOUND_PARAMS = 100
 
 /**
  * How many distinct key values one level may carry in total.

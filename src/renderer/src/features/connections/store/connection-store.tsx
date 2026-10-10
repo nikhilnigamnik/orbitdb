@@ -1,6 +1,7 @@
 import * as React from 'react'
 import type { ActiveConnectionMeta, SavedConnection } from '@renderer/types'
 import { unwrap } from '@renderer/lib/ipc'
+import { errorMessage } from '@renderer/lib/errors'
 
 interface ConnectionContextValue {
   connections: SavedConnection[]
@@ -14,10 +15,6 @@ interface ConnectionContextValue {
   isConnecting: boolean
   connectError: string | null
   disconnectError: string | null
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 const ConnectionContext = React.createContext<ConnectionContextValue | null>(null)

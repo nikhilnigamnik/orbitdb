@@ -1,3 +1,4 @@
+import { Types } from 'mysql2'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MAX_QUERY_RESULT_ROWS, type SavedConnection } from '../../../src/shared/types'
 
@@ -7,11 +8,22 @@ interface FakeConnectionHandle {
   emit: (event: string, ...args: unknown[]) => boolean
 }
 
+interface FakeField {
+  name: string
+  columnType: number
+}
+
 /** What a query on the editor session emits, in mysql2's own event order. */
-type Script = { kind: 'rows'; count: number } | { kind: 'ok'; affectedRows: number }
+type Script =
+  | { kind: 'rows'; count: number; fields?: FakeField[] }
+  | { kind: 'ok'; affectedRows: number }
 
 const state = vi.hoisted(() => ({
   poolQueries: [] as { sql: string; params: unknown[] }[],
+  /** What ran on a connection checked out with `pool.getConnection()`. */
+  checkedOutQueries: [] as { sql: string; params: unknown[] }[],
+  checkouts: 0,
+  releases: 0,
   poolConfigs: [] as Record<string, unknown>[],
   connections: [] as FakeConnectionHandle[],
   script: { kind: 'rows', count: 0 } as Script,
@@ -47,8 +59,26 @@ function respond(sql: string): unknown {
   if (sql.includes("index_name = 'PRIMARY'")) return [{ column_name: 'id' }]
   if (sql.includes('information_schema.columns')) {
     return [
-      { name: 'id', data_type: 'int', column_type: 'int' },
-      { name: 'doc', data_type: 'json', column_type: 'json' }
+      { name: 'id', data_type: 'int', column_type: 'int', extra: 'auto_increment' },
+      { name: 'doc', data_type: 'json', column_type: 'json', extra: '' },
+      {
+        name: 'total',
+        data_type: 'decimal',
+        column_type: 'decimal(10,2)',
+        extra: 'STORED GENERATED'
+      },
+      {
+        name: 'created_at',
+        data_type: 'timestamp',
+        column_type: 'timestamp',
+        extra: 'DEFAULT_GENERATED'
+      },
+      {
+        name: 'updated_at',
+        data_type: 'timestamp',
+        column_type: 'timestamp',
+        extra: 'on update CURRENT_TIMESTAMP'
+      }
     ].map((c, i) => ({
       ...c,
       is_nullable: 'YES',
@@ -71,14 +101,29 @@ vi.mock('mysql2/promise', () => ({
           state.poolQueries.push({ sql, params })
           return [respond(sql), []]
         },
+        async getConnection() {
+          state.checkouts += 1
+          return {
+            async query(sql: string, params: unknown[] = []) {
+              state.checkedOutQueries.push({ sql, params })
+              return [respond(sql), []]
+            },
+            release(): void {
+              state.releases += 1
+            }
+          }
+        },
         end: () => Promise.resolve()
       }
     }
   }
 }))
 
-vi.mock('mysql2', async () => {
+vi.mock('mysql2', async (importOriginal) => {
   const { EventEmitter } = await import('node:events')
+  // The real type constants, so the field mapping is checked against mysql2's
+  // own numbers rather than a copy of them.
+  const { Types } = await importOriginal<typeof import('mysql2')>()
   class Connection extends EventEmitter {
     threadId = 77
     isEnded = false
@@ -95,7 +140,7 @@ vi.mock('mysql2', async () => {
           query.emit('fields', undefined)
           query.emit('result', { affectedRows: script.affectedRows })
         } else {
-          query.emit('fields', [{ name: 'id', columnType: 3 }])
+          query.emit('fields', script.fields ?? [{ name: 'id', columnType: 3 }])
           for (let id = 0; id < script.count; id += 1) query.emit('result', { id }, 0)
         }
         query.emit('end')
@@ -111,6 +156,7 @@ vi.mock('mysql2', async () => {
     }
   }
   return {
+    Types,
     createConnection: () => {
       const connection = new Connection()
       state.connections.push(connection)
@@ -124,6 +170,9 @@ let driver: Driver
 
 beforeEach(async () => {
   state.poolQueries = []
+  state.checkedOutQueries = []
+  state.checkouts = 0
+  state.releases = 0
   state.poolConfigs = []
   state.connections = []
   state.script = { kind: 'rows', count: 0 }
@@ -148,7 +197,37 @@ describe('editor results', () => {
 
     expect(result.rows).toHaveLength(MAX_QUERY_RESULT_ROWS)
     expect(result.truncated).toBe(true)
-    expect(result.fields).toEqual([{ name: 'id', dataTypeID: 3 }])
+    // An integer has no rendering of its own, so its type id is dropped.
+    expect(result.fields).toEqual([{ name: 'id', dataTypeID: 0 }])
+  })
+
+  it('reports field types as the Postgres OIDs the renderer reads, not mysql2 numbers', async () => {
+    // mysql2's own ids collide with the OIDs: BIT is 16, the bool OID, so a
+    // bit column was drawn with a tick over its bytes.
+    expect(Types.BIT).toBe(16)
+    state.script = {
+      kind: 'rows',
+      count: 1,
+      fields: [
+        { name: 'flags', columnType: Types.BIT },
+        { name: 'born', columnType: Types.DATE },
+        { name: 'seen', columnType: Types.DATETIME },
+        { name: 'at', columnType: Types.TIMESTAMP },
+        { name: 'doc', columnType: Types.JSON },
+        { name: 'n', columnType: Types.LONG }
+      ]
+    }
+
+    const result = await driver.runQuery({ connectionId: SAVED.id, sql: 'select * from t' })
+
+    expect(result.fields).toEqual([
+      { name: 'flags', dataTypeID: 0 },
+      { name: 'born', dataTypeID: 1082 },
+      { name: 'seen', dataTypeID: 1114 },
+      { name: 'at', dataTypeID: 1114 },
+      { name: 'doc', dataTypeID: 114 },
+      { name: 'n', dataTypeID: 0 }
+    ])
   })
 
   it('reports a result exactly at the cap as complete', async () => {
@@ -192,6 +271,73 @@ describe('editor results', () => {
     await running
 
     expect(state.poolQueries.map((q) => q.sql)).toContain('KILL QUERY 77')
+  })
+})
+
+describe('introspection', () => {
+  it('reads `extra` to report the columns the database supplies itself', async () => {
+    // auto_increment never appears in column_default, which is where the seed
+    // feature looked - so the model invented ids and INSERT IGNORE dropped
+    // every duplicate as "Added 0 rows". A column that only updates itself
+    // (`on update CURRENT_TIMESTAMP` with no default) still needs a value.
+    const details = await driver.tableDetails(SAVED.id, 'app', 'docs')
+
+    const flags = Object.fromEntries(details.columns.map((c) => [c.name, c.isAutoGenerated]))
+    expect(flags).toEqual({
+      id: true,
+      doc: false,
+      total: true,
+      created_at: true,
+      updated_at: false
+    })
+    const columnsQuery = state.poolQueries.find((q) => q.sql.includes('information_schema.columns'))
+    expect(columnsQuery?.sql).toMatch(/\bextra\b/)
+  })
+})
+
+describe('cascade delete', () => {
+  it('logs every statement of the transaction, once, from the checked-out connection', async () => {
+    // Same registry as the driver's own import: both follow the resetModules above.
+    const { listQueryLogs } = await import('../../../src/main/db/query-log')
+
+    await driver.cascadeDelete({
+      connectionId: SAVED.id,
+      schema: 'app',
+      table: 'users',
+      pks: [{ id: 1 }]
+    })
+
+    const ran = state.checkedOutQueries.map((q) => q.sql)
+    expect(ran[0]).toBe('start transaction')
+    expect(ran.at(-1)).toBe('commit')
+    expect(ran.some((sql) => sql.includes('for update'))).toBe(true)
+    expect(ran.filter((sql) => sql.startsWith('delete from'))).toHaveLength(1)
+    expect(
+      state.poolQueries.some((q) => q.sql.startsWith('delete from')),
+      'the pool never saw the delete'
+    ).toBe(false)
+
+    // Oldest first, and exactly what the connection ran: nothing missing, nothing twice.
+    const logged = listQueryLogs()
+      .filter((entry) => ran.includes(entry.sql))
+      .map((entry) => entry.sql)
+      .reverse()
+    expect(logged).toEqual(ran)
+    expect(listQueryLogs().filter((entry) => entry.sql.startsWith('delete from'))).toHaveLength(1)
+    expect(state.releases, 'the connection went back to the pool').toBe(1)
+  })
+
+  it('refuses an all-NULL key before taking a connection, rather than locking on an empty IN', async () => {
+    await expect(
+      driver.cascadeDelete({
+        connectionId: SAVED.id,
+        schema: 'app',
+        table: 'users',
+        pks: [{ id: null }]
+      })
+    ).rejects.toThrow(/no primary key values to start from/)
+
+    expect(state.checkouts).toBe(0)
   })
 })
 

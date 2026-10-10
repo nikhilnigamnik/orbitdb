@@ -5,8 +5,8 @@
  * the many call sites do not depend on how a pool is obtained.
  */
 
-import { Pool, type ClientConfig, type PoolConfig } from 'pg'
-import { recordQuery } from '../../query-log'
+import { Pool, type ClientConfig, type PoolClient, type PoolConfig, type QueryResult } from 'pg'
+import { recordedQuery } from '../../query-log'
 import { invalidateIntrospection } from '../../introspection-cache'
 import { pgTlsOptions } from '../../tls'
 import { describeError } from '../../describe-error'
@@ -55,9 +55,12 @@ function createPool(connectionId: string): Pool {
   pools.set(connectionId, pool)
   return pool
 }
+function rowCountOf(res: { rowCount?: number | null } | undefined): number | null {
+  return res?.rowCount ?? null
+}
 function instrumentPgPool(pool: Pool, connectionId: string): void {
   const original = pool.query.bind(pool) as (...args: unknown[]) => Promise<unknown>
-  ;(pool as unknown as { query: unknown }).query = async function patched(
+  ;(pool as unknown as { query: unknown }).query = function patched(
     ...args: unknown[]
   ): Promise<unknown> {
     const first = args[0] as string | { text?: string; values?: unknown[] }
@@ -66,32 +69,29 @@ function instrumentPgPool(pool: Pool, connectionId: string): void {
       typeof first === 'string'
         ? ((args[1] as unknown[] | undefined) ?? [])
         : ((first?.values as unknown[] | undefined) ?? [])
-    const t0 = Date.now()
-    try {
-      const res = (await original(...args)) as { rowCount?: number | null }
-      recordQuery({
-        connectionId,
-        engine: 'postgres',
-        sql,
-        params,
-        durationMs: Date.now() - t0,
-        rowCount: res?.rowCount ?? null,
-        success: true
-      })
-      return res
-    } catch (err) {
-      recordQuery({
-        connectionId,
-        engine: 'postgres',
-        sql,
-        params,
-        durationMs: Date.now() - t0,
-        success: false,
-        error: describeError(err)
-      })
-      throw err
-    }
+    return recordedQuery(
+      { connectionId, engine: 'postgres', sql, params },
+      () => original(...args) as Promise<{ rowCount?: number | null }>,
+      rowCountOf
+    )
   }
+}
+/**
+ * `query` for a client checked out of the pool, recorded the way the pool's
+ * own calls are. The patch above covers `pool.query` only; a transaction has
+ * to hold one client, and nothing it ran there reached the log. Handed back as
+ * a function rather than patched onto the client, which returns to the pool.
+ */
+export function loggedQuery(
+  client: Pick<PoolClient, 'query'>,
+  connectionId: string
+): (sql: string, params?: unknown[]) => Promise<QueryResult<Record<string, unknown>>> {
+  return (sql, params = []) =>
+    recordedQuery(
+      { connectionId, engine: 'postgres', sql, params },
+      () => client.query<Record<string, unknown>>(sql, params),
+      rowCountOf
+    )
 }
 export async function disconnectPool(connectionId: string): Promise<void> {
   const pool = pools.get(connectionId)

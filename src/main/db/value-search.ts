@@ -43,7 +43,17 @@ const TEXTUAL = new Set([
   'name',
   'uuid',
   'json',
-  'jsonb'
+  'jsonb',
+  // MySQL reports its longer text types under their own names, and `enum` and
+  // `set` arrive as the bare type once normalise() drops the label list.
+  'tinytext',
+  'mediumtext',
+  'longtext',
+  'nchar',
+  'nvarchar',
+  'enum',
+  'set',
+  'clob'
 ])
 
 const NUMERIC = new Set([
@@ -89,6 +99,22 @@ export function isNumericTerm(term: string): boolean {
 }
 
 /**
+ * The character named in the `escape` clause of a contains search. Not a
+ * backslash: MySQL reads one inside a string literal as its own escape, and
+ * SQLite has no default escape character at all, so `!` is what means the same
+ * thing on all three engines.
+ */
+const LIKE_ESCAPE = '!'
+
+/**
+ * A term made literal for LIKE. Without this `order_1` matched `orderX1`, and
+ * a lone `%` or `_` counted every non-empty value as a hit.
+ */
+export function escapeLikeTerm(term: string): string {
+  return term.replace(/[!%_]/g, (char) => `${LIKE_ESCAPE}${char}`)
+}
+
+/**
  * Whether a column can hold the term being looked for. An enum counts as
  * textual - Postgres reports it as `USER-DEFINED`, which is why `enumValues` is
  * consulted rather than the type name.
@@ -131,7 +157,7 @@ export function buildTableSearchSql(
   const candidates = columns.filter((column) => isSearchableColumn(column, mode, term))
   if (candidates.length === 0) return null
 
-  const bound = mode === 'exact' ? term : `%${term.toLowerCase()}%`
+  const bound = mode === 'exact' ? term : `%${escapeLikeTerm(term.toLowerCase())}%`
 
   // The same value is bound once per column rather than once per query. It is
   // tempting to bind it a single time and repeat the placeholder, but `?` is
@@ -150,7 +176,7 @@ export function buildTableSearchSql(
         : // Both sides lowered rather than trusting ILIKE or a collation: the
           // three engines disagree, and a search that is case-sensitive on one
           // of them is a silent wrong answer.
-          `lower(${cast}) like ${placeholder}`
+          `lower(${cast}) like ${placeholder} escape '${LIKE_ESCAPE}'`
     return `sum(case when ${predicate} then 1 else 0 end) as c${i}`
   })
 

@@ -3,7 +3,7 @@ import { join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
 import {
   AI_PROVIDERS,
-  currentAiModelId,
+  migrateAiModelId,
   DEFAULT_AI_PROVIDER,
   defaultModelFor,
   isAiModelId,
@@ -127,10 +127,11 @@ function parseFile(): StoreShape {
     if (typeof key === 'string') state.ai.keys[provider.id] = key
     // A model dropped from the registry between releases must not be handed to
     // the provider; fall back rather than fail every AI call. A model that was
-    // only renamed is followed to its new id instead - falling back there would
-    // move the user to another vendor's model without saying so.
+    // renamed or retired is followed to its current id or its successor first -
+    // falling back there would move the user to another vendor's model without
+    // saying so, since the gateway's default is an Anthropic model.
     const stored = models[provider.id]
-    const model = typeof stored === 'string' ? currentAiModelId(stored) : stored
+    const model = typeof stored === 'string' ? migrateAiModelId(stored) : stored
     if (isAiModelId(provider.id, model)) state.ai.models[provider.id] = model
   }
   if (isAiProviderId(ai.provider)) state.ai.provider = ai.provider

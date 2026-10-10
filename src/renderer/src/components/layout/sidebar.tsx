@@ -15,6 +15,7 @@ import {
   type Icon
 } from '@tabler/icons-react'
 import { cn } from '@renderer/lib/utils'
+import { errorMessage } from '@renderer/lib/errors'
 import { APP_NAME, CONNECTION_TILE_CLASS } from '@renderer/config/site'
 import { ROUTES } from '@renderer/config/routes'
 import { useConnection } from '@renderer/features/connections/store/connection-store'
@@ -24,6 +25,7 @@ import { useUpdateCheck } from '@renderer/features/settings/store'
 import { SidebarTables } from '@renderer/features/database/components/schema-tree'
 import { requestValueSearch } from '@renderer/features/database/lib/schema-events'
 import { Kbd } from '@renderer/components/ui/kbd'
+import { useToast } from '@renderer/components/ui/toast'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -202,6 +204,7 @@ function ConnectionTile({ connection }: { connection: SavedConnection | null }) 
  */
 function WorkspaceSwitcher() {
   const navigate = useNavigate()
+  const toast = useToast()
   const { connections, current, connect, disconnect } = useConnection()
 
   async function switchTo(id: string) {
@@ -209,8 +212,11 @@ function WorkspaceSwitcher() {
     try {
       await connect(id)
       navigate(ROUTES.database)
-    } catch {
-      // The store records connectError; the connections page surfaces it.
+    } catch (err) {
+      // The connections page shows a failure only beside the Connect pressed
+      // there, so a switch that failed here has to say so itself.
+      const name = connections.find((c) => c.id === id)?.name ?? 'the database'
+      toast.error(`Could not connect to ${name}`, { description: errorMessage(err) })
       navigate(ROUTES.connections)
     }
   }

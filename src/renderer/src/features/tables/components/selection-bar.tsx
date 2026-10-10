@@ -7,13 +7,14 @@
 
 import { IconDownload, IconTrash, IconX } from '@tabler/icons-react'
 import { Button } from '@renderer/components/ui/button'
+import type { ColumnInfo, DatabaseEngine } from '@renderer/types'
 import { ExportMenu } from './export-menu'
-import type { DatabaseEngine } from '@renderer/types'
+import { udtNamesOf } from '../lib/clipboard-format'
 
 interface SelectionBarProps {
   count: number
   rows: Record<string, unknown>[]
-  columns: string[]
+  columns: ColumnInfo[]
   schema: string
   table: string
   engine: DatabaseEngine
@@ -53,7 +54,8 @@ export function SelectionBar({
         </Button>
         <ExportMenu
           rows={rows}
-          columns={columns}
+          columns={columns.map((column) => column.name)}
+          udtNames={udtNamesOf(columns)}
           filenameParts={[schema, table]}
           side="top"
           align="center"

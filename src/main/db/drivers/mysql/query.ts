@@ -6,6 +6,7 @@
 
 import {
   createConnection,
+  Types,
   type Connection,
   type FieldPacket,
   type OkPacket,
@@ -28,6 +29,24 @@ import {
 } from '../../../../shared/types'
 import { requireConnection } from '../../../store/connections-store'
 import { getPool, toConnectionConfig } from './pool'
+
+/**
+ * The renderer reads `dataTypeID` as a Postgres OID, so mysql2's column types
+ * are translated to the OIDs that change how a value renders. Everything else
+ * is 0 rather than passed through: mysql2's numbers collide with the OIDs, and
+ * its BIT is 16, the bool OID, which drew a tick over a byte string.
+ */
+const PG_OID_BY_MYSQL_TYPE: Record<number, number> = {
+  [Types.DATE]: 1082,
+  [Types.DATETIME]: 1114,
+  [Types.TIMESTAMP]: 1114,
+  [Types.JSON]: 114
+}
+
+export function toPgTypeId(columnType: unknown): number {
+  if (typeof columnType !== 'number') return 0
+  return PG_OID_BY_MYSQL_TYPE[columnType] ?? 0
+}
 
 /** mysql2 marks the errors after which it has already torn the connection down. */
 function isFatalMysqlError(err: unknown): boolean {
@@ -143,7 +162,7 @@ export async function runQuery(opts: RunQueryOptions): Promise<QueryResult> {
       rows: outcome.rows,
       fields: (outcome.fields ?? []).map((f) => ({
         name: String(f.name),
-        dataTypeID: typeof f.columnType === 'number' ? f.columnType : 0
+        dataTypeID: toPgTypeId(f.columnType)
       })),
       rowCount,
       command: detectCommand(opts.sql),

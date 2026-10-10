@@ -10,13 +10,21 @@ import {
 import { useToast } from '@renderer/components/ui/toast'
 import { exportToFile, type ExportFormat } from '@renderer/lib/export'
 import { errorMessage } from '@renderer/lib/errors'
-import { toInsertSql, toJsonText, toTsv, type InsertTarget } from '../lib/clipboard-format'
+import {
+  toInsertSql,
+  toJsonText,
+  toTsv,
+  type InsertTarget,
+  type UdtNames
+} from '../lib/clipboard-format'
 
 interface ExportMenuProps {
   /** Rows to export, already resolved (e.g. current page or current selection). */
   rows: Record<string, unknown>[]
   /** Column order for tabular formats (csv/xlsx). */
   columns: string[]
+  /** Column types, so a copied date reads as the grid shows it. */
+  udtNames?: UdtNames
   /** Filename segments, e.g. [schema, table]. */
   filenameParts: string[]
   /** The trigger element (rendered via `asChild`). */
@@ -35,6 +43,7 @@ interface ExportMenuProps {
 export function ExportMenu({
   rows,
   columns,
+  udtNames,
   filenameParts,
   children,
   align = 'end',
@@ -84,7 +93,9 @@ export function ExportMenu({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onSelect={() => void copy('text', toTsv(rows, columns, { withHeader: true }))}
+              onSelect={() =>
+                void copy('text', toTsv(rows, columns, { withHeader: true, udtNames }))
+              }
             >
               <IconClipboard size={16} />
               Copy as text
