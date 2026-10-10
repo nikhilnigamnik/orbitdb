@@ -1,6 +1,11 @@
 import { ipcMain, app, shell } from 'electron'
 import { safeExternalUrl } from '../app/open-external'
 import { checkForUpdate } from '../app/update-check'
+import {
+  getUpdateDownloadState,
+  installDownloadedUpdate,
+  startUpdateDownload
+} from '../app/updater'
 import { describeError } from '../db/describe-error'
 import { changeTheme } from '../app/theme'
 import { getThemePreference } from '../store/appearance-store'
@@ -389,6 +394,18 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'app:check-update',
     wrap(async () => checkForUpdate())
+  )
+  ipcMain.handle(
+    'app:update-download',
+    wrap(async () => startUpdateDownload())
+  )
+  ipcMain.handle(
+    'app:update-state',
+    wrap(() => getUpdateDownloadState())
+  )
+  ipcMain.handle(
+    'app:update-install',
+    wrap(async () => installDownloadedUpdate())
   )
   ipcMain.handle(
     'app:get-theme',

@@ -3,7 +3,6 @@ import {
   IconRefresh,
   IconCircleCheck,
   IconCircleArrowUp,
-  IconExternalLink,
   IconBrandGithub,
   IconAlertTriangle,
   IconSettings,
@@ -28,6 +27,7 @@ import { useUpdateCheck } from '@renderer/features/settings/store'
 
 import { AiSettings } from './ai-settings'
 import { AppearanceSettings } from './appearance-settings'
+import { UpdateActions } from './update-actions'
 import { UsageSettings } from './usage-settings'
 import { SettingFooter, SettingRow, SettingsCard } from './settings-card'
 import { SettingsNav, type SettingsNavItem } from './settings-nav'
@@ -50,7 +50,17 @@ const SECTIONS: SettingsNavItem[] = [
 const ACTIVE_SECTION_OFFSET = 96
 
 export function SettingsPage() {
-  const { version, result, isChecking, error, lastCheckedAt, check } = useUpdateCheck()
+  const {
+    version,
+    result,
+    isChecking,
+    error,
+    lastCheckedAt,
+    check,
+    download,
+    startDownload,
+    install
+  } = useUpdateCheck()
   const toast = useToast()
 
   async function openExternal(url: string) {
@@ -200,17 +210,13 @@ export function SettingsPage() {
                           </>
                         }
                       />
-                      {result.releaseUrl && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="shrink-0"
-                          onClick={() => void openExternal(result.releaseUrl!)}
-                        >
-                          <IconExternalLink size={14} />
-                          Open release page
-                        </Button>
-                      )}
+                      <UpdateActions
+                        result={result}
+                        download={download}
+                        onDownload={() => void startDownload()}
+                        onInstall={() => void install()}
+                        onOpenRelease={(url) => void openExternal(url)}
+                      />
                     </div>
                   ) : (
                     <UpdateStatus

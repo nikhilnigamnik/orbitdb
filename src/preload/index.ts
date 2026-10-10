@@ -1,7 +1,7 @@
 // Sandboxed: this file may import only what a sandboxed preload can require
 // (contextBridge, ipcRenderer) and read only `process.platform`. Anything else
 // fails at load and leaves the renderer with no `window.api` at all.
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type {
   ActiveConnectionMeta,
   ExplainSqlOptions,
@@ -52,11 +52,13 @@ import type {
   UsageSummary,
   TestConnectionResult,
   UpdateCheckResult,
+  UpdateDownloadState,
   ValueSearchOptions,
   ValueSearchResult,
   CheckReferencesOptions,
   CheckReferencesResult
 } from '../shared/types'
+import { UPDATE_STATE_CHANNEL } from '../shared/types'
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<OperationResult<T>> {
   return ipcRenderer.invoke(channel, ...args)
@@ -146,6 +148,18 @@ const api = {
   app: {
     getVersion: () => invoke<string>('app:get-version'),
     checkUpdate: () => invoke<UpdateCheckResult>('app:check-update'),
+    downloadUpdate: () => invoke<UpdateDownloadState>('app:update-download'),
+    getUpdateState: () => invoke<UpdateDownloadState>('app:update-state'),
+    installUpdate: () => invoke<void>('app:update-install'),
+    /** Download progress pushed from main; returns the unsubscribe. */
+    onUpdateState: (listener: (state: UpdateDownloadState) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, state: UpdateDownloadState): void =>
+        listener(state)
+      ipcRenderer.on(UPDATE_STATE_CHANNEL, handler)
+      return () => {
+        ipcRenderer.removeListener(UPDATE_STATE_CHANNEL, handler)
+      }
+    },
     openExternal: (url: string) => invoke<void>('app:open-external', url),
     getTheme: () => invoke<ThemePreference>('app:get-theme'),
     setTheme: (theme: ThemePreference) => invoke<ThemePreference>('app:set-theme', theme)

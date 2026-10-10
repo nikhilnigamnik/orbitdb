@@ -53,6 +53,7 @@ beforeEach(() => {
             currentVersion: '0.3.0',
             latestVersion: null,
             hasUpdate: false,
+            installSupport: 'manual',
             releaseUrl: null,
             publishedAt: null
           })
