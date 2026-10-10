@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { unwrap } from '@renderer/lib/ipc'
-import type { UpdateCheckResult } from '@renderer/types'
+import { errorMessage } from '@renderer/lib/errors'
+import type { UpdateCheckResult, UpdateDownloadState } from '@renderer/types'
+import { IDLE_UPDATE_DOWNLOAD } from '../../../../shared/types'
 
 interface UpdateContextValue {
   version: string | null
@@ -9,6 +11,10 @@ interface UpdateContextValue {
   error: string | null
   lastCheckedAt: Date | null
   check: () => Promise<void>
+  /** The in-app download, when this build supports one. */
+  download: UpdateDownloadState
+  startDownload: () => Promise<void>
+  install: () => Promise<void>
 }
 
 const UpdateContext = React.createContext<UpdateContextValue | null>(null)
@@ -26,6 +32,7 @@ export function UpdateCheckProvider({ children }: { children: React.ReactNode })
   const [isChecking, setIsChecking] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [lastCheckedAt, setLastCheckedAt] = React.useState<Date | null>(null)
+  const [download, setDownload] = React.useState<UpdateDownloadState>(IDLE_UPDATE_DOWNLOAD)
 
   React.useEffect(() => {
     void (async () => {
@@ -57,9 +64,51 @@ export function UpdateCheckProvider({ children }: { children: React.ReactNode })
     void check()
   }, [check])
 
+  // Main owns the download; this mirrors its state and follows the pushes. A
+  // preload from before the updater existed has none of these, and the panel
+  // then only links to the release page rather than failing to mount.
+  React.useEffect(() => {
+    const api = appApi()
+    if (typeof api.onUpdateState !== 'function') return undefined
+    void (async () => {
+      try {
+        setDownload(await unwrap(api.getUpdateState()))
+      } catch {
+        // Nothing to mirror yet; the first push fills it in.
+      }
+    })()
+    return api.onUpdateState(setDownload)
+  }, [])
+
+  const startDownload = React.useCallback(async () => {
+    try {
+      setDownload(await unwrap(appApi().downloadUpdate()))
+    } catch (err) {
+      setDownload((prev) => ({ ...prev, phase: 'error', error: errorMessage(err) }))
+    }
+  }, [])
+
+  const install = React.useCallback(async () => {
+    try {
+      await unwrap(appApi().installUpdate())
+    } catch (err) {
+      setDownload((prev) => ({ ...prev, phase: 'error', error: errorMessage(err) }))
+    }
+  }, [])
+
   const value = React.useMemo<UpdateContextValue>(
-    () => ({ version, result, isChecking, error, lastCheckedAt, check }),
-    [version, result, isChecking, error, lastCheckedAt, check]
+    () => ({
+      version,
+      result,
+      isChecking,
+      error,
+      lastCheckedAt,
+      check,
+      download,
+      startDownload,
+      install
+    }),
+    [version, result, isChecking, error, lastCheckedAt, check, download, startDownload, install]
   )
 
   return <UpdateContext.Provider value={value}>{children}</UpdateContext.Provider>

@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import type { UpdateCheckResult } from '../../shared/types'
+import { updateInstallSupport } from './updater'
 
 const RELEASES_API = 'https://api.github.com/repos/nikhilnigamnik/orbitdb/releases/latest'
 
@@ -31,8 +32,10 @@ function compareSemver(a: string, b: string): number {
 
 export async function checkForUpdate(): Promise<UpdateCheckResult> {
   const currentVersion = app.getVersion()
+  const installSupport = updateInstallSupport()
   const empty: UpdateCheckResult = {
     currentVersion,
+    installSupport,
     latestVersion: null,
     hasUpdate: false,
     releaseUrl: null,
@@ -58,6 +61,7 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
     latestVersion,
     hasUpdate,
     releaseUrl: release.html_url,
-    publishedAt: release.published_at
+    publishedAt: release.published_at,
+    installSupport
   }
 }

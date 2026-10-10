@@ -64,6 +64,8 @@ export type {
   TestConnectionResult,
   ThemePreference,
   UpdateCheckResult,
+  UpdateDownloadState,
+  UpdateInstallSupport,
   UsageBreakdown,
   UsageSummary,
   UsageWindow,
