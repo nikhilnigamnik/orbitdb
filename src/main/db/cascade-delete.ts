@@ -1,6 +1,5 @@
 import {
   CASCADE_DELETE_BIND_CHUNK,
-  CASCADE_DELETE_KEY_LIMIT,
   CASCADE_DELETE_MAX_DEPTH,
   type CascadeDeletePlan,
   type CascadeDeleteResult,
@@ -8,8 +7,18 @@ import {
   type CascadeDetachStep,
   type ReferencingKeyInfo
 } from '../../shared/types'
+import {
+  CascadeCycleError,
+  CascadeLimitError,
+  PlanGraph,
+  assertWithinKeyLimit,
+  tupleKey,
+  type PlanNode
+} from './cascade-plan-guard'
 import { toCount } from './coerce'
 import type { ValueSearchDialect } from './value-search'
+
+export { CascadeCycleError, CascadeLimitError } from './cascade-plan-guard'
 
 /**
  * Deleting a row together with everything that depends on it.
@@ -38,8 +47,27 @@ export interface CascadeStatement {
 
 export interface CascadeDeleteDeps {
   dialect: ValueSearchDialect
+  /**
+   * How many bound parameters one statement may carry, on an engine that caps
+   * it. D1 refuses more than 100; Postgres and MySQL take far more than the
+   * tuple chunk ever binds and leave this unset.
+   */
+  maxBindParams?: number
   referencingKeys(schema: string, table: string): Promise<ReferencingKeyInfo[]>
   select(sql: string, params: unknown[]): Promise<Record<string, unknown>[]>
+}
+
+export interface CascadePlanOptions {
+  /**
+   * Whether to count the rows each step, and the plan as a whole, will delete.
+   *
+   * The preview needs the counts - they are what the user agrees to. The
+   * execute path replans only for the statements and discards the plan, and on
+   * Postgres and MySQL it does so inside the write transaction with the target
+   * rows locked, so it turns them off: every `rowCount` and `totalRows` is then
+   * 0, and a step the count would have pruned is a delete matching nothing.
+   */
+  shouldCount?: boolean
 }
 
 export interface CascadePlanResult {
@@ -50,18 +78,16 @@ export interface CascadePlanResult {
 
 /** A planned step and the node it deletes - paired so neither can drift. */
 interface PlannedStep {
+  /** The node's place in the plan graph, which decides the delete order. */
+  index: number
   step: CascadeDeleteStep
   node: PlanNode
 }
 
-/** A set of rows, named by the columns whose values pick them out. */
-interface PlanNode {
-  schema: string
-  table: string
-  matchColumns: string[]
-  matchValues: unknown[][]
-  depth: number
-}
+type QueuedNode = Pick<PlannedStep, 'index' | 'node'>
+
+/** What a statement builder needs: where the values go and how many fit. */
+type BindContext = Pick<CascadeDeleteDeps, 'dialect' | 'maxBindParams'>
 
 /**
  * Rows are matched by an IN list rather than a correlated subquery.
@@ -96,21 +122,29 @@ export function buildMatchSql(
 }
 
 /**
- * Splits a value list into batches small enough to bind.
+ * Tuples per statement.
+ *
+ * Postgres and MySQL take `CASCADE_DELETE_BIND_CHUNK` tuples. An engine that
+ * caps bound parameters gets however many whole tuples fit under the cap - a
+ * composite key spends one parameter per column - and never fewer than one.
+ */
+export function tuplesPerStatement(ctx: BindContext, columnCount: number): number {
+  if (ctx.maxBindParams === undefined) return CASCADE_DELETE_BIND_CHUNK
+  return Math.max(1, Math.floor(ctx.maxBindParams / Math.max(1, columnCount)))
+}
+
+/**
+ * Splits a value list into batches small enough to bind. An empty list gives
+ * no batch at all: a statement over an empty IN list is a syntax error.
  *
  * The batches partition a *distinct* set of tuples, so a row matches at most one
  * of them - which is what lets the counts be summed and the deletes be run one
  * after another without either double-counting.
  */
 function chunk<T>(items: T[], size: number): T[][] {
-  if (items.length <= size) return [items]
   const batches: T[][] = []
   for (let i = 0; i < items.length; i += size) batches.push(items.slice(i, i + size))
   return batches
-}
-
-function tupleKey(tuple: unknown[]): string {
-  return JSON.stringify(tuple.map((value) => (value instanceof Date ? value.toISOString() : value)))
 }
 
 /**
@@ -157,7 +191,8 @@ async function valuesFor(
 
   const projection = columns.map((column) => deps.dialect.quoteIdent(column)).join(', ')
   const collected: unknown[][] = []
-  for (const batch of chunk(node.matchValues, CASCADE_DELETE_BIND_CHUNK)) {
+  const size = tuplesPerStatement(deps, node.matchColumns.length)
+  for (const batch of chunk(node.matchValues, size)) {
     const params: unknown[] = []
     const where = buildMatchSql(deps.dialect, node.matchColumns, batch, params)
     const sql = `select distinct ${projection} from ${deps.dialect.qualifiedTable(node.schema, node.table)} where ${where}`
@@ -175,7 +210,7 @@ async function countMatching(
   deps: CascadeDeleteDeps
 ): Promise<number> {
   let total = 0
-  for (const batch of chunk(values, CASCADE_DELETE_BIND_CHUNK)) {
+  for (const batch of chunk(values, tuplesPerStatement(deps, columns.length))) {
     const params: unknown[] = []
     const where = buildMatchSql(deps.dialect, columns, batch, params)
     const sql = `select count(*) as total from ${deps.dialect.qualifiedTable(schema, table)} where ${where}`
@@ -185,11 +220,12 @@ async function countMatching(
   return total
 }
 
-function deleteStatements(node: PlanNode, deps: CascadeDeleteDeps): CascadeStatement[] {
-  return chunk(node.matchValues, CASCADE_DELETE_BIND_CHUNK).map((batch) => {
+function deleteStatements(node: PlanNode, ctx: BindContext): CascadeStatement[] {
+  const size = tuplesPerStatement(ctx, node.matchColumns.length)
+  return chunk(node.matchValues, size).map((batch) => {
     const params: unknown[] = []
-    const where = buildMatchSql(deps.dialect, node.matchColumns, batch, params)
-    const sql = `delete from ${deps.dialect.qualifiedTable(node.schema, node.table)} where ${where}`
+    const where = buildMatchSql(ctx.dialect, node.matchColumns, batch, params)
+    const sql = `delete from ${ctx.dialect.qualifiedTable(node.schema, node.table)} where ${where}`
     return { schema: node.schema, table: node.table, sql, params }
   })
 }
@@ -207,16 +243,16 @@ function deleteStatements(node: PlanNode, deps: CascadeDeleteDeps): CascadeState
  * is no transaction for a lock to live in.
  */
 export function lockStatements(
-  dialect: ValueSearchDialect,
+  ctx: BindContext,
   schema: string,
   table: string,
   columns: string[],
   values: unknown[][]
 ): CascadeStatement[] {
-  return chunk(values, CASCADE_DELETE_BIND_CHUNK).map((batch) => {
+  return chunk(values, tuplesPerStatement(ctx, columns.length)).map((batch) => {
     const params: unknown[] = []
-    const where = buildMatchSql(dialect, columns, batch, params)
-    const sql = `select 1 from ${dialect.qualifiedTable(schema, table)} where ${where} for update`
+    const where = buildMatchSql(ctx.dialect, columns, batch, params)
+    const sql = `select 1 from ${ctx.dialect.qualifiedTable(schema, table)} where ${where} for update`
     return { schema, table, sql, params }
   })
 }
@@ -228,32 +264,6 @@ function isDetaching(onDelete: string): boolean {
 
 function isUsableKey(key: ReferencingKeyInfo): boolean {
   return key.columns.length > 0 && key.columns.length === key.referencedColumns.length
-}
-
-/**
- * Distinct from a per-table failure: one table that cannot be read leaves a plan
- * worth showing, but a plan too large to bind is not a plan at all, so this is
- * rethrown past the per-key catch rather than collected.
- */
-export class CascadeLimitError extends Error {}
-
-/**
- * The bound on a level, once chunking has taken the statement size out of it.
- *
- * This counts *parent* keys, not the rows they select: a row with 50k log
- * entries carries a single value and cascades fine. It is deliberately far
- * above the chunk size - an intermediate table matching a few thousand rows is
- * an ordinary customer/orders/order-items shape, not a pathological one, and
- * refusing it left the user with no path at all once the plain delete had
- * already been turned down by the foreign key.
- */
-function assertWithinKeyLimit(node: PlanNode): void {
-  if (node.matchValues.length <= CASCADE_DELETE_KEY_LIMIT) return
-  throw new CascadeLimitError(
-    `Too many rows to cascade safely: ${node.schema}.${node.table} matches ` +
-      `${node.matchValues.length} keys, past the limit of ${CASCADE_DELETE_KEY_LIMIT}. ` +
-      `Delete these in the query editor instead.`
-  )
 }
 
 /**
@@ -297,7 +307,7 @@ async function countPlannedRows(planned: PlannedStep[], deps: CascadeDeleteDeps)
       (sum, entry) => sum + entry.node.matchValues.length * entry.node.matchColumns.length,
       0
     )
-    if (bound > CASCADE_DELETE_BIND_CHUNK) {
+    if (bound > (deps.maxBindParams ?? CASCADE_DELETE_BIND_CHUNK)) {
       total += summed
       continue
     }
@@ -325,26 +335,57 @@ async function countUnion(nodes: PlanNode[], deps: CascadeDeleteDeps): Promise<n
   return toCount(rows[0]?.total)
 }
 
+function assertRootValues(
+  schema: string,
+  table: string,
+  pkColumns: string[],
+  values: unknown[][]
+): void {
+  if (pkColumns.length > 0 && values.length > 0) return
+  throw new Error(`Cannot cascade from ${schema}.${table}: no primary key values to start from`)
+}
+
+/**
+ * The tuples the walk starts from: each row's primary key, distinct and with
+ * NULLs dropped - or the planner's own error when nothing is left.
+ *
+ * The drivers' lock step runs before the planner does and used to take the raw
+ * tuples, so an all-NULL key list produced `where ("id" in ()) for update`: a
+ * syntax error raised from inside the transaction in place of this message.
+ */
+export function rootTuples(
+  schema: string,
+  table: string,
+  pkColumns: string[],
+  pks: Record<string, unknown>[]
+): unknown[][] {
+  const values = normaliseTuples(toPkTuples(pkColumns, pks))
+  assertRootValues(schema, table, pkColumns, values)
+  return values
+}
+
 /**
  * Breadth-first down the foreign key graph, counting as it goes.
  *
- * Breadth-first is not incidental: a row's dependents are always at a strictly
- * greater depth than the row itself, so walking back up the levels is a delete
- * order that never leaves a constraint violated. Two tables that reference each
- * other would revisit the same row set forever, hence the `seen` guard; a
- * self-referencing tree walks down real levels instead and is bounded by depth.
+ * The walk is breadth-first so that `depth` is a hop count, but the delete
+ * order comes from the `PlanGraph` the walk builds: a node's rank is the
+ * longest path the root reaches it by, and ranks are deleted deepest first.
+ * In a tree that is the reversed walk; where a table is reached along two
+ * paths it is what keeps the node after the dependents of both. A link that
+ * closes a loop is refused outright, and a self-referencing tree walks down
+ * real levels instead and is bounded by depth.
  */
 export async function planCascadeDelete(
   schema: string,
   table: string,
   pkColumns: string[],
   pkValues: unknown[][],
-  deps: CascadeDeleteDeps
+  deps: CascadeDeleteDeps,
+  options: CascadePlanOptions = {}
 ): Promise<CascadePlanResult> {
+  const shouldCount = options.shouldCount ?? true
   const rootValues = normaliseTuples(pkValues)
-  if (pkColumns.length === 0 || rootValues.length === 0) {
-    throw new Error(`Cannot cascade from ${schema}.${table}: no primary key values to start from`)
-  }
+  assertRootValues(schema, table, pkColumns, rootValues)
 
   const root: PlanNode = {
     schema,
@@ -355,11 +396,11 @@ export async function planCascadeDelete(
   }
   assertWithinKeyLimit(root)
 
+  const graph = new PlanGraph(root)
   const planned: PlannedStep[] = []
   const detached: CascadeDetachStep[] = []
   const failures: { table: string; error: string }[] = []
-  const seen = new Set<string>()
-  const queue: PlanNode[] = [root]
+  const queue: QueuedNode[] = [{ node: root, index: 0 }]
   let isTruncated = false
 
   // One sweep per table rather than per node. A self-referencing tree meets the
@@ -377,7 +418,7 @@ export async function planCascadeDelete(
   }
 
   while (queue.length > 0) {
-    const node = queue.shift() as PlanNode
+    const { node, index } = queue.shift() as QueuedNode
 
     let keys: ReferencingKeyInfo[]
     try {
@@ -398,18 +439,22 @@ export async function planCascadeDelete(
         const parentValues = await valuesFor(node, key.referencedColumns, deps)
         if (parentValues.length === 0) continue
 
-        const rowCount = await countMatching(key.schema, key.table, key.columns, parentValues, deps)
+        const rowCount = shouldCount
+          ? await countMatching(key.schema, key.table, key.columns, parentValues, deps)
+          : null
         if (rowCount === 0) continue
 
         if (isDetaching(key.onDelete)) {
-          detached.push({
-            schema: key.schema,
-            table: key.table,
-            columns: key.columns,
-            constraintName: key.name,
-            onDelete: key.onDelete,
-            rowCount
-          })
+          if (rowCount !== null) {
+            detached.push({
+              schema: key.schema,
+              table: key.table,
+              columns: key.columns,
+              constraintName: key.name,
+              onDelete: key.onDelete,
+              rowCount
+            })
+          }
           continue
         }
 
@@ -431,14 +476,11 @@ export async function planCascadeDelete(
         }
         assertWithinKeyLimit(child)
 
-        const fingerprint = `${child.schema}.${child.table}|${child.matchColumns.join(',')}|${child.matchValues
-          .map(tupleKey)
-          .sort()
-          .join('|')}`
-        if (seen.has(fingerprint)) continue
-        seen.add(fingerprint)
+        const link = graph.link(index, child)
+        if (!link.isNew) continue
 
         planned.push({
+          index: link.index,
           step: {
             schema: key.schema,
             table: key.table,
@@ -447,14 +489,14 @@ export async function planCascadeDelete(
             parentSchema: node.schema,
             parentTable: node.table,
             depth: child.depth,
-            rowCount,
+            rowCount: rowCount ?? 0,
             onDelete: key.onDelete
           },
           node: child
         })
-        queue.push(child)
+        queue.push({ node: child, index: link.index })
       } catch (err) {
-        if (err instanceof CascadeLimitError) throw err
+        if (err instanceof CascadeLimitError || err instanceof CascadeCycleError) throw err
         failures.push({
           table: `${key.schema}.${key.table}`,
           error: err instanceof Error ? err.message : String(err)
@@ -463,19 +505,23 @@ export async function planCascadeDelete(
     }
   }
 
-  const statements = [...planned]
+  // Shallowest rank first; the deletes are exactly that, reversed.
+  const ordered = [...planned].sort(
+    (a, b) => graph.rankOf(a.index) - graph.rankOf(b.index) || a.index - b.index
+  )
+  const statements = [...ordered]
     .reverse()
     .flatMap((entry) => deleteStatements(entry.node, deps))
     .concat(deleteStatements(root, deps))
 
-  const totalRows = await countPlannedRows(planned, deps)
+  const totalRows = shouldCount ? await countPlannedRows(planned, deps) : 0
 
   return {
     plan: {
       schema,
       table,
       targetRows: rootValues.length,
-      steps: planned.map((entry) => entry.step),
+      steps: ordered.map((entry) => ({ ...entry.step, depth: graph.rankOf(entry.index) })),
       detached,
       totalRows,
       isTruncated,

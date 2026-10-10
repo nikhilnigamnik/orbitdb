@@ -12,14 +12,13 @@ import {
 import {
   lockStatements,
   planCascadeDelete,
+  rootTuples,
   toCascadeResult,
-  toPkTuples,
-  type CascadeDeleteDeps,
-  type CascadePlanResult
+  type CascadeDeleteDeps
 } from '../../cascade-delete'
 import { searchDialect } from './dialect'
 import { referencingKeys, tableDetails } from './introspect'
-import { getPool } from './pool'
+import { getPool, loggedQuery } from './pool'
 
 type CascadeSelect = (sql: string, params: unknown[]) => Promise<Record<string, unknown>[]>
 function cascadeDeps(connectionId: string, select: CascadeSelect): CascadeDeleteDeps {
@@ -29,37 +28,27 @@ function cascadeDeps(connectionId: string, select: CascadeSelect): CascadeDelete
     select
   }
 }
-/**
- * `select` is threaded in so the delete can run the walk on the connection that
- * holds its transaction. Reading the plan on a pooled connection and then
- * opening the transaction on another left every count outside it.
- */
-async function planCascade(
-  opts: CascadeDeleteOptions,
-  select?: CascadeSelect
-): Promise<CascadePlanResult> {
+async function primaryKeyOf(opts: CascadeDeleteOptions): Promise<string[]> {
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   if (details.primaryKey.length === 0) {
     throw new Error(`Cannot delete rows on ${opts.schema}.${opts.table}: no primary key`)
   }
-  let run = select
-  if (!run) {
-    const pool = await getPool(opts.connectionId)
-    run = async (sql, params) => {
-      const [rows] = await pool.query<RowDataPacket[]>(sql, params)
-      return rows as Record<string, unknown>[]
-    }
-  }
-  return planCascadeDelete(
-    opts.schema,
-    opts.table,
-    details.primaryKey,
-    toPkTuples(details.primaryKey, opts.pks),
-    cascadeDeps(opts.connectionId, run)
-  )
+  return details.primaryKey
 }
 export async function cascadeDeletePlan(opts: CascadeDeleteOptions): Promise<CascadeDeletePlan> {
-  return (await planCascade(opts)).plan
+  const pkColumns = await primaryKeyOf(opts)
+  const pool = await getPool(opts.connectionId)
+  const { plan } = await planCascadeDelete(
+    opts.schema,
+    opts.table,
+    pkColumns,
+    rootTuples(opts.schema, opts.table, pkColumns, opts.pks),
+    cascadeDeps(opts.connectionId, async (sql, params) => {
+      const [rows] = await pool.query<RowDataPacket[]>(sql, params)
+      return rows as Record<string, unknown>[]
+    })
+  )
+  return plan
 }
 /**
  * Replanned rather than handed the preview's statements: the plan crosses IPC
@@ -72,44 +61,51 @@ export async function cascadeDeletePlan(opts: CascadeDeleteOptions): Promise<Cas
  *
  * The replan runs *inside* the transaction, behind a `for update` on the target
  * rows, so a child inserted after the walk counted its parent cannot slip past
- * the bound lists and fail the delete.
+ * the bound lists and fail the delete. It replans without counting: the counts
+ * were for the preview, and here they would only hold the locks longer.
+ *
+ * Every statement goes through `loggedQuery`, since a connection checked out
+ * of the pool is not covered by the pool's own query log.
  */
 export async function cascadeDelete(opts: CascadeDeleteOptions): Promise<CascadeDeleteResult> {
-  const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
-  if (details.primaryKey.length === 0) {
-    throw new Error(`Cannot delete rows on ${opts.schema}.${opts.table}: no primary key`)
-  }
+  const pkColumns = await primaryKeyOf(opts)
+  // Resolved before a connection is taken: an all-NULL key list used to reach
+  // the lock as `where (`id` in ()) for update`, a syntax error from inside the
+  // transaction in place of the planner's own message.
+  const rootValues = rootTuples(opts.schema, opts.table, pkColumns, opts.pks)
   const pool = await getPool(opts.connectionId)
   const conn = await pool.getConnection()
+  const run = loggedQuery(conn, opts.connectionId)
   try {
-    await conn.beginTransaction()
-    const select: CascadeSelect = async (sql, params) => {
-      const [rows] = await conn.query<RowDataPacket[]>(sql, params)
+    await run('start transaction')
+    const deps = cascadeDeps(opts.connectionId, async (sql, params) => {
+      const [rows] = await run<RowDataPacket[]>(sql, params)
       return rows as Record<string, unknown>[]
+    })
+    for (const lock of lockStatements(deps, opts.schema, opts.table, pkColumns, rootValues)) {
+      await run(lock.sql, lock.params)
     }
-    for (const lock of lockStatements(
-      searchDialect,
+    const { statements } = await planCascadeDelete(
       opts.schema,
       opts.table,
-      details.primaryKey,
-      toPkTuples(details.primaryKey, opts.pks)
-    )) {
-      await conn.query(lock.sql, lock.params)
-    }
-    const { statements } = await planCascade(opts, select)
+      pkColumns,
+      rootValues,
+      deps,
+      { shouldCount: false }
+    )
     const affected: { schema: string; table: string; rows: number }[] = []
     for (const statement of statements) {
-      const [result] = await conn.query<ResultSetHeader>(statement.sql, statement.params)
+      const [result] = await run<ResultSetHeader>(statement.sql, statement.params)
       affected.push({
         schema: statement.schema,
         table: statement.table,
         rows: result.affectedRows ?? 0
       })
     }
-    await conn.commit()
+    await run('commit')
     return toCascadeResult(affected, true)
   } catch (err) {
-    await conn.rollback().catch(() => {})
+    await run('rollback').catch(() => {})
     throw err
   } finally {
     conn.release()

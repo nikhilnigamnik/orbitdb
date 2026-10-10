@@ -3,6 +3,7 @@
  */
 
 import {
+  D1_MAX_BOUND_PARAMS,
   type CascadeDeleteOptions,
   type CascadeDeletePlan,
   type CascadeDeleteResult,
@@ -10,9 +11,10 @@ import {
 } from '../../../../shared/types'
 import {
   planCascadeDelete,
+  rootTuples,
   toCascadeResult,
-  toPkTuples,
   type CascadeDeleteDeps,
+  type CascadePlanOptions,
   type CascadePlanResult
 } from '../../cascade-delete'
 import { callD1, loadSaved, searchDialect } from './client'
@@ -21,11 +23,17 @@ import { referencingKeys, tableDetails } from './introspect'
 function cascadeDeps(saved: SavedConnection, connectionId: string): CascadeDeleteDeps {
   return {
     dialect: searchDialect,
+    // Past this D1 rejects the statement outright, and the planner's per-key
+    // catch then recorded a failure and left the whole subtree out of the plan.
+    maxBindParams: D1_MAX_BOUND_PARAMS,
     referencingKeys: (schema, table) => referencingKeys(connectionId, schema, table),
     select: async (sql, params) => (await callD1(saved, sql, params)).results
   }
 }
-async function planCascade(opts: CascadeDeleteOptions): Promise<CascadePlanResult> {
+async function planCascade(
+  opts: CascadeDeleteOptions,
+  options?: CascadePlanOptions
+): Promise<CascadePlanResult> {
   const saved = loadSaved(opts.connectionId)
   const details = await tableDetails(opts.connectionId, opts.schema, opts.table)
   if (details.primaryKey.length === 0) {
@@ -35,8 +43,9 @@ async function planCascade(opts: CascadeDeleteOptions): Promise<CascadePlanResul
     opts.schema,
     opts.table,
     details.primaryKey,
-    toPkTuples(details.primaryKey, opts.pks),
-    cascadeDeps(saved, opts.connectionId)
+    rootTuples(opts.schema, opts.table, details.primaryKey, opts.pks),
+    cascadeDeps(saved, opts.connectionId),
+    options
   )
 }
 export async function cascadeDeletePlan(opts: CascadeDeleteOptions): Promise<CascadeDeletePlan> {
@@ -53,10 +62,13 @@ export async function cascadeDeletePlan(opts: CascadeDeleteOptions): Promise<Cas
  * Deepest-first ordering makes that far less likely to matter: the deletes that
  * could still be refused are the last ones, so a failure usually means the
  * dependents went and the target row did not.
+ *
+ * The replan skips the counts: they were for the preview, and here each one is
+ * a REST round trip that decides nothing.
  */
 export async function cascadeDelete(opts: CascadeDeleteOptions): Promise<CascadeDeleteResult> {
   const saved = loadSaved(opts.connectionId)
-  const { statements } = await planCascade(opts)
+  const { statements } = await planCascade(opts, { shouldCount: false })
   const affected: { schema: string; table: string; rows: number }[] = []
   for (const statement of statements) {
     try {

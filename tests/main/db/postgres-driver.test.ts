@@ -15,6 +15,10 @@ interface FakeClientHandle {
 
 const state = vi.hoisted(() => ({
   poolQueries: [] as { sql: string; params: unknown[] }[],
+  /** What ran on a client checked out with `pool.connect()`. */
+  clientQueries: [] as { sql: string; params: unknown[] }[],
+  connects: 0,
+  releases: 0,
   poolConfigs: [] as Record<string, unknown>[],
   clients: [] as FakeClientHandle[],
   cursors: [] as { sql: string; params: unknown[] | undefined }[],
@@ -61,6 +65,7 @@ function respond(sql: string): Record<string, unknown>[] {
   if (sql.includes('c.relname as table, a.attname as column')) return []
   if (sql.includes('a.attname as column')) return [{ column: 'id' }]
   if (sql.includes('information_schema.columns') && sql.includes('table_name = $2')) {
+    const pgCatalog = { udt_schema: 'pg_catalog', is_identity: 'NO', is_generated: 'NEVER' }
     return [
       { ...pgCatalog, name: 'id', data_type: 'integer', udt_name: 'int4', is_identity: 'YES' },
       { ...pgCatalog, name: 'doc', data_type: 'jsonb', udt_name: 'jsonb' },
@@ -72,7 +77,6 @@ function respond(sql: string): Record<string, unknown>[] {
         udt_name: 'int4',
         is_generated: 'ALWAYS'
       }
-    const pgCatalog = { udt_schema: 'pg_catalog', is_identity: 'NO', is_generated: 'NEVER' }
     ].map((c, i) => ({
       ...c,
       is_nullable: 'YES',
@@ -98,6 +102,19 @@ vi.mock('pg', async () => {
       state.poolQueries.push({ sql, params })
       const rows = respond(sql)
       return { rows, rowCount: rows.length }
+    }
+    async connect() {
+      state.connects += 1
+      return {
+        async query(sql: string, params: unknown[] = []) {
+          state.clientQueries.push({ sql, params })
+          const rows = respond(sql)
+          return { rows, rowCount: rows.length }
+        },
+        release(): void {
+          state.releases += 1
+        }
+      }
     }
     end(): Promise<void> {
       return Promise.resolve()
@@ -168,6 +185,9 @@ let driver: Driver
 
 beforeEach(async () => {
   state.poolQueries = []
+  state.clientQueries = []
+  state.connects = 0
+  state.releases = 0
   state.poolConfigs = []
   state.clients = []
   state.cursors = []
@@ -296,34 +316,6 @@ describe('cancelling', () => {
     expect(countPool('pg_cancel_backend')).toBe(0)
   })
 
-  it('signals the session backend once the query is running', async () => {
-    state.readGate = gate()
-    const running = driver.runQuery({ connectionId: SAVED.id, sql: 'select 1', queryId: 'q1' })
-    await vi.waitFor(() => expect(state.cursorReads).toHaveLength(1))
-
-    await driver.cancelQuery(SAVED.id, 'q1')
-    state.readGate.open()
-    await running
-
-    const cancel = state.poolQueries.find((q) => q.sql.includes('pg_cancel_backend'))
-    expect(cancel?.params).toEqual([4242])
-  })
-})
-
-describe('introspection caching', () => {
-  it('runs one introspection for two concurrent first callers', async () => {
-    const [a, b] = await Promise.all([
-      driver.tableDetails(SAVED.id, 'public', 'users'),
-      driver.tableDetails(SAVED.id, 'public', 'users')
-    ])
-
-    expect(a).toBe(b)
-    expect(countPool('c.relkind::text as kind')).toBe(1)
-  })
-
-  it('caches the schema graph until something may have changed the schema', async () => {
-    const loads = (): number => countPool('select c.relname as name')
-    await driver.getSchemaGraph(SAVED.id, 'public')
   it('keeps the session when the cancel lands before the run attached', async () => {
     // The cancel is raised by this app before anything reached the socket. It
     // carries no severity, which used to read as fatal and end the session -
@@ -342,12 +334,20 @@ describe('introspection caching', () => {
     expect(state.clients, 'the next run reuses the session').toHaveLength(1)
   })
 
-    await driver.getSchemaGraph(SAVED.id, 'public')
-    expect(loads()).toBe(1)
+  it('signals the session backend once the query is running', async () => {
+    state.readGate = gate()
+    const running = driver.runQuery({ connectionId: SAVED.id, sql: 'select 1', queryId: 'q1' })
+    await vi.waitFor(() => expect(state.cursorReads).toHaveLength(1))
 
-    await driver.runQuery({ connectionId: SAVED.id, sql: 'select 1' })
-    await driver.getSchemaGraph(SAVED.id, 'public')
-    expect(loads(), 'a read leaves it').toBe(1)
+    await driver.cancelQuery(SAVED.id, 'q1')
+    state.readGate.open()
+    await running
+
+    const cancel = state.poolQueries.find((q) => q.sql.includes('pg_cancel_backend'))
+    expect(cancel?.params).toEqual([4242])
+  })
+})
+
 describe('introspection', () => {
   it("reports identity and generated columns as the database's own", async () => {
     // An identity column has no column_default, so the seed feature's
@@ -365,6 +365,26 @@ describe('introspection', () => {
   })
 })
 
+describe('introspection caching', () => {
+  it('runs one introspection for two concurrent first callers', async () => {
+    const [a, b] = await Promise.all([
+      driver.tableDetails(SAVED.id, 'public', 'users'),
+      driver.tableDetails(SAVED.id, 'public', 'users')
+    ])
+
+    expect(a).toBe(b)
+    expect(countPool('c.relkind::text as kind')).toBe(1)
+  })
+
+  it('caches the schema graph until something may have changed the schema', async () => {
+    const loads = (): number => countPool('select c.relname as name')
+    await driver.getSchemaGraph(SAVED.id, 'public')
+    await driver.getSchemaGraph(SAVED.id, 'public')
+    expect(loads()).toBe(1)
+
+    await driver.runQuery({ connectionId: SAVED.id, sql: 'select 1' })
+    await driver.getSchemaGraph(SAVED.id, 'public')
+    expect(loads(), 'a read leaves it').toBe(1)
 
     await driver.runQuery({ connectionId: SAVED.id, sql: 'create table t (id int)' })
     await driver.getSchemaGraph(SAVED.id, 'public')
@@ -386,6 +406,52 @@ describe('introspection', () => {
     await driver.disconnectPool(SAVED.id)
     await driver.getSchemaGraph(SAVED.id, 'public')
     expect(loads(), 'and disconnecting').toBe(5)
+  })
+})
+
+describe('cascade delete', () => {
+  it('logs every statement of the transaction, once, from the checked-out client', async () => {
+    // Same registry as the driver's own import: both follow the resetModules above.
+    const { listQueryLogs } = await import('../../../src/main/db/query-log')
+
+    await driver.cascadeDelete({
+      connectionId: SAVED.id,
+      schema: 'public',
+      table: 'users',
+      pks: [{ id: 1 }]
+    })
+
+    const ran = state.clientQueries.map((q) => q.sql)
+    expect(ran[0]).toBe('begin')
+    expect(ran.at(-1)).toBe('commit')
+    expect(ran.some((sql) => sql.includes('for update'))).toBe(true)
+    expect(ran.filter((sql) => sql.startsWith('delete from'))).toHaveLength(1)
+    expect(
+      state.poolQueries.some((q) => q.sql.startsWith('delete from')),
+      'the pool never saw the delete'
+    ).toBe(false)
+
+    // Oldest first, and exactly what the client ran: nothing missing, nothing twice.
+    const logged = listQueryLogs()
+      .filter((entry) => ran.includes(entry.sql))
+      .map((entry) => entry.sql)
+      .reverse()
+    expect(logged).toEqual(ran)
+    expect(listQueryLogs().filter((entry) => entry.sql.startsWith('delete from'))).toHaveLength(1)
+    expect(state.releases, 'the client went back to the pool').toBe(1)
+  })
+
+  it('refuses an all-NULL key before taking a client, rather than locking on an empty IN', async () => {
+    await expect(
+      driver.cascadeDelete({
+        connectionId: SAVED.id,
+        schema: 'public',
+        table: 'users',
+        pks: [{ id: null }]
+      })
+    ).rejects.toThrow(/no primary key values to start from/)
+
+    expect(state.connects).toBe(0)
   })
 })
 

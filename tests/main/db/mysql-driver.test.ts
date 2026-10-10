@@ -20,6 +20,10 @@ type Script =
 
 const state = vi.hoisted(() => ({
   poolQueries: [] as { sql: string; params: unknown[] }[],
+  /** What ran on a connection checked out with `pool.getConnection()`. */
+  checkedOutQueries: [] as { sql: string; params: unknown[] }[],
+  checkouts: 0,
+  releases: 0,
   poolConfigs: [] as Record<string, unknown>[],
   connections: [] as FakeConnectionHandle[],
   script: { kind: 'rows', count: 0 } as Script,
@@ -97,6 +101,18 @@ vi.mock('mysql2/promise', () => ({
           state.poolQueries.push({ sql, params })
           return [respond(sql), []]
         },
+        async getConnection() {
+          state.checkouts += 1
+          return {
+            async query(sql: string, params: unknown[] = []) {
+              state.checkedOutQueries.push({ sql, params })
+              return [respond(sql), []]
+            },
+            release(): void {
+              state.releases += 1
+            }
+          }
+        },
         end: () => Promise.resolve()
       }
     }
@@ -105,6 +121,9 @@ vi.mock('mysql2/promise', () => ({
 
 vi.mock('mysql2', async (importOriginal) => {
   const { EventEmitter } = await import('node:events')
+  // The real type constants, so the field mapping is checked against mysql2's
+  // own numbers rather than a copy of them.
+  const { Types } = await importOriginal<typeof import('mysql2')>()
   class Connection extends EventEmitter {
     threadId = 77
     isEnded = false
@@ -137,11 +156,9 @@ vi.mock('mysql2', async (importOriginal) => {
     }
   }
   return {
+    Types,
     createConnection: () => {
       const connection = new Connection()
-  // The real type constants, so the field mapping is checked against mysql2's
-  // own numbers rather than a copy of them.
-  const { Types } = await importOriginal<typeof import('mysql2')>()
       state.connections.push(connection)
       return connection
     }
@@ -153,6 +170,9 @@ let driver: Driver
 
 beforeEach(async () => {
   state.poolQueries = []
+  state.checkedOutQueries = []
+  state.checkouts = 0
+  state.releases = 0
   state.poolConfigs = []
   state.connections = []
   state.script = { kind: 'rows', count: 0 }
@@ -174,7 +194,6 @@ describe('editor results', () => {
     state.script = { kind: 'rows', count: MAX_QUERY_RESULT_ROWS + 25 }
 
     const result = await driver.runQuery({ connectionId: SAVED.id, sql: 'select * from big' })
-    Types,
 
     expect(result.rows).toHaveLength(MAX_QUERY_RESULT_ROWS)
     expect(result.truncated).toBe(true)
@@ -255,20 +274,6 @@ describe('editor results', () => {
   })
 })
 
-describe('writing JSON columns', () => {
-  it('serialises an object headed for a json column instead of sending [object Object]', async () => {
-    await driver.updateRow({
-      connectionId: SAVED.id,
-      schema: 'app',
-      table: 'docs',
-      values: { doc: { a: [1, 2] } },
-      pk: { id: 1 }
-    })
-
-    const update = state.poolQueries.find((q) => q.sql.startsWith('update '))
-    expect(update?.params).toEqual(['{"a":[1,2]}', 1])
-  })
-})
 describe('introspection', () => {
   it('reads `extra` to report the columns the database supplies itself', async () => {
     // auto_increment never appears in column_default, which is where the seed
@@ -290,3 +295,63 @@ describe('introspection', () => {
   })
 })
 
+describe('cascade delete', () => {
+  it('logs every statement of the transaction, once, from the checked-out connection', async () => {
+    // Same registry as the driver's own import: both follow the resetModules above.
+    const { listQueryLogs } = await import('../../../src/main/db/query-log')
+
+    await driver.cascadeDelete({
+      connectionId: SAVED.id,
+      schema: 'app',
+      table: 'users',
+      pks: [{ id: 1 }]
+    })
+
+    const ran = state.checkedOutQueries.map((q) => q.sql)
+    expect(ran[0]).toBe('start transaction')
+    expect(ran.at(-1)).toBe('commit')
+    expect(ran.some((sql) => sql.includes('for update'))).toBe(true)
+    expect(ran.filter((sql) => sql.startsWith('delete from'))).toHaveLength(1)
+    expect(
+      state.poolQueries.some((q) => q.sql.startsWith('delete from')),
+      'the pool never saw the delete'
+    ).toBe(false)
+
+    // Oldest first, and exactly what the connection ran: nothing missing, nothing twice.
+    const logged = listQueryLogs()
+      .filter((entry) => ran.includes(entry.sql))
+      .map((entry) => entry.sql)
+      .reverse()
+    expect(logged).toEqual(ran)
+    expect(listQueryLogs().filter((entry) => entry.sql.startsWith('delete from'))).toHaveLength(1)
+    expect(state.releases, 'the connection went back to the pool').toBe(1)
+  })
+
+  it('refuses an all-NULL key before taking a connection, rather than locking on an empty IN', async () => {
+    await expect(
+      driver.cascadeDelete({
+        connectionId: SAVED.id,
+        schema: 'app',
+        table: 'users',
+        pks: [{ id: null }]
+      })
+    ).rejects.toThrow(/no primary key values to start from/)
+
+    expect(state.checkouts).toBe(0)
+  })
+})
+
+describe('writing JSON columns', () => {
+  it('serialises an object headed for a json column instead of sending [object Object]', async () => {
+    await driver.updateRow({
+      connectionId: SAVED.id,
+      schema: 'app',
+      table: 'docs',
+      values: { doc: { a: [1, 2] } },
+      pk: { id: 1 }
+    })
+
+    const update = state.poolQueries.find((q) => q.sql.startsWith('update '))
+    expect(update?.params).toEqual(['{"a":[1,2]}', 1])
+  })
+})
