@@ -168,6 +168,19 @@ describe('length limits', () => {
   it('measures the raw value, not a trimmed one', () => {
     expect(() => coerce('text', '  a  ', false, { characterMaximumLength: 3 })).toThrow(/exceeds/)
   })
+
+  it('counts characters, not UTF-16 code units', () => {
+    // Postgres and MySQL measure varchar(n) in characters. An emoji is two
+    // code units, so `.length` refused three of them on a varchar(3).
+    const emoji = '\u{1F600}'
+
+    expect(coerce('varchar', emoji.repeat(3), false, { characterMaximumLength: 3 })).toBe(
+      emoji.repeat(3)
+    )
+    expect(() => coerce('varchar', emoji.repeat(4), false, { characterMaximumLength: 3 })).toThrow(
+      /exceeds 3 characters/
+    )
+  })
 })
 
 describe('stringifyValue', () => {

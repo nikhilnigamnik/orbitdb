@@ -397,7 +397,7 @@ export function TableDataView({
           <SelectionBar
             count={selectedCount}
             rows={selectedRows}
-            columns={visibleColumns.map((c) => c.name)}
+            columns={visibleColumns}
             schema={details.schema}
             table={details.name}
             engine={engine}

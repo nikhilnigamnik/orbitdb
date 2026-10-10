@@ -8,6 +8,11 @@ const DECIMAL_TYPES = ['numeric', 'money']
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NUMERIC_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/
 
+/** Characters as a database counts them: a surrogate pair is one, not two. */
+function codePointCount(text: string): number {
+  return Array.from(text).length
+}
+
 export function isJsonType(udt: string): boolean {
   return udt === 'json' || udt === 'jsonb'
 }
@@ -109,7 +114,9 @@ export function coerceCellValue(col: ColumnInfo, raw: string, isNull: boolean): 
     }
     return trimmed.toLowerCase()
   }
-  if (col.characterMaximumLength != null && raw.length > col.characterMaximumLength) {
+  // Postgres and MySQL measure varchar(n) in characters, not UTF-16 code
+  // units: three emoji fit a varchar(3), and `raw.length` said they did not.
+  if (col.characterMaximumLength != null && codePointCount(raw) > col.characterMaximumLength) {
     throw new Error(
       `Column "${col.name}": exceeds ${col.characterMaximumLength} character${col.characterMaximumLength === 1 ? '' : 's'}`
     )

@@ -1,3 +1,4 @@
+import { formatCellValue, stringifyDate } from '@renderer/lib/format'
 import type { DatabaseEngine } from '@renderer/types'
 
 /**
@@ -7,18 +8,25 @@ import type { DatabaseEngine } from '@renderer/types'
  * script wants JSON, and another database wants INSERT statements.
  */
 
-/** One cell as plain text. Null becomes empty - a spreadsheet has no NULL. */
-function cellText(value: unknown): string {
+/** Column name to the engine's type name, so a date copies as the grid shows it. */
+export type UdtNames = Record<string, string | undefined>
+
+export function udtNamesOf(columns: { name: string; udtName?: string }[]): UdtNames {
+  return Object.fromEntries(columns.map((column) => [column.name, column.udtName]))
+}
+
+/**
+ * One cell as plain text, exactly as the grid renders it. Null becomes empty -
+ * a spreadsheet has no NULL.
+ *
+ * Dates go through the grid's own formatter rather than `toISOString()`: pg
+ * hands a `date` over as local midnight and a naive `timestamp` as local time,
+ * so the UTC instant of either is a different day or hour from what the cell
+ * shows.
+ */
+function cellText(value: unknown, udtName?: string): string {
   if (value === null || value === undefined) return ''
-  if (value instanceof Date) return value.toISOString()
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value)
-    } catch {
-      return String(value)
-    }
-  }
-  return String(value)
+  return formatCellValue(value, udtName)
 }
 
 /**
@@ -26,8 +34,8 @@ function cellText(value: unknown): string {
  * quotes with its own quotes doubled. Without it, one multi-line JSON column
  * silently becomes several rows on paste.
  */
-function tsvField(value: unknown): string {
-  const text = cellText(value)
+function tsvField(value: unknown, udtName?: string): string {
+  const text = cellText(value, udtName)
   if (!/[\t\n\r"]/.test(text)) return text
   return `"${text.replace(/"/g, '""')}"`
 }
@@ -35,6 +43,8 @@ function tsvField(value: unknown): string {
 export interface TsvOptions {
   /** Prepend the column names. Off for a single cell, where a header is noise. */
   withHeader?: boolean
+  /** Column types, where known: a `date` column then copies without a time. */
+  udtNames?: UdtNames
 }
 
 export function toTsv(
@@ -44,7 +54,9 @@ export function toTsv(
 ): string {
   const lines = options.withHeader ? [columns.join('\t')] : []
   for (const row of rows) {
-    lines.push(columns.map((column) => tsvField(row[column])).join('\t'))
+    lines.push(
+      columns.map((column) => tsvField(row[column], options.udtNames?.[column])).join('\t')
+    )
   }
   return lines.join('\n')
 }
@@ -70,6 +82,22 @@ function quoteIdent(name: string, engine: DatabaseEngine): string {
 }
 
 /**
+ * A Date as the engine will read it back to the same wall-clock value the grid
+ * shows.
+ *
+ * Postgres gets the local time with its offset: it honours the offset for a
+ * timestamptz and ignores it when casting to a date or a naive timestamp, so
+ * one form is right for all three. MySQL gets the bare local time, because
+ * MySQL 8 converts an offset literal into the session zone - and the grid's
+ * value already is session time. The UTC instant that `toISOString()` gives
+ * is the wrong day for a `date` and the wrong hour for a naive timestamp.
+ */
+function sqlDateLiteral(value: Date, engine: DatabaseEngine): string {
+  if (Number.isNaN(value.getTime())) return 'NULL'
+  return `'${stringifyDate(value, engine === 'mysql' ? 'timestamp' : 'timestamptz')}'`
+}
+
+/**
  * A SQL literal. Escaping differs by engine: MySQL treats a backslash as an
  * escape character inside a string by default, so a Windows path or a regex
  * pasted into Postgres-style quoting arrives mangled.
@@ -78,14 +106,9 @@ function sqlLiteral(value: unknown, engine: DatabaseEngine): string {
   if (value === null || value === undefined) return 'NULL'
   if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'NULL'
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
+  if (value instanceof Date) return sqlDateLiteral(value, engine)
 
-  const text =
-    value instanceof Date
-      ? value.toISOString()
-      : typeof value === 'object'
-        ? JSON.stringify(value)
-        : String(value)
-
+  const text = typeof value === 'object' ? JSON.stringify(value) : String(value)
   const escaped =
     engine === 'mysql' ? text.replace(/\\/g, '\\\\').replace(/'/g, "''") : text.replace(/'/g, "''")
   return `'${escaped}'`

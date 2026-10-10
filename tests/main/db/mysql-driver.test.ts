@@ -1,3 +1,4 @@
+import { Types } from 'mysql2'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MAX_QUERY_RESULT_ROWS, type SavedConnection } from '../../../src/shared/types'
 
@@ -7,8 +8,15 @@ interface FakeConnectionHandle {
   emit: (event: string, ...args: unknown[]) => boolean
 }
 
+interface FakeField {
+  name: string
+  columnType: number
+}
+
 /** What a query on the editor session emits, in mysql2's own event order. */
-type Script = { kind: 'rows'; count: number } | { kind: 'ok'; affectedRows: number }
+type Script =
+  | { kind: 'rows'; count: number; fields?: FakeField[] }
+  | { kind: 'ok'; affectedRows: number }
 
 const state = vi.hoisted(() => ({
   poolQueries: [] as { sql: string; params: unknown[] }[],
@@ -77,7 +85,7 @@ vi.mock('mysql2/promise', () => ({
   }
 }))
 
-vi.mock('mysql2', async () => {
+vi.mock('mysql2', async (importOriginal) => {
   const { EventEmitter } = await import('node:events')
   class Connection extends EventEmitter {
     threadId = 77
@@ -95,7 +103,7 @@ vi.mock('mysql2', async () => {
           query.emit('fields', undefined)
           query.emit('result', { affectedRows: script.affectedRows })
         } else {
-          query.emit('fields', [{ name: 'id', columnType: 3 }])
+          query.emit('fields', script.fields ?? [{ name: 'id', columnType: 3 }])
           for (let id = 0; id < script.count; id += 1) query.emit('result', { id }, 0)
         }
         query.emit('end')
@@ -113,6 +121,9 @@ vi.mock('mysql2', async () => {
   return {
     createConnection: () => {
       const connection = new Connection()
+  // The real type constants, so the field mapping is checked against mysql2's
+  // own numbers rather than a copy of them.
+  const { Types } = await importOriginal<typeof import('mysql2')>()
       state.connections.push(connection)
       return connection
     }
@@ -145,10 +156,41 @@ describe('editor results', () => {
     state.script = { kind: 'rows', count: MAX_QUERY_RESULT_ROWS + 25 }
 
     const result = await driver.runQuery({ connectionId: SAVED.id, sql: 'select * from big' })
+    Types,
 
     expect(result.rows).toHaveLength(MAX_QUERY_RESULT_ROWS)
     expect(result.truncated).toBe(true)
-    expect(result.fields).toEqual([{ name: 'id', dataTypeID: 3 }])
+    // An integer has no rendering of its own, so its type id is dropped.
+    expect(result.fields).toEqual([{ name: 'id', dataTypeID: 0 }])
+  })
+
+  it('reports field types as the Postgres OIDs the renderer reads, not mysql2 numbers', async () => {
+    // mysql2's own ids collide with the OIDs: BIT is 16, the bool OID, so a
+    // bit column was drawn with a tick over its bytes.
+    expect(Types.BIT).toBe(16)
+    state.script = {
+      kind: 'rows',
+      count: 1,
+      fields: [
+        { name: 'flags', columnType: Types.BIT },
+        { name: 'born', columnType: Types.DATE },
+        { name: 'seen', columnType: Types.DATETIME },
+        { name: 'at', columnType: Types.TIMESTAMP },
+        { name: 'doc', columnType: Types.JSON },
+        { name: 'n', columnType: Types.LONG }
+      ]
+    }
+
+    const result = await driver.runQuery({ connectionId: SAVED.id, sql: 'select * from t' })
+
+    expect(result.fields).toEqual([
+      { name: 'flags', dataTypeID: 0 },
+      { name: 'born', dataTypeID: 1082 },
+      { name: 'seen', dataTypeID: 1114 },
+      { name: 'at', dataTypeID: 1114 },
+      { name: 'doc', dataTypeID: 114 },
+      { name: 'n', dataTypeID: 0 }
+    ])
   })
 
   it('reports a result exactly at the cap as complete', async () => {

@@ -9,7 +9,13 @@ import {
   type CellRange,
   type CursorMove
 } from '../lib/grid-cursor'
-import { toInsertSql, toJsonText, toTsv, type InsertTarget } from '../lib/clipboard-format'
+import {
+  toInsertSql,
+  toJsonText,
+  toTsv,
+  type InsertTarget,
+  type UdtNames
+} from '../lib/clipboard-format'
 
 type Row = Record<string, unknown>
 
@@ -25,6 +31,8 @@ interface UseGridCursorOptions {
   isEditing: boolean
   /** Identifies the table for `copy as INSERT`. */
   insertTarget: InsertTarget
+  /** Column types, so a copied date reads as the cell does. */
+  udtNames?: UdtNames
   onCopied?: (format: CopyFormat, cellCount: number) => void
   onCopyFailed?: (error: unknown) => void
   /** Space on the cursor row. */
@@ -58,6 +66,7 @@ export function useGridCursor({
   onStartEditing,
   isEditing,
   insertTarget,
+  udtNames,
   onCopied,
   onCopyFailed,
   onToggleRow,
@@ -121,7 +130,8 @@ export function useGridCursor({
             : toTsv(selectedRows, selectedColumns, {
                 // A header above a single value is noise; above a block it is
                 // what makes the paste readable.
-                withHeader: !isSingleCell(range)
+                withHeader: !isSingleCell(range),
+                udtNames
               })
 
       try {
@@ -131,7 +141,7 @@ export function useGridCursor({
         onCopyFailed?.(err)
       }
     },
-    [range, rows, columnIds, insertTarget, onCopied, onCopyFailed]
+    [range, rows, columnIds, insertTarget, udtNames, onCopied, onCopyFailed]
   )
 
   const handleKeyDown = React.useCallback(

@@ -70,8 +70,8 @@ export function useTableRows({
   const [totalEstimate, setTotalEstimate] = React.useState<number | null>(details.estimatedRows)
   /** Exact count for the current filters, once it lands. Null while unknown. */
   const [filteredTotal, setFilteredTotal] = React.useState<number | null>(null)
-  const usesSharedCount = unfilteredTotal !== undefined && filters.length === 0
-  const totalExact = usesSharedCount ? unfilteredTotal : filteredTotal
+  const hasSharedCount = unfilteredTotal !== undefined && filters.length === 0
+  const totalExact = hasSharedCount ? unfilteredTotal : filteredTotal
   const [isLoading, setIsLoading] = React.useState(true)
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -284,7 +284,7 @@ export function useTableRows({
   // The count runs alongside the page rather than gating it: the rows appear
   // immediately and the total sharpens from estimate to exact when it arrives.
   React.useEffect(() => {
-    if (usesSharedCount) return
+    if (hasSharedCount) return
     let cancelled = false
     setFilteredTotal(null)
     void unwrap(
@@ -305,7 +305,7 @@ export function useTableRows({
     return () => {
       cancelled = true
     }
-  }, [connectionId, details.schema, details.name, filters, filterJoin, usesSharedCount])
+  }, [connectionId, details.schema, details.name, filters, filterJoin, hasSharedCount])
 
   // Signal the container once the first page lands, so it can reveal the header
   // and grid together - a single loader instead of loader-then-loader.

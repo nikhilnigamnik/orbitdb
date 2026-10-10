@@ -65,7 +65,7 @@ export function QueryPage() {
   const engine = current?.engine ?? 'postgres'
   const toast = useToast()
   const [sql, setSql] = React.useState('')
-  const completionSchema = useSqlSchema(connectionId)
+  const completionSchema = useSqlSchema(connectionId, active?.currentDatabase)
   const [result, setResult] = React.useState<QueryResult | null>(null)
   const [isRunning, setIsRunning] = React.useState(false)
   const runningQueryIdRef = React.useRef<string | null>(null)

@@ -2,6 +2,7 @@ import * as React from 'react'
 import type { SQLNamespace } from '@codemirror/lang-sql'
 import { unwrap } from '@renderer/lib/ipc'
 import type { SchemaGraph } from '@renderer/types'
+import { defaultSchema } from '@renderer/features/database/components/default-schema'
 import { buildSqlSchema } from '../lib/sql-completion'
 
 /**
@@ -10,6 +11,21 @@ import { buildSqlSchema } from '../lib/sql-completion'
  * has a lot going on.
  */
 const MAX_SCHEMAS = 5
+
+/**
+ * The schemas worth loading: the one unqualified names resolve to, then the
+ * rest in the order the engine lists them, up to the cap.
+ *
+ * The default is chosen rather than taken as the first listed: Postgres lists
+ * schemas alphabetically, so on a Supabase database `public` sat behind auth,
+ * extensions, graphql and the rest, was never loaded, and a bare `users`
+ * completed to auth.users.
+ */
+export function schemasToLoad(names: string[], currentDatabase?: string | null): string[] {
+  if (names.length === 0) return []
+  const primary = defaultSchema(names, currentDatabase)
+  return [primary, ...names.filter((name) => name !== primary)].slice(0, MAX_SCHEMAS)
+}
 
 /**
  * Tables and columns for editor completion.
@@ -22,7 +38,10 @@ const MAX_SCHEMAS = 5
  * user cannot introspect should not put an error on a page that still runs
  * queries perfectly well.
  */
-export function useSqlSchema(connectionId: string): SQLNamespace | undefined {
+export function useSqlSchema(
+  connectionId: string,
+  currentDatabase?: string | null
+): SQLNamespace | undefined {
   const [schema, setSchema] = React.useState<SQLNamespace | undefined>(undefined)
 
   React.useEffect(() => {
@@ -37,7 +56,10 @@ export function useSqlSchema(connectionId: string): SQLNamespace | undefined {
         const schemas = await unwrap(window.api.db.listSchemas(connectionId))
         if (!isCurrent || schemas.length === 0) return
 
-        const names = schemas.slice(0, MAX_SCHEMAS).map((s) => s.name)
+        const names = schemasToLoad(
+          schemas.map((s) => s.name),
+          currentDatabase
+        )
         const graphs = await Promise.all(
           names.map(async (name) => {
             try {
@@ -51,8 +73,8 @@ export function useSqlSchema(connectionId: string): SQLNamespace | undefined {
 
         const usable = graphs.filter((graph): graph is SchemaGraph => graph != null)
         if (usable.length === 0) return
-        // The first schema the engine reports is the one whose tables are
-        // written unqualified: `public` on Postgres, the database on MySQL.
+        // The first name is the schema whose tables are written unqualified:
+        // `public` on Postgres, the database on MySQL.
         setSchema(buildSqlSchema(usable, names[0]))
       } catch {
         // Completion stays off; the editor still works.
@@ -63,7 +85,7 @@ export function useSqlSchema(connectionId: string): SQLNamespace | undefined {
     return () => {
       isCurrent = false
     }
-  }, [connectionId])
+  }, [connectionId, currentDatabase])
 
   return schema
 }

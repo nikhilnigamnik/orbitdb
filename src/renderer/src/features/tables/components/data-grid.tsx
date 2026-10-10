@@ -20,7 +20,7 @@ import { useRowSelection } from '../hooks/use-row-selection'
 import { useStableCallback } from '../hooks/use-stable-callback'
 import { revealDelta, stickyWidth } from '../lib/reveal-cell'
 import { INDEX_COLUMN_WIDTH, SELECT_COLUMN_WIDTH, orderColumns } from '../lib/frozen-columns'
-import type { InsertTarget } from '../lib/clipboard-format'
+import { udtNamesOf, type InsertTarget } from '../lib/clipboard-format'
 import { isSingleCell } from '../lib/grid-cursor'
 import {
   ACTIONS_COLUMN_ID,
@@ -112,6 +112,7 @@ export function DataGrid({
   })
 
   const dataColumnIds = React.useMemo(() => columns.map((c) => c.name), [columns])
+  const udtNames = React.useMemo(() => udtNamesOf(columns), [columns])
   const canEditCells = canMutate && !!onEditCell
 
   const {
@@ -198,6 +199,7 @@ export function DataGrid({
           setEditingCell({ rowIndex, columnId: dataColumnIds[columnIndex] })
       : undefined,
     insertTarget: insertTarget ?? NO_INSERT_TARGET,
+    udtNames,
     onCopied,
     onCopyFailed,
     onToggleRow: toggleRow,
