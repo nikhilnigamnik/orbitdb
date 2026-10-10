@@ -21,6 +21,8 @@ import type { ValueSearchDialect } from './value-search'
 export interface RefCandidate {
   table: string
   column: string
+  /** Where the parent lives - a declared key may point outside the sweep's schema. */
+  referencedSchema: string
   referencedTable: string
   referencedColumn: string
   isDeclared: boolean
@@ -82,6 +84,7 @@ export function inferCandidates(tables: TableDetails[]): RefCandidate[] {
       candidates.push({
         table: table.name,
         column: fk.columns[0],
+        referencedSchema: fk.referencedSchema,
         referencedTable: fk.referencedTable,
         referencedColumn: fk.referencedColumns[0],
         isDeclared: true
@@ -111,6 +114,7 @@ export function inferCandidates(tables: TableDetails[]): RefCandidate[] {
         candidates.push({
           table: table.name,
           column: column.name,
+          referencedSchema: parent.schema,
           referencedTable: parent.name,
           referencedColumn: parentPk.name,
           isDeclared: false
@@ -161,7 +165,11 @@ export function buildOrphanSql(
   candidate: RefCandidate
 ): string {
   const child = dialect.qualifiedTable(schema, candidate.table)
-  const parent = dialect.qualifiedTable(schema, candidate.referencedTable)
+  // The parent under its own schema, not the child's: `app.orders.customer_id`
+  // may point at `crm.customers`, and joining `app.customers` instead either
+  // fails or, if a table by that name exists there, reports every row as an
+  // orphan behind a constraint the database is enforcing perfectly well.
+  const parent = dialect.qualifiedTable(candidate.referencedSchema, candidate.referencedTable)
   const childCol = `c.${dialect.quoteIdent(candidate.column)}`
   const parentCol = `p.${dialect.quoteIdent(candidate.referencedColumn)}`
   return (
@@ -214,7 +222,17 @@ export async function sweepReferences(
       const row = await deps.run(buildOrphanSql(deps.dialect, schema, candidate))
       pairsChecked += 1
       const count = toBrokenCount(row)
-      if (count > 0) broken.push({ schema, ...candidate, count })
+      if (count > 0) {
+        broken.push({
+          schema,
+          table: candidate.table,
+          column: candidate.column,
+          referencedTable: candidate.referencedTable,
+          referencedColumn: candidate.referencedColumn,
+          isDeclared: candidate.isDeclared,
+          count
+        })
+      }
     } catch (err) {
       failures.push({
         table: `${candidate.table}.${candidate.column}`,

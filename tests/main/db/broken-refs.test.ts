@@ -41,10 +41,10 @@ function column(name: string, udtName = 'uuid'): ColumnInfo {
 function table(
   name: string,
   columns: ColumnInfo[],
-  options: { primaryKey?: string[]; foreignKeys?: ForeignKeyInfo[] } = {}
+  options: { schema?: string; primaryKey?: string[]; foreignKeys?: ForeignKeyInfo[] } = {}
 ): TableDetails {
   return {
-    schema: 'public',
+    schema: options.schema ?? 'public',
     name,
     type: 'table',
     columns,
@@ -56,6 +56,21 @@ function table(
 }
 
 const USERS = table('users', [column('id'), column('email', 'text')])
+
+/** `app.orders.customer_id -> crm.customers.id`: a declared key across schemas. */
+const CROSS_SCHEMA_FK: ForeignKeyInfo = {
+  name: 'orders_customer_id_fkey',
+  columns: ['customer_id'],
+  referencedSchema: 'crm',
+  referencedTable: 'customers',
+  referencedColumns: ['id'],
+  onDelete: 'NO ACTION',
+  onUpdate: 'NO ACTION'
+}
+const ORDERS = table('orders', [column('id'), column('customer_id')], {
+  schema: 'app',
+  foreignKeys: [CROSS_SCHEMA_FK]
+})
 
 describe('spotting a column that looks like a reference', () => {
   it('reads author_id and authorId the same way', () => {
@@ -84,11 +99,25 @@ describe('inferring what a column points at', () => {
       {
         table: 'posts',
         column: 'user_id',
+        // Inferred by name, so the parent can only be in the schema being swept.
+        referencedSchema: 'public',
         referencedTable: 'users',
         referencedColumn: 'id',
         isDeclared: false
       }
     ])
+  })
+
+  it('keeps the schema a declared key points at, which need not be the one swept', () => {
+    const [found] = inferCandidates([ORDERS])
+
+    expect(found).toMatchObject({
+      table: 'orders',
+      column: 'customer_id',
+      referencedSchema: 'crm',
+      referencedTable: 'customers',
+      isDeclared: true
+    })
   })
 
   it('refuses to pair columns whose types disagree', () => {
@@ -175,7 +204,13 @@ describe('inferring what a column points at', () => {
 })
 
 describe('which pairs get checked', () => {
-  const declared = { table: 'a', column: 'x', referencedTable: 'u', referencedColumn: 'id' }
+  const declared = {
+    table: 'a',
+    column: 'x',
+    referencedSchema: 'public',
+    referencedTable: 'u',
+    referencedColumn: 'id'
+  }
 
   it('puts declared references first, since a broken one means it is not enforced', () => {
     const ordered = orderCandidates([
@@ -202,10 +237,31 @@ describe('the orphan query', () => {
   const candidate = {
     table: 'posts',
     column: 'user_id',
+    referencedSchema: 'public',
     referencedTable: 'users',
     referencedColumn: 'id',
     isDeclared: false
   }
+
+  it("joins the parent under its own schema, not the child's", () => {
+    // Joining "app"."customers" here was a failure for a perfectly valid
+    // constraint - or, if app had a table by that name, every row an orphan
+    // chipped "Not enforced".
+    const crossSchema = {
+      table: 'orders',
+      column: 'customer_id',
+      referencedSchema: 'crm',
+      referencedTable: 'customers',
+      referencedColumn: 'id',
+      isDeclared: true
+    }
+
+    expect(buildOrphanSql(pg, 'app', crossSchema)).toBe(
+      'select count(*) as broken from "app"."orders" c ' +
+        'left join "crm"."customers" p on p."id" = c."customer_id" ' +
+        'where c."customer_id" is not null and p."id" is null'
+    )
+  })
 
   it('asks the question the way it is meant', () => {
     expect(buildOrphanSql(pg, 'public', candidate)).toBe(
@@ -261,6 +317,29 @@ describe('the sweep', () => {
       }
     ])
     expect(result.pairsChecked).toBe(1)
+  })
+
+  it('checks a declared cross-schema key against the schema it names', async () => {
+    const run = vi.fn(async () => ({ broken: 2 }))
+    const result = await sweepReferences('app', {
+      dialect: pg,
+      loadTables: async () => [ORDERS],
+      run,
+      isCancelled: () => false
+    })
+
+    expect(run).toHaveBeenCalledWith(expect.stringContaining('left join "crm"."customers" p'))
+    expect(result.broken).toEqual([
+      {
+        schema: 'app',
+        table: 'orders',
+        column: 'customer_id',
+        referencedTable: 'customers',
+        referencedColumn: 'id',
+        isDeclared: true,
+        count: 2
+      }
+    ])
   })
 
   it('says nothing is broken when nothing is', async () => {

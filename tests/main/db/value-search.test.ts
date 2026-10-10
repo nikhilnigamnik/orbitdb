@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildTableSearchSql,
+  escapeLikeTerm,
   isSearchableColumn,
   orderTablesForSearch,
   sweepTables,
@@ -86,6 +87,39 @@ describe('which columns are worth searching', () => {
     const at = column({ name: 'created_at', dataType: 'timestamptz', udtName: 'timestamptz' })
     expect(isSearchableColumn(at, 'contains', '2026')).toBe(false)
   })
+
+  it("takes MySQL's longer text types, which arrive under their own names", () => {
+    // Introspection reports `longtext` as both dataType and udtName. It is
+    // neither `text` nor numeric, so every such column used to be skipped.
+    const body = column({ name: 'body', dataType: 'longtext', udtName: 'longtext' })
+    expect(isSearchableColumn(body, 'contains', 'a')).toBe(true)
+
+    const note = column({ name: 'note', dataType: 'tinytext', udtName: 'tinytext' })
+    expect(isSearchableColumn(note, 'contains', 'a')).toBe(true)
+  })
+
+  it('takes a MySQL set, whose label list is dropped before the type is read', () => {
+    const tags = column({ name: 'tags', dataType: "set('a','b')", udtName: 'set' })
+    expect(isSearchableColumn(tags, 'contains', 'a')).toBe(true)
+  })
+})
+
+describe('escaping a contains term', () => {
+  it('escapes the three characters LIKE reads specially, and nothing else', () => {
+    expect(escapeLikeTerm('order_1')).toBe('order!_1')
+    expect(escapeLikeTerm('100%')).toBe('100!%')
+    expect(escapeLikeTerm('plain')).toBe('plain')
+  })
+
+  it('doubles the escape character itself, so a literal ! still matches', () => {
+    expect(escapeLikeTerm('hi!')).toBe('hi!!')
+  })
+
+  it('leaves a backslash alone, since ! is the escape and not \\', () => {
+    // A backslash inside a MySQL literal is its own escape, which is why it
+    // was not chosen; bound as a parameter it is just a character.
+    expect(escapeLikeTerm('a\\b')).toBe('a\\b')
+  })
 })
 
 describe('the per-table query', () => {
@@ -128,6 +162,36 @@ describe('the per-table query', () => {
 
     expect(built?.sql).toContain('lower("id"::text) like $1')
     expect(built?.params).toEqual(['%abc%', '%abc%'])
+  })
+
+  it('makes a wildcard in the term literal, so order_1 cannot match orderX1', () => {
+    const built = buildTableSearchSql(pg, 'public', 'users', columns, 'contains', 'order_1')
+
+    expect(built?.params).toEqual(['%order!_1%', '%order!_1%'])
+    expect(built?.sql).toContain(`lower("id"::text) like $1 escape '!'`)
+    expect(built?.sql).toContain(`lower("email"::text) like $2 escape '!'`)
+  })
+
+  it('treats a lone % or _ as a character rather than as every row', () => {
+    const percent = buildTableSearchSql(pg, 'public', 'users', columns, 'contains', '%')
+    const underscore = buildTableSearchSql(pg, 'public', 'users', columns, 'contains', '_')
+
+    expect(percent?.params[0]).toBe('%!%%')
+    expect(underscore?.params[0]).toBe('%!_%')
+  })
+
+  it('names the escape on a positional dialect too, with one binding per column', () => {
+    const built = buildTableSearchSql(mysql, 'app', 'users', columns, 'contains', 'a_b')
+
+    expect(built?.sql).toContain(`lower(cast(\`id\` as char)) like ? escape '!'`)
+    expect(built?.params).toEqual(['%a!_b%', '%a!_b%'])
+  })
+
+  it('leaves an exact search alone - equality has no wildcards to escape', () => {
+    const built = buildTableSearchSql(pg, 'public', 'users', columns, 'exact', 'order_1')
+
+    expect(built?.params).toEqual(['order_1', 'order_1'])
+    expect(built?.sql).not.toContain('escape')
   })
 
   it('uses each engine’s own cast, since MySQL has no text target', () => {

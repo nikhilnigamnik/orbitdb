@@ -181,15 +181,22 @@ export function toForeignKeys(rows: ForeignKeyRow[]): ForeignKeyInfo[] {
   })
 }
 
-/** Tables and views, minus SQLite's and Cloudflare's internal bookkeeping. */
+/**
+ * SQLite's and Cloudflare's internal bookkeeping, left out of every table list.
+ * `_` is LIKE's single-character wildcard, so an unescaped `'_cf_%'` also hid
+ * user tables such as `pcf_rules` and `scfg`; SQLite has no default escape
+ * character, so one is named.
+ */
+const INTERNAL_TABLE_FILTER = `name not like 'sqlite!_%' escape '!'
+    and name not like '!_cf!_%' escape '!'`
+
+/** Tables and views, minus the internal bookkeeping. */
 export const LIST_TABLES_SQL = `select name, type from sqlite_master
   where type in ('table', 'view')
-    and name not like 'sqlite_%'
-    and name not like '_cf_%'
+    and ${INTERNAL_TABLE_FILTER}
   order by name`
 
 export const LIST_BASE_TABLES_SQL = `select name from sqlite_master
   where type = 'table'
-    and name not like 'sqlite_%'
-    and name not like '_cf_%'
+    and ${INTERNAL_TABLE_FILTER}
   order by name`
